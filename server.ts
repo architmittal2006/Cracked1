@@ -88,7 +88,7 @@ app.post('/api/auth/github/callback', async (req: Request, res: Response) => {
       }),
     });
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = await tokenResponse.json() as { error?: string; error_description?: string; access_token?: string };
 
     if (tokenData.error) {
       res.status(400).json({ success: false, error: tokenData.error_description || 'OAuth failed' });
@@ -102,7 +102,7 @@ app.post('/api/auth/github/callback', async (req: Request, res: Response) => {
       },
     });
 
-    const userData = await userResponse.json();
+    const userData = await userResponse.json() as { id: number; login: string; name?: string; email?: string };
 
     // Store user in session
     req.session.user = {
@@ -148,7 +148,7 @@ app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
       }),
     });
 
-    const tokenData = await tokenResponse.json();
+    const tokenData = await tokenResponse.json() as { error?: string; error_description?: string; access_token?: string };
 
     if (tokenData.error) {
       res.status(400).json({ success: false, error: tokenData.error_description || 'OAuth failed' });
@@ -162,7 +162,7 @@ app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
       },
     });
 
-    const userData = await userResponse.json();
+    const userData = await userResponse.json() as { id: string; name: string; email: string };
 
     // Store user in session
     req.session.user = {
