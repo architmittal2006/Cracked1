@@ -2,10 +2,10 @@
   "name": "peer-platform",
   "version": "1.0.0",
   "description": "",
-  "main": "index.js",
+  "main": "dist/server.js",
   "scripts": {
     "build": "tsc",
-    "start": "node server.js",
+    "start": "node dist/server.js",
     "dev": "node --loader ts-node/esm server.ts",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
