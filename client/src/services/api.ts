@@ -1,9 +1,9 @@
 // ═══════════════════════════════════════════════════
 // CRACKED? — API SERVICE LAYER
-// Connects frontend to backend on port 8080
+// Connects frontend to backend
 // ═══════════════════════════════════════════════════
 
-const API_BASE = 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 
 export interface ApiError {
   success: false;

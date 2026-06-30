@@ -9,3 +9,12 @@ services:
         value: production
       - key: PORT
         value: 10000
+
+  - type: web
+    name: cracked-frontend
+    env: static
+    buildCommand: cd client && npm install && npm run build
+    publishPath: client/dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://cracked-backend.onrender.com
