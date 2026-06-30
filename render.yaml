@@ -2,10 +2,12 @@ services:
   - type: web
     name: cracked
     env: node
-    buildCommand: npm install && cd client && npm install && npm run build && cd .. && npm run build
+    buildCommand: npm install --legacy-peer-deps && cd client && npm install --legacy-peer-deps && npm run build && cd .. && npm run build
     startCommand: npm start
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: NPM_CONFIG_PRODUCTION
+        value: "false"
