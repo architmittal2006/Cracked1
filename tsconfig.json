@@ -5,8 +5,7 @@
     "outDir": "./dist",
     "rootDir": "./",
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "moduleResolution": "node"
+    "skipLibCheck": true
   },
   "include": ["*.ts"],
   "exclude": ["node_modules", "dist", "client"]
