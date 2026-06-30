@@ -1,0 +1,220 @@
+
+<h2 class="sr-only">CaseForge implementation roadmap — 10 phases from foundation to marketplace, click each phase to see pages, API endpoints, database changes, features, and components</h2>
+
+<style>
+.rm-layout{display:grid;grid-template-columns:188px 1fr;gap:14px;margin-bottom:20px}
+.rm-left{display:flex;flex-direction:column;gap:2px;position:sticky;top:16px;align-self:flex-start}
+.rm-btn{display:grid;grid-template-columns:10px 1fr;gap:8px;align-items:center;padding:8px 10px;border:none;border-radius:var(--border-radius-md);background:none;cursor:pointer;text-align:left;width:100%}
+.rm-btn.on{background:var(--color-background-secondary)}
+.rm-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.rm-card{background:var(--color-background-primary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-lg);padding:1rem 1.25rem;margin-bottom:10px}
+.rm-lbl{font-size:11px;color:var(--color-text-secondary);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:10px}
+.rm-g2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.rm-row{display:flex;gap:7px;align-items:flex-start;margin-bottom:7px}
+.rm-accent{height:3px;margin:-1rem -1.25rem 1rem;border-radius:var(--border-radius-lg) var(--border-radius-lg) 0 0}
+.rm-stack{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+</style>
+
+<div style="padding:4px 0 24px">
+  <div style="margin-bottom:18px">
+    <div style="font-size:11px;letter-spacing:1.5px;color:var(--color-text-secondary);text-transform:uppercase;margin-bottom:4px">CaseForge</div>
+    <div style="font-size:22px;font-weight:500;color:var(--color-text-primary);margin-bottom:4px">Implementation roadmap</div>
+    <div style="font-size:13px;color:var(--color-text-secondary)">10 phases · 16 weeks to full MVP · marketplace at month 6+</div>
+  </div>
+
+  <div class="rm-layout">
+    <nav class="rm-left" id="nav" aria-label="Phase selector"></nav>
+    <div id="det"></div>
+  </div>
+
+  <div style="margin-top:4px">
+    <div class="rm-lbl"><i class="ti ti-stack" style="font-size:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"></i>Tech stack</div>
+    <div class="rm-stack" id="stk"></div>
+  </div>
+</div>
+
+<script>
+const P=[
+  {id:0,lbl:"Phase 0",title:"Foundation",time:"Weeks 1–2",dot:"#888780",bg:"#F1EFE8",brd:"#5F5E5A",txt:"#2C2C2A",status:"start",
+  goal:"Project scaffolding, design system, and auth. Nothing user-facing yet except login.",
+  pages:[{p:"/",n:"Static landing page skeleton"},{p:"/login",n:"Supabase Auth — email OTP or Google OAuth"},{p:"/register",n:"Username, name, email"}],
+  api:["No custom API routes yet","Supabase Auth handles /auth/callback automatically"],
+  db:["users — id, name, email, username, solve_score (0), review_score (0), credibility_score (computed), merge_bonus_count (0), status ('Active'), avatar_url, created_at","Enable Row Level Security on all tables from day 1 — never disable it","Trigger: after users insert → create default profile row"],
+  features:["Design token setup — CSS variables for all colors, spacing, radius","Supabase client config + TypeScript type generation (supabase gen types typescript)","Auth middleware: redirect unauthenticated users from protected routes","Layout shell: sticky navbar + page wrapper + user tier badge","Error boundary + 404 page"],
+  components:["Navbar","Avatar","TierBadge","ScoreRing","DiffBadge","StatusPill","PageWrapper"],
+  ai:null,dep:"—",note:"Lock your stack here. Next.js + Supabase removes the need for a separate backend for all of phases 1–7. Changing later is expensive."},
+
+  {id:1,lbl:"Phase 1",title:"Case browsing",time:"Weeks 3–4",dot:"#639922",bg:"#EAF3DE",brd:"#3B6D11",txt:"#173404",status:"planned",
+  goal:"Users can browse, filter, and read case briefs. No submission, no review, no score yet.",
+  pages:[{p:"/cases",n:"Case grid — search + type, difficulty, sector filters"},{p:"/cases/[id]",n:"Case detail — read-only. Brief, deliverables, submission count, points"},{p:"/cases/type/[type]",n:"Type-filtered view per problem category — SEO value"}],
+  api:["GET /api/cases — list with filters (type, difficulty, sector, is_chaos)","GET /api/cases/[id] — full case detail with deliverables array"],
+  db:["cases — id, title, type (enum: 7 types), sector, difficulty (enum), company_label, is_chaos, timer_deadline, description, deliverables (jsonb), pts, created_at","case_tags — case_id + tag for secondary labels (B2C, SaaS, Regulated, India-specific, etc.)","Seed 8–10 cases manually before launch — at least 4 different problem types"],
+  features:["7 primary types: Market Sizing, Profitability, Market Entry, Operational, Pricing, M&A, Growth & Retention","Secondary tags: B2C, B2B, SaaS, D2C, India-specific, Regulated, Crisis, Greenfield, Data-heavy","Case card: title, type, difficulty, sector, gate indicator (greyed — not yet earned), points","Chaos Case banner when any active case has a live timer","Chaos case cards have a red top-border accent to distinguish them visually"],
+  components:["CaseCard","CaseGrid","CaseFilterBar","ChaosBanner","DeliverablesList","ProblemTypeBadge","TagRow"],
+  ai:null,dep:"Phase 0 complete",note:"Seed cases manually. Don't build company case-posting yet. Once you have 200+ users you'll understand what companies actually want to post."},
+
+  {id:2,lbl:"Phase 2",title:"Submission system",time:"Weeks 5–6",dot:"#378ADD",bg:"#E6F1FB",brd:"#185FA5",txt:"#042C53",status:"planned",
+  goal:"Users can write and save structured submissions per problem type. Gate enforcement wired in Phase 3.",
+  pages:[{p:"/cases/[id]/submit",n:"Typed template editor — mandatory sections per problem type, not a free text box"},{p:"/dashboard",n:"User dashboard: active submissions, review queue, score snapshot"}],
+  api:["POST /api/submissions — create a draft submission","PUT /api/submissions/[id] — autosave draft content every 60s","POST /api/submissions/[id]/submit — trigger structural validation then enter review queue","GET /api/submissions/[id] — fetch existing draft"],
+  db:["submissions — id, user_id, case_id, status (Draft|Pending_Review|In_Dispute|Completed|Merged), content (jsonb keyed by section), image_url, solve_score, created_at, updated_at","Unique constraint: one submission per user per case"],
+  features:["7 typed templates — each problem type has its own mandatory sections with per-field character limits","Market Sizing: approach dropdown, key assumptions (250w), calculation steps, final estimate + range, sanity check (150w)","Profitability: problem framing (300w), framework rationale (200w), revenue branch, cost branch, root cause (200w), 3 recommendations structured, first 90-day step (150w)","Autosave every 60 seconds — 'last saved Xm ago' shown live","1 image upload per submission — Supabase Storage, PNG/JPG max 2MB","Mandatory section enforcement — cannot submit with any blank section (client + server validation)"],
+  components:["SubmissionEditor","SectionField","WordCounter","ImageUploader","GateBlocker","DraftSaver","SubmitButton"],
+  ai:"Structural validation on submit: completeness check + numeric sanity (Market Sizing estimates in plausible range?). Returns pass/fail with specific flags before entering review queue.",
+  dep:"Phase 1 complete",note:"Build Market Sizing and Profitability templates first — they share 70% of the same structure. The other 5 types follow the same pattern."},
+
+  {id:3,lbl:"Phase 3",title:"Peer review gate",time:"Weeks 7–8",dot:"#7F77DD",bg:"#EEEDFE",brd:"#534AB7",txt:"#26215C",status:"planned",
+  goal:"Enforce the Proof-of-Review gate: 2 reviews on case X required before submission to case X unlocks.",
+  pages:[{p:"/cases/[id]/review",n:"Review interface — anonymized peer submission, rubric scoring, written feedback"},{p:"/reviews/[id]",n:"Review detail — author can view their score breakdown per rubric dimension"}],
+  api:["GET /api/cases/[id]/review-queue — fetch an unreviewed peer submission","POST /api/reviews — submit a completed review","POST /api/reviews/[id]/flag — flag a review as low-effort","GET /api/gate/[caseId] — returns {reviews_completed, can_submit} for current user"],
+  db:["reviews — id, reviewer_id, submission_id, rubric_scores (jsonb: framing, framework, data, insight, feasibility all 1–5), feedback_text, status (Submitted|Flagged|Voided), score_contribution, created_at","review_flags — id, review_id, flagged_by, confirmed_by (jsonb), resolved_at","Materialized view: user_gate — user_id + case_id → reviews_completed. Refresh on every review insert."],
+  features:["Rubric: 5 dimensions scored 1–5, weights 25/20/20/25/10% — shown to reviewer while scoring","Written feedback minimum 80 characters — error shown if violated on submit","Score divergence detection: if reviewer 3 deviates >2 points from reviewers 1+2 average → flag for Arbiter","Flag flow: author flags → 2 community members confirm → review voided + reviewer loses Review XP","Gate indicator on every case card: 2 circles (filled/empty), 'Gate cleared' or 'X/2 reviews'","Gate check is server-side via Supabase RLS — client never controls access"],
+  components:["RubricScorer","ReviewEditor","GateIndicator","FlagButton","SubmissionViewer","ReviewConfirmModal"],
+  ai:null,dep:"Phase 2 complete",note:"Build the gate with Supabase Row Level Security — a policy that checks reviews_completed before allowing submission inserts. Never trust the client on access control."},
+
+  {id:4,lbl:"Phase 4",title:"Scoring + profiles",time:"Weeks 9–10",dot:"#BA7517",bg:"#FAEEDA",brd:"#854F0B",txt:"#412402",status:"planned",
+  goal:"Live credibility scores, tier progression, public profiles, and a shareable certificate page.",
+  pages:[{p:"/profile/[username]",n:"Public profile — credibility ring, tier, submission history, merge bonus badges"},{p:"/certificate/[username]",n:"Live certificate — real-time score, QR code, verification hash. Shareable URL with og:image."}],
+  api:["GET /api/profile/[username] — public profile data","GET /api/scores/[userId] — solve_score, review_score, credibility_score, tier, progress_to_next","GET /api/certificate/[username] — certificate data + verification hash"],
+  db:["score_events — id, user_id, type (solve_awarded|review_awarded|merge_bonus|flag_penalty), delta, case_id, created_at","credibility_score = (solve_score × 0.7) + (review_score × 0.3) — Supabase computed column or trigger","Dormancy: daily cron — set status='Dormant' if no score_events in 90 days"],
+  features:["6 tiers: Analyst (0–999), Associate (1k–2.4k), Consultant (2.5k–4.9k), Sr. Consultant (5k–7.4k), Principal (7.5k–9.9k), Partner (10k+)","Tier badge auto-updates live when score crosses threshold — Supabase Realtime subscription","Merge Bonus displayed separately — always visible, distinct from regular solve score","Certificate: live score, tier, cases count, merge count, QR code, verification hash (SHA-256 of userId+score+date)","og:image meta tag on certificate page — LinkedIn share shows the actual certificate card","Dormant label: score preserved, rank grayed out after 90 days inactive"],
+  components:["ScoreRing","TierProgressBar","ProfileHeader","SubmissionHistory","CertificateCard","MergeBonusBadge"],
+  ai:null,dep:"Phase 3 complete",note:"Generate og:image dynamically using @vercel/og. Every LinkedIn share of a certificate is free organic reach — this is your most important viral loop."},
+
+  {id:5,lbl:"Phase 5",title:"Leaderboard",time:"Weeks 11–12",dot:"#D85A30",bg:"#FAECE7",brd:"#993C1D",txt:"#4A1B0C",status:"planned",
+  goal:"Global and per-type rankings — the most visible and shareable part of the platform.",
+  pages:[{p:"/leaderboard",n:"Global: all-time + monthly toggle, tier filter, name search"},{p:"/leaderboard/[type]",n:"Type-specific: top contributors per problem type — SEO and specialization signal"}],
+  api:["GET /api/leaderboard?period=all|month&tier=&type= — paginated ranked list","GET /api/leaderboard/[username]/rank — returns {rank, percentile, rank_delta}"],
+  db:["leaderboard_snapshots — daily materialized snapshot of all ranks + scores. Used for rank change tracking.","rank_deltas — computed diff from daily snapshot: +N / -N / NEW","Monthly leaderboard: filter score_events to current calendar month only"],
+  features:["Top-3 podium with tier-colored avatars and medal emojis","Full ranked table: avatar, name, tier badge, cases solved, merge bonuses, credibility score","Current user's row always pinned at bottom if not in top 20","Rank change badge vs last week: +3 (green) / -2 (red) / NEW (blue)","Tier distribution bar chart: % of community in each tier","Type-specialist sub-leaderboards — top 10 per problem type","Supabase Realtime subscription: score updates propagate to leaderboard live"],
+  components:["PodiumTop3","LeaderboardTable","RankRow","TierDistributionChart","PeriodToggle","RankDeltaBadge"],
+  ai:null,dep:"Phase 4 complete",note:"The /leaderboard/[type] pages are your SEO wedge. Each indexes separately on Google for consulting prep terms — free long-term traffic with zero ongoing cost."},
+
+  {id:6,lbl:"Phase 6",title:"Follow-ups + challenges",time:"Weeks 13–14",dot:"#1D9E75",bg:"#E1F5EE",brd:"#0F6E56",txt:"#04342C",status:"planned",
+  goal:"3-round submission flow: initial → follow-up questions → public peer challenge thread.",
+  pages:[{p:"/cases/[id]/followup",n:"Round 2: 2 follow-up questions per submission, unlocks when Round 1 score is returned"},{p:"/submissions/[id]",n:"Public submission view with peer challenge thread at bottom"}],
+  api:["GET /api/followup/[submissionId] — fetch follow-up questions + any existing responses","POST /api/followup/[submissionId] — submit Round 2 responses (within 48-hour window)","POST /api/challenges — post a public challenge to any submission","PUT /api/challenges/[id]/respond — respond to a peer challenge"],
+  db:["followup_responses — id, submission_id, question_index (0|1), response_text, score, reviewed_by, created_at","peer_challenges — id, submission_id, challenger_id, question, response, is_public, created_at","Follow-up score weight: 20% of total solve score for that case","48-hour window: followup_deadline = submission.scored_at + 48h (enforced server-side)"],
+  features:["Round 2 unlocks when Round 1 peer score is returned — push notification + email trigger","2 follow-up questions per case — written by case poster (required at case creation time)","48-hour response window with visible countdown timer","Round 3: any Verified Reviewer can post 1 public challenge to any completed submission","Challenge thread visible on public submission page and contributor profile","'X challenges responded to' tracked on profile — signals depth of engagement"],
+  components:["FollowupForm","ChallengeThread","ChallengeCard","ResponseEditor","SubmissionPublicView","CountdownTimer"],
+  ai:"AI follow-up generation: after Round 1 score, Claude reads the submission and generates 2 personalized questions targeting the weakest rubric dimensions. Supplements the static case-poster questions.",
+  dep:"Phase 5 complete",note:"This is your moat against case prep websites. Hiring managers read challenge threads to assess how contributors think under pushback. Build this before the marketplace."},
+
+  {id:7,lbl:"Phase 7",title:"AI integration",time:"Weeks 15–16",dot:"#378ADD",bg:"#E6F1FB",brd:"#185FA5",txt:"#042C53",status:"planned",
+  goal:"Three AI systems: structural validator, follow-up generator, and Chaos Case drafting engine.",
+  pages:[{p:"/admin/chaos",n:"Admin panel: AI-drafted Chaos Cases queue — review, edit, and approve before publishing"},{p:"/admin/validations",n:"Admin view: validation logs + false positive tracking"}],
+  api:["POST /api/ai/validate — structural validation on submission submit (internal call only)","POST /api/ai/followup — generate 2 follow-up questions from submission content (internal)","POST /api/ai/chaos — draft a Chaos Case from news event + company ticker (admin only)"],
+  db:["ai_validations — id, submission_id, input_hash, flags (jsonb), passed (bool), latency_ms, created_at","chaos_drafts — id, source_url, company, draft_content (jsonb), status (Draft|Approved|Live|Rejected), admin_notes, created_at","ai_followup_cache — submission_id, questions (jsonb[2]), generated_at — cache for 7 days"],
+  features:["Structural validator: completeness + numeric sanity + minimum word counts per section","Validation result shown to submitter with specific flags before review queue entry","Follow-up generator: POST {content, case_type, rubric_scores} → {questions[2]} targeting weakest dimensions","Chaos Case engine: POST {news_url, ticker} → draft case object → admin approves → publishes live","All prompts in /src/prompts/*.txt — version controlled separately from application code","Rate limiting: max 1 AI call per submission, cached responses for identical inputs"],
+  components:["ValidationReport","ChaosAdminQueue","AIFollowupPreview","ValidationBadge"],
+  ai:"claude-sonnet-4-6 for all 3 tasks. Prompts: (1) VALIDATOR — JSON output with pass/fail per section. (2) FOLLOWUP_GEN — 2 questions targeting weak rubric dimensions. (3) CHAOS_GEN — structured case object from news + earnings. AI never influences the credibility score calculation.",
+  dep:"Phase 6 complete",note:"Document in ARCHITECTURE.md that AI is never in the scoring pipeline. This protects the credibility system and must be explicit for future contributors and investors doing due diligence."},
+
+  {id:8,lbl:"Phase 8",title:"Company dashboard",time:"Month 5–6",dot:"#D4537E",bg:"#FBEAF0",brd:"#993556",txt:"#4B1528",status:"planned",
+  goal:"Verified companies can post cases, browse contributor portfolios, and issue Merge Bonuses.",
+  pages:[{p:"/company/register",n:"Onboarding form — manually verified by you before access is granted"},{p:"/company/[id]/dashboard",n:"Posted cases, submission analytics, solution browser, contributor search"},{p:"/company/[id]/post",n:"Case creation wizard — confidentiality tier, follow-up authoring, point allocation"}],
+  api:["POST /api/company/register — onboarding request (triggers your manual review)","GET /api/company/[id]/submissions — all submissions on their posted cases","POST /api/company/[id]/merge-bonus — issue a Merge Bonus to a contributor","POST /api/cases/company — create a case linked to a verified company"],
+  db:["companies — id, name, verified (bool), contact_email, industry, tier (Free|Partner), created_at","case_company_link — case_id → company_id (nullable — anonymous cases still work)","Confidentiality enum: Anonymous | Sanitized | Named"],
+  features:["Manual verification flow — company submits form, you approve via admin panel, access granted","3 confidentiality tiers: Anonymous (no attribution), Sanitized (sector only), Named (company shown on case)","Company can view all submissions on their cases — read-only portal, no editing","Merge Bonus button: company clicks a submission → +bonus on contributor's score + public merge badge","Contributor portfolio search: filter leaderboard by type, tier, for fractional hiring discovery","CSV export: all submissions for a case (for companies wanting to analyse contributor thinking offline)"],
+  components:["CompanyNav","CaseWizard","ConfidentialitySelector","SubmissionBrowser","MergeBonusButton","CompanyVerifiedBadge"],
+  ai:null,dep:"Phase 5 complete (can run parallel to Phases 6–7)",note:"Start with 1–2 companies you personally know. Do not cold-pitch until you have 300+ contributors on the leaderboard — supply-side signal is your only leverage."},
+
+  {id:9,lbl:"Phase 9",title:"Git-merge + marketplace",time:"Month 6+",dot:"#D85A30",bg:"#FAECE7",brd:"#993C1D",txt:"#4A1B0C",status:"future",
+  goal:"Collaborative fork/merge for solutions + fractional consulting marketplace with squad formation.",
+  pages:[{p:"/submissions/[id]/fork",n:"Fork a submission — creates a child with parent attribution shown publicly"},{p:"/marketplace",n:"Fractional projects: companies post, contributors apply solo or as a squad"},{p:"/marketplace/[id]",n:"Project detail — brief, budget, required types, squad size, application form"}],
+  api:["POST /api/submissions/[id]/fork — create a fork (sets parent_submission_id)","POST /api/submissions/[id]/merge — company selects merged solution + specifies contributor point split","GET /api/marketplace — list open projects with filters","POST /api/marketplace/[id]/apply — submit application (solo or squad)"],
+  db:["submission_forks — id, child_id, parent_id, is_merged, point_split (jsonb: {userId: %pct}), merged_by, created_at","marketplace_projects — id, company_id, title, scope, budget_inr, required_types (jsonb), squad_min, squad_max, deadline, status","applications — id, project_id, lead_id, squad_members (jsonb), proposal_text, status, created_at","Platform fee: 15% of project value — held in escrow until milestone delivery confirmed"],
+  features:["Fork any completed submission — child created with parent lineage visible publicly","Company selects accepted submission → specifies contributors + point split → triggers proportional score distribution","Fork tree: visual showing lineage of a merged solution and each contributor's layer","Marketplace: companies post 1–4 week fractional projects with budget, required types, squad size","Squad formation: contributors self-organize (e.g., Finance + Ops specialist pair)","Platform escrow: fee held until company confirms milestone, then auto-disbursed minus 15%"],
+  components:["ForkButton","ForkTree","MergeSelector","PointSplitVisualizer","MarketplaceGrid","ProjectCard","SquadBuilder","ApplicationForm"],
+  ai:"Squad matching suggestion: given a project's required problem types, suggest optimal contributor pairings from the leaderboard.",
+  dep:"Phase 8 complete — needs real company participation to be meaningful",note:"Do not build the marketplace until at least 2 companies have hired someone through the platform informally. The marketplace codifies something that should already be happening organically."},
+];
+
+const STACK=[
+  {icon:"ti-brand-nextjs",label:"Frontend",col:"#378ADD",bg:"#E6F1FB",brd:"#185FA5",txt:"#042C53",items:["Next.js 14 — App Router + TypeScript","Tailwind CSS + shadcn/ui","TipTap — rich text editor for submissions","Recharts — score rings + charts","@vercel/og — dynamic certificate images"]},
+  {icon:"ti-database",label:"Backend / DB",col:"#639922",bg:"#EAF3DE",brd:"#3B6D11",txt:"#173404",items:["Supabase — PostgreSQL managed","Supabase Auth — email OTP + Google OAuth","Supabase Storage — image uploads","Supabase Realtime — live leaderboard","Row Level Security on every table"]},
+  {icon:"ti-sparkles",label:"AI",col:"#BA7517",bg:"#FAEEDA",brd:"#854F0B",txt:"#412402",items:["Anthropic Claude API","Model: claude-sonnet-4-6","Validate + follow-ups + chaos cases","Prompts in /src/prompts/*.txt (versioned)","Never in the scoring pipeline"]},
+  {icon:"ti-server",label:"Infra",col:"#7F77DD",bg:"#EEEDFE",brd:"#534AB7",txt:"#26215C",items:["Vercel — frontend + API routes","GitHub — source + CI/CD via Vercel","Supabase managed — no self-hosted DB","Vercel Analytics + Supabase Dashboard"]},
+];
+
+let cur=0;
+
+function draw(){
+  const p=P[cur];
+  document.getElementById('nav').innerHTML=P.map(ph=>`
+    <button class="rm-btn${ph.id===cur?' on':''}" onclick="go(${ph.id})" style="opacity:${ph.status==='future'?.5:1}">
+      <div class="rm-dot" style="background:${ph.dot}"></div>
+      <div style="display:flex;flex-direction:column;gap:1px;min-width:0;overflow:hidden">
+        <div style="font-size:11px;color:var(--color-text-secondary)">${ph.lbl}</div>
+        <div style="font-size:12px;color:var(--color-text-primary);font-weight:${ph.id===cur?500:400};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${ph.title}</div>
+      </div>
+    </button>`).join('');
+
+  document.getElementById('det').innerHTML=`
+    <div class="rm-card">
+      <div class="rm-accent" style="background:${p.dot}"></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="background:${p.bg};color:${p.txt};border:0.5px solid ${p.brd};border-radius:20px;padding:3px 10px;font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.5px">${p.lbl}</span>
+          <span style="font-size:18px;font-weight:500;color:var(--color-text-primary)">${p.title}</span>
+        </div>
+        <span style="font-size:11px;color:var(--color-text-secondary)">${p.time}</span>
+      </div>
+      <div style="font-size:13px;color:var(--color-text-secondary);line-height:1.7;padding:10px;background:var(--color-background-secondary);border-radius:var(--border-radius-md)">${p.goal}</div>
+    </div>
+
+    <div class="rm-g2">
+      <div class="rm-card" style="margin-bottom:0">
+        <div class="rm-lbl"><i class="ti ti-file-text" style="font-size:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"></i>Pages to build</div>
+        ${p.pages.map(pg=>`<div class="rm-row"><i class="ti ti-chevron-right" style="font-size:12px;margin-top:2px;flex-shrink:0;color:var(--color-text-secondary)" aria-hidden="true"></i><div><div style="font-size:12px;font-weight:500;color:var(--color-text-primary);font-family:var(--font-mono)">${pg.p}</div><div style="font-size:11px;color:var(--color-text-secondary);margin-top:1px;line-height:1.5">${pg.n}</div></div></div>`).join('')}
+      </div>
+      <div class="rm-card" style="margin-bottom:0">
+        <div class="rm-lbl"><i class="ti ti-api" style="font-size:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"></i>API endpoints</div>
+        ${p.api.map(a=>`<div class="rm-row"><i class="ti ti-chevron-right" style="font-size:12px;margin-top:2px;flex-shrink:0;color:var(--color-text-secondary)" aria-hidden="true"></i><div style="font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono);line-height:1.6">${a}</div></div>`).join('')}
+      </div>
+    </div>
+
+    <div class="rm-card">
+      <div class="rm-lbl"><i class="ti ti-database" style="font-size:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"></i>Database changes</div>
+      ${p.db.map(d=>`<div class="rm-row"><i class="ti ti-circle-dot" style="font-size:12px;margin-top:2px;flex-shrink:0;color:var(--color-text-secondary)" aria-hidden="true"></i><div style="font-size:12px;color:var(--color-text-secondary);line-height:1.6">${d}</div></div>`).join('')}
+    </div>
+
+    <div class="rm-g2">
+      <div class="rm-card" style="margin-bottom:0">
+        <div class="rm-lbl"><i class="ti ti-list-check" style="font-size:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"></i>Key features</div>
+        ${p.features.map(f=>`<div class="rm-row"><i class="ti ti-chevron-right" style="font-size:12px;margin-top:2px;flex-shrink:0;color:var(--color-text-secondary)" aria-hidden="true"></i><div style="font-size:12px;color:var(--color-text-secondary);line-height:1.5">${f}</div></div>`).join('')}
+      </div>
+      <div class="rm-card" style="margin-bottom:0">
+        <div class="rm-lbl"><i class="ti ti-components" style="font-size:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"></i>Components to build</div>
+        <div style="display:flex;flex-wrap:wrap;gap:5px">${p.components.map(c=>`<span style="background:var(--color-background-secondary);border:0.5px solid var(--color-border-tertiary);border-radius:var(--border-radius-md);padding:3px 8px;font-size:11px;color:var(--color-text-secondary);font-family:var(--font-mono)">${c}</span>`).join('')}</div>
+      </div>
+    </div>
+
+    ${p.ai?`<div class="rm-card" style="border-left:2px solid var(--color-border-warning);border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0"><div class="rm-lbl" style="color:var(--color-text-warning)"><i class="ti ti-sparkles" style="font-size:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"></i>AI integration</div><div style="font-size:12px;color:var(--color-text-secondary);line-height:1.7">${p.ai}</div></div>`:''}
+
+    <div class="rm-g2">
+      <div class="rm-card" style="margin-bottom:0;background:var(--color-background-secondary)">
+        <div class="rm-lbl"><i class="ti ti-arrow-right" style="font-size:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"></i>Dependency</div>
+        <div style="font-size:13px;font-weight:500;color:var(--color-text-primary)">${p.dep}</div>
+      </div>
+      <div class="rm-card" style="margin-bottom:0;border-left:2px solid ${p.dot};border-radius:0 var(--border-radius-lg) var(--border-radius-lg) 0">
+        <div class="rm-lbl"><i class="ti ti-bulb" style="font-size:13px;vertical-align:-1px;margin-right:4px" aria-hidden="true"></i>Implementation note</div>
+        <div style="font-size:12px;color:var(--color-text-secondary);line-height:1.6">${p.note}</div>
+      </div>
+    </div>`;
+
+  document.getElementById('stk').innerHTML=STACK.map(s=>`
+    <div class="rm-card" style="margin-bottom:0">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px">
+        <div style="width:28px;height:28px;border-radius:var(--border-radius-md);background:${s.bg};border:0.5px solid ${s.brd};display:flex;align-items:center;justify-content:center">
+          <i class="${s.icon}" style="font-size:15px;color:${s.col}" aria-hidden="true"></i>
+        </div>
+        <div style="font-size:12px;font-weight:500;color:var(--color-text-primary)">${s.label}</div>
+      </div>
+      ${s.items.map(i=>`<div style="font-size:11px;color:var(--color-text-secondary);padding:4px 0;border-bottom:0.5px solid var(--color-border-tertiary);line-height:1.5">${i}</div>`).join('')}
+    </div>`).join('');
+}
+
+function go(id){cur=id;draw();}
+draw();
+</script>
