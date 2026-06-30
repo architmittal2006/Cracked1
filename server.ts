@@ -3,11 +3,17 @@ import type { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { DatabaseService } from './dbService.js';
 import { VerificationEngine } from './verificationEngine.js';
 
 // Load environment variables
 dotenv.config();
+
+// Get __dirname in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Extend Session type to include user
 declare module 'express-session' {
@@ -277,4 +283,20 @@ app.post('/api/submissions/:submissionId/reviews', mockAuthUser, async (req: Req
   }
 });
 
-app.listen(8080, () => console.log('Continuous Case Operations Server running on port 8080'));
+// Serve static files from client/dist in production
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'client/dist')));
+
+  // SPA fallback - serve index.html for all non-API routes
+  app.get('*', (req: Request, res: Response) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
+      res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
+    }
+  });
+}
+
+// Start server
+const PORT = process.env.PORT || 8080;
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});

@@ -3,7 +3,7 @@
 // Connects frontend to backend
 // ═══════════════════════════════════════════════════
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_API_URL || window.location.origin;
 
 export interface ApiError {
   success: false;
