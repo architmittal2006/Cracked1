@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { Reveal } from '../components/Reveal';
+import { ScrollTextCycle } from '../components/ScrollTextCycle';
 import { useMagnetic } from '../hooks/useMagnetic';
 import { PLATFORM_STATS } from '../data/mockData';
 
@@ -147,6 +148,8 @@ export const LandingPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <ScrollTextCycle />
 
       <section className="page-container intro-block">
         <Reveal variant="up">
