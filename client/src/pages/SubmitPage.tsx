@@ -4,7 +4,6 @@ import { Lock, Save } from 'lucide-react';
 import { MOCK_CASES, SUBMISSION_TEMPLATES } from '../data/mockData';
 import { GateIndicator } from '../components/GateIndicator';
 import { PageWrapper } from '../components/PageWrapper';
-import { ImageUploader } from '../components/ImageUploader';
 import { createSubmission, getGateStatus } from '../services/api';
 
 function countWords(text: string): number {
@@ -37,7 +36,6 @@ export const SubmitPage: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [imageFile, setImageFile] = useState<File | null>(null);
 
   useEffect(() => {
     if (!caseData) return;
@@ -158,13 +156,6 @@ export const SubmitPage: React.FC = () => {
               </div>
             ))}
 
-            <div className="glass-card p-6">
-              <label className="text-sm font-bold text-white mb-3 block">Supporting Image (optional)</label>
-              <ImageUploader 
-                onImageUpload={setImageFile}
-                maxSizeMB={2}
-              />
-            </div>
           </div>
 
           <div className="space-y-6">

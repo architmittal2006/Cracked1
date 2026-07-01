@@ -9,7 +9,6 @@ interface VoteButtonProps {
 
 export const VoteButton: React.FC<VoteButtonProps> = ({ upvotes, downvotes, onVote }) => {
   const [userVote, setUserVote] = useState<'up' | 'down' | null>(null);
-  const net = upvotes - downvotes;
 
   const handleVote = (direction: 'up' | 'down') => {
     if (userVote === direction) {

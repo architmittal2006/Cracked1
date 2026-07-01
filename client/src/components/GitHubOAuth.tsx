@@ -5,7 +5,7 @@ interface GitHubLoginButtonProps {
   onSuccess?: () => void;
 }
 
-export const GitHubLoginButton: React.FC<GitHubLoginButtonProps> = ({ onSuccess }) => {
+export const GitHubLoginButton: React.FC<GitHubLoginButtonProps> = () => {
   const handleGitHubLogin = async () => {
     try {
       // Get GitHub auth URL from backend

@@ -5,7 +5,7 @@ interface GoogleLoginButtonProps {
   onSuccess?: () => void;
 }
 
-export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = ({ onSuccess }) => {
+export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = () => {
   const handleGoogleLogin = async () => {
     try {
       // Get Google auth URL from backend

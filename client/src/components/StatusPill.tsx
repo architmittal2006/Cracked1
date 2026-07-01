@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type StatusType = 'Draft' | 'Pending_Review' | 'In_Dispute' | 'Completed' | 'Merged' | 'Open' | 'In_Review';
+export type StatusType = 'Draft' | 'Pending_Review' | 'In_Dispute' | 'Completed' | 'Merged' | 'Open' | 'In_Review' | 'Accepted' | 'Archived';
 
 interface StatusPillProps {
   status: StatusType;
