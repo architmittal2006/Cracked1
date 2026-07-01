@@ -1,4 +1,6 @@
 export class DatabaseService {
+    static mockReviews = [];
+    static mockSubmissions = [];
     static async getCompletedReviewCountForCase(userId, caseId) {
         return this.mockReviews.filter(r => r.reviewerId === userId && r.caseId === caseId && !r.isVoided).length;
     }
@@ -26,5 +28,3 @@ export class DatabaseService {
         }
     }
 }
-DatabaseService.mockReviews = [];
-DatabaseService.mockSubmissions = [];
