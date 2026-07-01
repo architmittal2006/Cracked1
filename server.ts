@@ -288,7 +288,7 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(path.join(__dirname, 'client/dist')));
 
   // SPA fallback - serve index.html for all non-API routes
-  app.get('*', (req: Request, res: Response) => {
+  app.get('/*', (req: Request, res: Response) => {
     if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
       res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
     }
