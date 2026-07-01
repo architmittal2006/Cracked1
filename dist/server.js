@@ -236,7 +236,7 @@ app.post('/api/submissions/:submissionId/reviews', mockAuthUser, async (req, res
 if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.join(__dirname, 'client/dist')));
     // SPA fallback - serve index.html for all non-API routes
-    app.get('*', (req, res) => {
+    app.get('/*', (req, res) => {
         if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
             res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
         }
