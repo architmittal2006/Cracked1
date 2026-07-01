@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import FileStore from 'session-file-store';
 import { DatabaseService } from './dbService.js';
 import { VerificationEngine } from './verificationEngine.js';
 
@@ -38,6 +39,10 @@ app.use(session({
   secret: process.env.SESSION_SECRET || 'change-this-secret-in-production',
   resave: false,
   saveUninitialized: false,
+  store: new (FileStore(session))({
+    path: path.join(__dirname, 'sessions'),
+    logFn: () => {} // Disable logging
+  }),
   cookie: {
     httpOnly: true, // Prevents JavaScript access to cookies
     secure: process.env.NODE_ENV === 'production', // HTTPS only in production
