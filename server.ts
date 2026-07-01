@@ -292,12 +292,13 @@ app.post('/api/submissions/:submissionId/reviews', mockAuthUser, async (req: Req
 
 // Serve static files from client/dist in production
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'client/dist')));
+  const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+  app.use(express.static(clientDistPath));
 
   // SPA fallback - serve index.html for all non-API routes
-  app.get('/*', (req: Request, res: Response) => {
+  app.get('/*splat', (req: Request, res: Response) => {
     if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
-      res.sendFile(path.join(__dirname, 'client/dist', 'index.html'));
+      res.sendFile(path.join(clientDistPath, 'index.html'));
     }
   });
 }

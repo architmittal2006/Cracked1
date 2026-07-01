@@ -13,6 +13,8 @@ import {
   Zap,
 } from 'lucide-react';
 import { AnimatedCounter } from '../components/AnimatedCounter';
+import { Reveal } from '../components/Reveal';
+import { useMagnetic } from '../hooks/useMagnetic';
 import { PLATFORM_STATS } from '../data/mockData';
 
 const tracks = [
@@ -67,6 +69,9 @@ const timeline = [
 ];
 
 export const LandingPage: React.FC = () => {
+  const magneticExplore = useMagnetic<HTMLAnchorElement>(0.25);
+  const magneticHow = useMagnetic<HTMLAnchorElement>(0.25);
+  const magneticFinal = useMagnetic<HTMLAnchorElement>(0.3);
   return (
     <div className="landing-stage">
       <section className="poster-hero">
@@ -118,55 +123,65 @@ export const LandingPage: React.FC = () => {
           </div>
 
           <div className="poster-actions">
-            <Link to="/cases" className="poster-btn poster-btn-primary">
+            <Link to="/cases" className="poster-btn poster-btn-primary btn-magnetic" {...magneticExplore}>
               Explore Cases <ArrowRight className="w-5 h-5" />
             </Link>
-            <Link to="/how-it-works" className="poster-btn poster-btn-secondary">
+            <Link to="/how-it-works" className="poster-btn poster-btn-secondary btn-magnetic" {...magneticHow}>
               <BookOpen className="w-5 h-5" /> How It Works
             </Link>
           </div>
 
           <div className="track-strip">
-            {tracks.map(({ title, meta, icon: Icon, color, bgColor, borderColor, weight }) => (
-              <div className="track-chip" key={title} style={{ background: bgColor, border: `0.5px solid ${borderColor}` }}>
-                <Icon style={{ color }} className="w-5 h-5" />
-                <div>
-                  <strong style={{ color }}>{title}</strong>
-                  <span>{meta}</span>
-                  <span style={{ color, fontWeight: 500, marginTop: 2 }}>{weight}</span>
+            {tracks.map(({ title, meta, icon: Icon, color, bgColor, borderColor, weight }, i) => (
+              <Reveal key={title} delay={i * 100} variant="up">
+                <div className="track-chip" style={{ background: bgColor, border: `0.5px solid ${borderColor}` }}>
+                  <Icon style={{ color }} className="w-5 h-5" />
+                  <div>
+                    <strong style={{ color }}>{title}</strong>
+                    <span>{meta}</span>
+                    <span style={{ color, fontWeight: 500, marginTop: 2 }}>{weight}</span>
+                  </div>
                 </div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
       <section className="page-container intro-block">
-        <div className="mega-heading">
-          <span>What is</span>
-          <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-24 w-auto" />
-        </div>
-        <p>
-          An open-source platform for consultancy and case competitions. Instead of static profiles,
-          contributors prove judgment by solving live business problems and reviewing each other
-          against a transparent five-dimension rubric.
-        </p>
+        <Reveal variant="up">
+          <div className="mega-heading">
+            <span>What is</span>
+            <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-24 w-auto" />
+          </div>
+          <p>
+            An open-source platform for consultancy and case competitions. Instead of static profiles,
+            contributors prove judgment by solving live business problems and reviewing each other
+            against a transparent five-dimension rubric.
+          </p>
+        </Reveal>
         <div className="intro-grid">
-          <div>
-            <ShieldCheck className="w-8 h-8" />
-            <h3>Proof-of-Review Gate</h3>
-            <p>Complete 2 peer reviews on a case before you can submit your own solution to it.</p>
-          </div>
-          <div>
-            <Users className="w-8 h-8" />
-            <h3>Peer Consensus</h3>
-            <p>Every submission scored across framing, framework, data, insight, and feasibility.</p>
-          </div>
-          <div>
-            <Scale className="w-8 h-8" />
-            <h3>Live Credibility</h3>
-            <p>Analyst to Partner tiers. Shareable certificates with verification hashes.</p>
-          </div>
+          <Reveal delay={0} variant="up">
+            <div>
+              <ShieldCheck className="w-8 h-8" />
+              <h3>Proof-of-Review Gate</h3>
+              <p>Complete 2 peer reviews on a case before you can submit your own solution to it.</p>
+            </div>
+          </Reveal>
+          <Reveal delay={100} variant="up">
+            <div>
+              <Users className="w-8 h-8" />
+              <h3>Peer Consensus</h3>
+              <p>Every submission scored across framing, framework, data, insight, and feasibility.</p>
+            </div>
+          </Reveal>
+          <Reveal delay={200} variant="up">
+            <div>
+              <Scale className="w-8 h-8" />
+              <h3>Live Credibility</h3>
+              <p>Analyst to Partner tiers. Shareable certificates with verification hashes.</p>
+            </div>
+          </Reveal>
         </div>
       </section>
 
@@ -177,29 +192,33 @@ export const LandingPage: React.FC = () => {
             <strong>Compete</strong>
           </div>
           <div className="timeline-grid">
-            {timeline.map((item) => (
-              <article className="timeline-panel" key={item.phase}>
-                <div className="timeline-num">{item.phase}</div>
-                <p className="timeline-date">{item.date}</p>
-                <h3>{item.title}</h3>
-                <p>{item.copy}</p>
-                <CheckCircle2 className="timeline-icon" />
-              </article>
+            {timeline.map((item, i) => (
+              <Reveal key={item.phase} delay={i * 120} variant="up">
+                <article className="timeline-panel">
+                  <div className="timeline-num">{item.phase}</div>
+                  <p className="timeline-date">{item.date}</p>
+                  <h3>{item.title}</h3>
+                  <p>{item.copy}</p>
+                  <CheckCircle2 className="timeline-icon" />
+                </article>
+              </Reveal>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="page-container final-poster">
-        <Sparkles className="w-10 h-10" />
-        <div>
-          <h2>Ready to find out if you&apos;re <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-20 w-auto inline" />?</h2>
-          <p>Start with one case. Let the review system make your work visible.</p>
-        </div>
-        <Link to="/register" className="poster-btn poster-btn-primary">
-          Get Started <ArrowRight className="w-5 h-5" />
-        </Link>
-      </section>
+      <Reveal variant="scale">
+        <section className="page-container final-poster">
+          <Sparkles className="w-10 h-10" />
+          <div>
+            <h2>Ready to find out if you&apos;re <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-20 w-auto inline" />?</h2>
+            <p>Start with one case. Let the review system make your work visible.</p>
+          </div>
+          <Link to="/register" className="poster-btn poster-btn-primary btn-magnetic" {...magneticFinal}>
+            Get Started <ArrowRight className="w-5 h-5" />
+          </Link>
+        </section>
+      </Reveal>
     </div>
   );
 };

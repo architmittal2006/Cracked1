@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { SmoothScroll } from './components/SmoothScroll';
 import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -46,6 +47,7 @@ const App: React.FC = () => {
       <AuthProvider>
         <Router>
           <ScrollToTop />
+          <SmoothScroll>
           <div className="min-h-screen text-slate-100 flex flex-col font-sans selection:bg-[#2D87FF]/30">
             <Navbar />
             <main className="flex-grow pt-16 relative z-10">
@@ -121,6 +123,7 @@ const App: React.FC = () => {
               <Footer />
             </div>
           </div>
+          </SmoothScroll>
         </Router>
       </AuthProvider>
     </ErrorBoundary>

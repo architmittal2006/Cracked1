@@ -92,6 +92,26 @@ h1, h2, h3, .font-display {
   font-weight: 700; /* Montserrat needs explicit weight */
 }
 
+/* ─── Scroll Reveal (used by <Reveal>) ─── */
+.reveal {
+  opacity: 0;
+  transition: opacity 0.8s cubic-bezier(0.16, 1, 0.3, 1), transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: opacity, transform;
+}
+.reveal-up { transform: translateY(36px); }
+.reveal-fade { transform: none; }
+.reveal-scale { transform: scale(0.94); }
+.reveal-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* ─── Magnetic Button (hero CTAs) ─── */
+.btn-magnetic {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
 /* ─── Glass Cards ─── */
 .glass-card {
   background: var(--bg-card);
