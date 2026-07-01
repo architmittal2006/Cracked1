@@ -3,7 +3,7 @@ services:
     name: cracked
     env: node
     plan: free
-    buildCommand: npm install && npm run build && cd client && npm install --legacy-peer-deps && npm run build && cd ..
+    buildCommand: npm install && cd client && npm install --legacy-peer-deps && cd ..
     startCommand: node dist/server.js
     envVars:
       - key: NODE_ENV
