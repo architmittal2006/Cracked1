@@ -51,7 +51,8 @@ const requireAuth = (req, res, next) => {
 };
 // GitHub OAuth endpoints
 app.get('/api/auth/github', (req, res) => {
-    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent('http://localhost:5174/callback/github')}&scope=user:email`;
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5174';
+    const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(`${baseUrl}/callback/github`)}&scope=user:email`;
     res.json({ authUrl: githubAuthUrl });
 });
 app.post('/api/auth/github/callback', async (req, res) => {
@@ -101,7 +102,8 @@ app.post('/api/auth/github/callback', async (req, res) => {
 });
 // Google OAuth endpoints
 app.get('/api/auth/google', (req, res) => {
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent('http://localhost:5174/callback/google')}&response_type=code&scope=openid%20email%20profile`;
+    const baseUrl = process.env.BASE_URL || 'http://localhost:5174';
+    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(`${baseUrl}/callback/google`)}&response_type=code&scope=openid%20email%20profile`;
     res.json({ authUrl: googleAuthUrl });
 });
 app.post('/api/auth/google/callback', async (req, res) => {

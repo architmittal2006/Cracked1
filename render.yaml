@@ -2,10 +2,11 @@ services:
   - type: web
     name: cracked
     env: node
-    buildCommand: cd client && npm install --legacy-peer-deps && cd .. && npm install
+    plan: free
+    buildCommand: npm install && npm run build && cd client && npm install --legacy-peer-deps && npm run build && cd ..
     startCommand: node dist/server.js
     envVars:
       - key: NODE_ENV
         value: production
-      - key: PORT
-        value: 10000
+      - key: BASE_URL
+        value: https://cracked1-1.onrender.com
