@@ -108,8 +108,6 @@ export const LandingPage: React.FC = () => {
             that hiring managers actually trust.
           </p>
 
-          <ScrollTextCycle />
-
           <div className="poster-statline" aria-label="Platform stats">
             <span>
               <AnimatedCounter target={PLATFORM_STATS.totalCasesSolved} suffix="+" /> cases solved
@@ -139,6 +137,8 @@ export const LandingPage: React.FC = () => {
           </div>
         </div>
       </section>
+
+      <ScrollTextCycle />
 
       <section className="page-container intro-block">
         <Reveal variant="up">
