@@ -2,7 +2,6 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
-  BookOpen,
   CheckCircle2,
   GitPullRequest,
   Scale,
@@ -70,8 +69,6 @@ const timeline = [
 ];
 
 export const LandingPage: React.FC = () => {
-  const magneticExplore = useMagnetic<HTMLAnchorElement>(0.25);
-  const magneticHow = useMagnetic<HTMLAnchorElement>(0.25);
   const magneticFinal = useMagnetic<HTMLAnchorElement>(0.3);
   return (
     <div className="landing-stage">
@@ -123,14 +120,6 @@ export const LandingPage: React.FC = () => {
             </span>
           </div>
 
-          <div className="poster-actions">
-            <Link to="/cases" className="poster-btn poster-btn-primary btn-magnetic" {...magneticExplore}>
-              Explore Cases <ArrowRight className="w-5 h-5" />
-            </Link>
-            <Link to="/how-it-works" className="poster-btn poster-btn-secondary btn-magnetic" {...magneticHow}>
-              <BookOpen className="w-5 h-5" /> How It Works
-            </Link>
-          </div>
 
           <div className="track-strip">
             {tracks.map(({ title, meta, icon: Icon, color, bgColor, borderColor, weight }, i) => (
