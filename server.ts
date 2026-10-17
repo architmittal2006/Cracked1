@@ -6,8 +6,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import FileStore from 'session-file-store';
-import { DatabaseService } from './dbService.ts';
-import { VerificationEngine } from './verificationEngine.ts';
+import { DatabaseService } from './dbService';
+import { VerificationEngine } from './verificationEngine';
 
 // Load environment variables
 dotenv.config();
@@ -290,18 +290,16 @@ app.post('/api/submissions/:submissionId/reviews', mockAuthUser, async (req: Req
   }
 });
 
-// Serve static files from client/dist in production
-if (process.env.NODE_ENV === 'production') {
-  const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
-  app.use(express.static(clientDistPath));
+// Serve static files from client/dist
+const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+app.use(express.static(clientDistPath));
 
-  // SPA fallback - serve index.html for all non-API routes
-  app.get('/*splat', (req: Request, res: Response) => {
-    if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
-      res.sendFile(path.join(clientDistPath, 'index.html'));
-    }
-  });
-}
+// SPA fallback - serve index.html for all non-API routes
+app.get('/*splat', (req: Request, res: Response) => {
+  if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
+    res.sendFile(path.join(clientDistPath, 'index.html'));
+  }
+});
 
 // Start server
 const PORT = process.env.PORT || 8080;
