@@ -24,7 +24,7 @@ export const Navbar: React.FC = () => {
   ];
 
   return (
-    <nav className="fixed top-0 w-full z-50 bg-[#0a0e1a]/80 backdrop-blur-nav border-b border-subtle h-16">
+    <nav className="fixed top-0 w-full z-50 bg-[#0a0e1a] border-b border-slate-800 h-16">
       <div className="page-container h-full flex items-center justify-between">
         <Link to="/" className="flex items-center gap-2 group">
           <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-11 w-auto transition-transform duration-300 group-hover:scale-105" />

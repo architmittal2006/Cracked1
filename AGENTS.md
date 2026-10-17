@@ -42,6 +42,39 @@ npm run preview      # Preview production build
 - Strong visual hierarchy
 - Consistent spacing and alignment
 
+## Critical Layout Bugs to Fix First
+
+1. **Sticky header overlap:** Header overlaps page titles/subtitles on /cases and Arena page
+   - Fix: Add proper top offset, make header solid or blurred with bottom border
+   - Ensure Sign Up and Login are vertically centered inside header
+
+2. **Card padding inconsistency:** Cards lack consistent inner padding
+   - Fix: Add consistent inner padding (p-5 to p-6) to every card
+   - No text, tag, or button may touch card border
+
+3. **Nav tab pills clipping:** Labels clip and lack clear active state
+   - Fix: Ensure pills don't clip labels, show clear active state
+
+4. **Filter chips:** Lack visible selected state, container styling, consistent spacing
+   - Fix: Add visible selected state, proper container styling, consistent spacing
+
+5. **Font inconsistency:** Multiple font families used
+   - Fix: Use one font family for whole UI (plus mono for timers/numbers only)
+   - Sign Up and Login must use same font as other buttons
+
+6. **Accent color overuse:** Too many accent colors used
+   - Fix: Limit accents to orange (brand) plus three track colors
+   - Use neutral grays for everything else
+
+7. **Empty states:** Black void instead of helpful message + CTA
+   - Fix: Add short message and CTA to all empty states
+
+8. **Timer bug:** Shows 00:00:00 instead of "Ended" or real countdown
+   - Fix: Show "Ended" or actual countdown when applicable
+
+9. **Visual QA requirement:** Need to screenshot at multiple breakpoints
+   - Add step: Screenshot every main page at 375px, 768px, 1440px before opening PR
+
 ## Current Problems Identified
 
 ### 1. Landing Page Issues
@@ -95,9 +128,19 @@ npm run preview      # Preview production build
 
 ### Color Strategy
 - **Primary accent (#FF4C25):** Use purposefully for primary actions, selected states, meaningful progress, important highlights only
-- **Supporting neutrals:** Refine surface colors, borders, text hierarchy
+- **Track-specific accents:** Give each track (Open Arena, Community Questions, Curated Cases) its own accent color
+- **Supporting neutrals:** Use neutral grays for everything else
 - **Status colors:** Keep emerald (success), rose (error), amber (warning)
 - **Avoid:** Making every component orange
+
+### Brand and Icon System
+- **Logo cleanup:** Keep "Cracked?" wordmark but ensure crack lines stay inside/touch letterforms, remove ® symbol
+- **Logo versions:** Create 3 versions - full wordmark, compact "C?" mark with single crack, favicon/app icon
+- **Logo usage:** Use compact version in nav/footer at readable size (at least 28px tall)
+- **Icon system:** Use Lucide only, 1.75 stroke width, three sizes (16, 20, 24px)
+- **Icon alignment:** Icons align with label baseline with fixed gap
+- **Icon selection:** Choose meaningful icons, give each track its own icon and accent color
+- **Starburst widget:** Remove or restyle floating yellow starburst unless required feature
 
 ### Typography Scale
 - **Display headings:** Hero and section titles

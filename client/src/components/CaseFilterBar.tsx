@@ -43,7 +43,11 @@ export const CaseFilterBar: React.FC<CaseFilterBarProps> = ({
       <button
         type="button"
         onClick={() => onTypeChange('All')}
-        className={`btn-ghost text-xs ${typeFilter === 'All' ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+        className={`px-3 py-1.5 text-xs rounded-md border transition-all duration-200 ${
+          typeFilter === 'All'
+            ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
+        }`}
       >
         All Types
       </button>
@@ -52,7 +56,11 @@ export const CaseFilterBar: React.FC<CaseFilterBarProps> = ({
           key={type}
           type="button"
           onClick={() => onTypeChange(type)}
-          className={`btn-ghost text-xs ${typeFilter === type ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+          className={`px-3 py-1.5 text-xs rounded-md border transition-all duration-200 ${
+            typeFilter === type
+              ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+              : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
+          }`}
         >
           {type}
         </button>
@@ -66,7 +74,11 @@ export const CaseFilterBar: React.FC<CaseFilterBarProps> = ({
           key={diff}
           type="button"
           onClick={() => onDifficultyChange(diff)}
-          className={`btn-ghost text-xs ${difficultyFilter === diff ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+          className={`px-3 py-1.5 text-xs rounded-md border transition-all duration-200 ${
+            difficultyFilter === diff
+              ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+              : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
+          }`}
         >
           {diff === 'All' ? 'All' : diff}
         </button>

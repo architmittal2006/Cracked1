@@ -6,8 +6,7 @@
 
 @theme {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-serif: 'Playfair Display', serif;
-  --font-display: 'Inter', sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
 }
 
 :root {
@@ -17,10 +16,15 @@
   --bg-card: rgba(15, 23, 42, 0.5);
   --bg-card-hover: rgba(30, 41, 59, 0.7);
 
-  /* Accents - Brand Orange/Red */
+  /* Brand Accent - Orange */
   --accent-primary: #FF4C25;
   --accent-secondary: #FF6B4A;
   --accent-tertiary: #FF8569;
+
+  /* Track-Specific Accents */
+  --track-arena: #10B981; /* Emerald for Open Arena */
+  --track-questions: #8B5CF6; /* Violet for Community Questions */
+  --track-cases: #F59E0B; /* Amber for Curated Cases */
 
   /* Status Colors */
   --success: #10B981;
@@ -33,9 +37,9 @@
   --text-muted: #94A3B8;
 
   /* Borders */
-  --border-subtle: rgba(255, 76, 37, 0.1);
-  --border-medium: rgba(255, 76, 37, 0.2);
-  --border-strong: rgba(255, 76, 37, 0.3);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --border-medium: rgba(255, 255, 255, 0.15);
+  --border-strong: rgba(255, 255, 255, 0.2);
 
   /* Shadows */
   --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
@@ -62,7 +66,7 @@ html {
 }
 
 body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-family: var(--font-sans);
   background-color: var(--bg-deep);
   background-image:
     radial-gradient(circle at 50% 0%, rgba(255, 76, 37, 0.06) 0%, transparent 40%),
@@ -89,9 +93,13 @@ body {
 
 /* ─── Typography overrides ─── */
 h1, h2, h3, .font-display {
-  font-family: 'Montserrat', sans-serif;
+  font-family: var(--font-sans);
   letter-spacing: 0.01em;
-  font-weight: 700; /* Montserrat needs explicit weight */
+  font-weight: 700;
+}
+
+.font-mono {
+  font-family: var(--font-mono);
 }
 
 /* ─── Scroll Reveal (used by <Reveal>) ─── */
@@ -123,6 +131,7 @@ h1, h2, h3, .font-display {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-card);
   transition: all var(--transition-base);
+  padding: 1.5rem;
 }
 
 .glass-card:hover {

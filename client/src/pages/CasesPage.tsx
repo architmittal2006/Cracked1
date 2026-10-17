@@ -67,7 +67,8 @@ export const CasesPage: React.FC = () => {
             <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-900 mb-4">
               <span className="text-3xl">🔍</span>
             </div>
-            <p className="text-slate-400 mb-2">No cases match your filters.</p>
+            <h3 className="text-xl font-bold text-white mb-2">No cases found</h3>
+            <p className="text-slate-400 mb-6">Try adjusting your filters or search terms</p>
             <button
               type="button"
               onClick={() => {
@@ -76,7 +77,7 @@ export const CasesPage: React.FC = () => {
                 setDifficultyFilter('All');
                 setSectorFilter('All');
               }}
-              className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+              className="btn-primary"
             >
               Clear all filters
             </button>

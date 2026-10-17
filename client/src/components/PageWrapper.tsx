@@ -7,7 +7,7 @@ interface PageWrapperProps {
 
 export const PageWrapper: React.FC<PageWrapperProps> = ({ children, className = '' }) => {
   return (
-    <div className={`page-container py-12 animate-fade-in ${className}`}>
+    <div className={`page-container pt-20 pb-12 animate-fade-in ${className}`}>
       {children}
     </div>
   );
