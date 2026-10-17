@@ -291,9 +291,8 @@ app.post('/api/submissions/:submissionId/reviews', mockAuthUser, async (req: Req
 });
 
 // Serve static files from client/dist
-const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+const clientDistPath = path.join(path.dirname(fileURLToPath(import.meta.url)), 'client', 'dist');
 console.log('Serving static files from:', clientDistPath);
-console.log('__dirname:', __dirname);
 console.log('File exists:', require('fs').existsSync(clientDistPath));
 app.use(express.static(clientDistPath));
 
