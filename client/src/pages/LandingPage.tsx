@@ -80,61 +80,89 @@ export const LandingPage: React.FC = () => {
           <span className="poly poly-4" />
           <span className="scanline scanline-1" />
           <span className="scanline scanline-2" />
+          <div className="glow-orb glow-orb-1" />
+          <div className="glow-orb glow-orb-2" />
         </div>
 
         <div className="page-container poster-content">
-          <div className="presented-strip">
-            <span>Open source</span>
-            <span>Case competitions</span>
-          </div>
-
-          <div className="poster-mark" aria-hidden="true">
-            <div className="mark-ring">
-              <span className="text-3xl md:text-5xl font-black">?</span>
+          <Reveal variant="fade" delay={0}>
+            <div className="presented-strip">
+              <span>Open source</span>
+              <span>Case competitions</span>
             </div>
-            <div className="mark-copy">
-              <span>are you</span>
-              <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-24 w-auto" />
+          </Reveal>
+
+          <Reveal variant="up" delay={100}>
+            <div className="poster-mark" aria-hidden="true">
+              <div className="mark-ring">
+                <span className="text-3xl md:text-5xl font-black">?</span>
+              </div>
+              <div className="mark-copy">
+                <span>are you</span>
+                <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-24 w-auto" />
+              </div>
             </div>
-          </div>
+          </Reveal>
 
-          <h1 className="poster-title">
-            <span>Peer-Reviewed</span>
-            <strong>Consulting Arena</strong>
-          </h1>
+          <Reveal variant="up" delay={200}>
+            <h1 className="poster-title">
+              <span>Peer-Reviewed</span>
+              <strong>Consulting Arena</strong>
+            </h1>
+          </Reveal>
 
-          <p className="poster-kicker">
-            Solve real business cases. Get scored by peers. Build proof-of-work credibility
-            that hiring managers actually trust.
-          </p>
+          <Reveal variant="up" delay={300}>
+            <p className="poster-kicker">
+              Solve real business cases. Get scored by peers. Build proof-of-work credibility
+              that hiring managers actually trust.
+            </p>
+          </Reveal>
 
-          <div className="poster-statline" aria-label="Platform stats">
-            <span>
-              <AnimatedCounter target={PLATFORM_STATS.totalCasesSolved} suffix="+" /> cases solved
-            </span>
-            <span>
-              <AnimatedCounter target={PLATFORM_STATS.activeConsultants} suffix="+" /> contributors
-            </span>
-            <span>
-              <AnimatedCounter target={PLATFORM_STATS.mergeBonusesAwarded} suffix="" /> merge bonuses
-            </span>
-          </div>
+          <Reveal variant="up" delay={400}>
+            <div className="poster-statline" aria-label="Platform stats">
+              <span>
+                <AnimatedCounter target={PLATFORM_STATS.totalCasesSolved} suffix="+" /> cases solved
+              </span>
+              <span>
+                <AnimatedCounter target={PLATFORM_STATS.activeConsultants} suffix="+" /> contributors
+              </span>
+              <span>
+                <AnimatedCounter target={PLATFORM_STATS.mergeBonusesAwarded} suffix="" /> merge bonuses
+              </span>
+            </div>
+          </Reveal>
 
+          <Reveal variant="up" delay={500}>
+            <div className="poster-actions">
+              <Link to="/register" className="poster-btn poster-btn-primary btn-magnetic group" {...magneticFinal}>
+                Get Started
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+              </Link>
+              <Link to="/how-it-works" className="poster-btn poster-btn-secondary group">
+                How It Works
+                <ArrowRight className="w-5 h-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
+              </Link>
+            </div>
+          </Reveal>
 
-          <div className="track-strip">
-            {tracks.map(({ title, meta, icon: Icon, color, bgColor, borderColor, weight }, i) => (
-              <Reveal key={title} delay={i * 100} variant="up">
-                <div className="track-chip" style={{ background: bgColor, border: `0.5px solid ${borderColor}` }}>
-                  <Icon style={{ color }} className="w-5 h-5" />
+          <Reveal variant="up" delay={600}>
+            <div className="track-strip">
+              {tracks.map(({ title, meta, icon: Icon, color, bgColor, borderColor, weight }) => (
+                <div
+                  key={title}
+                  className="track-chip group"
+                  style={{ background: bgColor, border: `0.5px solid ${borderColor}` }}
+                >
+                  <Icon style={{ color }} className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
                   <div>
                     <strong style={{ color }}>{title}</strong>
                     <span>{meta}</span>
                     <span style={{ color, fontWeight: 500, marginTop: 2 }}>{weight}</span>
                   </div>
                 </div>
-              </Reveal>
-            ))}
-          </div>
+              ))}
+            </div>
+          </Reveal>
         </div>
       </section>
 
@@ -201,13 +229,14 @@ export const LandingPage: React.FC = () => {
 
       <Reveal variant="scale">
         <section className="page-container final-poster">
-          <Sparkles className="w-10 h-10" />
+          <Sparkles className="w-10 h-10 text-emerald-400 animate-pulse" />
           <div>
             <h2>Ready to find out if you&apos;re <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-20 w-auto inline" />?</h2>
             <p>Start with one case. Let the review system make your work visible.</p>
           </div>
-          <Link to="/register" className="poster-btn poster-btn-primary btn-magnetic" {...magneticFinal}>
-            Get Started <ArrowRight className="w-5 h-5" />
+          <Link to="/register" className="poster-btn poster-btn-primary btn-magnetic group" {...magneticFinal}>
+            Get Started
+            <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
           </Link>
         </section>
       </Reveal>

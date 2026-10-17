@@ -25,7 +25,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
   const gridLayout = caseData.isFeatured ? 'md:grid md:grid-cols-3 md:gap-8' : 'flex flex-col';
 
   return (
-    <div className={`glass-card glass-card-hover p-6 ${featuredClass} ${chaosBorder} ${gridLayout} h-full`}>
+    <div className={`glass-card glass-card-hover p-6 ${featuredClass} ${chaosBorder} ${gridLayout} h-full group`}>
       <div className={caseData.isFeatured ? 'md:col-span-2 flex flex-col justify-between' : 'flex flex-col justify-between h-full'}>
         <div>
           <div className="flex justify-between items-start mb-4 gap-2 flex-wrap">
@@ -36,12 +36,12 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
           </div>
 
           {caseData.is_chaos && (
-            <div className="text-rose-400 font-bold text-xs uppercase tracking-[0.2em] mb-2 flex items-center gap-1">
+            <div className="text-rose-400 font-bold text-xs uppercase tracking-[0.2em] mb-2 flex items-center gap-1 animate-pulse">
               <Zap className="w-3 h-3" /> Chaos Case
             </div>
           )}
 
-          <h3 className={`${caseData.isFeatured ? 'text-2xl md:text-3xl' : 'text-lg'} font-bold text-white mb-1 line-clamp-2`}>
+          <h3 className={`${caseData.isFeatured ? 'text-2xl md:text-3xl' : 'text-lg'} font-bold text-white mb-1 line-clamp-2 group-hover:text-emerald-400 transition-colors`}>
             {caseData.title}
           </h3>
           <p className="text-sm text-slate-400 mb-1">{caseData.sector} · {caseData.companyType}</p>
@@ -52,7 +52,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
 
           <div className="flex flex-wrap gap-2 mb-4">
             {caseData.tags.map(tag => (
-              <span key={tag} className="text-[10px] px-2 py-1 bg-slate-900/50 border border-slate-800 text-slate-400 rounded">
+              <span key={tag} className="text-[10px] px-2 py-1 bg-slate-900/50 border border-slate-800 text-slate-400 rounded hover:border-emerald-500/50 hover:text-emerald-400 transition-colors cursor-default">
                 {tag}
               </span>
             ))}
@@ -81,7 +81,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
       <div className={`${caseData.isFeatured ? 'md:col-span-1 flex items-center justify-center mt-6 md:mt-0' : 'mt-4'}`}>
         <Link
           to={`/cases/${caseData.id}`}
-          className={`w-full text-center ${caseData.isFeatured ? 'btn-primary py-4' : 'btn-secondary py-2'}`}
+          className={`w-full text-center ${caseData.isFeatured ? 'btn-primary py-4' : 'btn-secondary py-2'} group-hover:scale-105 transition-transform`}
         >
           View Case
         </Link>

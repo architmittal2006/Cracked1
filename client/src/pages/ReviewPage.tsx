@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { Shield } from 'lucide-react';
+import { Shield, CheckCircle, Clock, AlertCircle, TrendingUp } from 'lucide-react';
 import { MOCK_CASES, RUBRIC_DIMENSIONS } from '../data/mockData';
 import { RubricSlider } from '../components/RubricSlider';
 import { RadarChart } from '../components/RadarChart';
@@ -60,6 +60,8 @@ export const ReviewPage: React.FC = () => {
   }, [caseData]);
 
   const feedbackValid = feedback.trim().length >= 80;
+  const feedbackLength = feedback.trim().length;
+  const feedbackProgress = Math.min((feedbackLength / 80) * 100, 100);
 
   const weightedScore = (
     rubricScores.problem_framing * 0.25 +
@@ -68,6 +70,8 @@ export const ReviewPage: React.FC = () => {
     rubricScores.insight_depth * 0.25 +
     rubricScores.feasibility * 0.10
   ).toFixed(2);
+
+  const scoreLevel = parseFloat(weightedScore) >= 4 ? 'excellent' : parseFloat(weightedScore) >= 3 ? 'good' : 'needs-improvement';
 
   const handleSubmit = async () => {
     if (!caseData || !feedbackValid || !submissionId) return;
@@ -108,9 +112,19 @@ export const ReviewPage: React.FC = () => {
 
       {submitted ? (
         <div className="glass-card p-12 text-center animate-scale-in">
-          <Shield className="w-12 h-12 text-emerald-400 mx-auto mb-4" />
+          <div className="w-20 h-20 rounded-full bg-emerald-500/20 border-2 border-emerald-500 flex items-center justify-center mx-auto mb-4 animate-scale-in">
+            <CheckCircle className="w-10 h-10 text-emerald-400" />
+          </div>
           <h3 className="text-2xl font-bold text-white mb-2">Review Submitted</h3>
-          <p className="text-slate-400 mb-2">Weighted score: {weightedScore}</p>
+          <div className="mb-4">
+            <p className="text-slate-400 mb-1">Weighted score: <span className="text-emerald-400 font-mono text-xl font-bold">{weightedScore}</span></p>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30">
+              <TrendingUp className="w-4 h-4 text-emerald-400" />
+              <span className="text-emerald-400 text-xs font-bold uppercase">
+                {scoreLevel === 'excellent' ? 'Excellent' : scoreLevel === 'good' ? 'Good' : 'Needs Improvement'}
+              </span>
+            </div>
+          </div>
           <p className="text-slate-400 mb-6">This counts toward your proof-of-review gate for this case.</p>
           <Link to="/dashboard" className="btn-primary">Back to Dashboard</Link>
         </div>
@@ -119,63 +133,136 @@ export const ReviewPage: React.FC = () => {
           <div className="lg:col-span-2 space-y-6">
             <div className="glass-card p-6">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-mono uppercase tracking-widest text-slate-500">Anonymous Submission</span>
+                <span className="text-xs font-mono uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                  <Shield className="w-3 h-3" />
+                  Anonymous Submission
+                </span>
               </div>
-              <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">
+              <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed whitespace-pre-wrap bg-slate-900/50 p-4 rounded-lg border border-slate-800">
                 {ANONYMOUS_SUBMISSION}
               </div>
             </div>
 
             <div className="glass-card p-6">
-              <h2 className="text-xl font-bold text-white mb-6">Rubric Scoring</h2>
+              <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                <TrendingUp className="w-5 h-5 text-emerald-400" />
+                Rubric Scoring
+              </h2>
               <div className="space-y-2">
-                {RUBRIC_DIMENSIONS.map(dim => (
-                  <RubricSlider
+                {RUBRIC_DIMENSIONS.map((dim, index) => (
+                  <div
                     key={dim.key}
-                    dimension={dim}
-                    value={rubricScores[dim.key]}
-                    onChange={(val) => setRubricScores(prev => ({ ...prev, [dim.key]: val }))}
-                  />
+                    className="transition-all duration-300"
+                    style={{ animationDelay: `${index * 100}ms` }}
+                  >
+                    <RubricSlider
+                      dimension={dim}
+                      value={rubricScores[dim.key]}
+                      onChange={(val) => setRubricScores(prev => ({ ...prev, [dim.key]: val }))}
+                    />
+                  </div>
                 ))}
               </div>
             </div>
 
             <div className="glass-card p-6">
-              <label className="block text-sm font-bold text-white mb-2">
-                Written Feedback <span className="text-slate-500 font-normal">(min 80 characters)</span>
+              <label className="block text-sm font-bold text-white mb-2 flex items-center justify-between">
+                <span>Written Feedback</span>
+                <span className="text-slate-500 font-normal text-xs">(min 80 characters)</span>
               </label>
               <textarea
-                className="input-field min-h-[140px]"
+                className="input-field min-h-[140px] transition-all duration-300"
                 placeholder="Provide specific, actionable feedback on framing, data use, and recommendations..."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
               />
-              <div className={`text-xs mt-2 ${feedbackValid ? 'text-emerald-400' : 'text-rose-400'}`}>
-                {feedback.trim().length}/80 characters minimum
+              <div className="mt-3">
+                <div className="flex justify-between items-center mb-1">
+                  <span className={`text-xs font-medium ${feedbackValid ? 'text-emerald-400' : 'text-slate-400'}`}>
+                    {feedbackLength}/80 characters
+                  </span>
+                  {feedbackValid && (
+                    <span className="text-xs text-emerald-400 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" />
+                      Ready to submit
+                    </span>
+                  )}
+                </div>
+                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ease-out ${
+                      feedbackValid ? 'bg-emerald-500' : 'bg-amber-500'
+                    }`}
+                    style={{ width: `${feedbackProgress}%` }}
+                  />
+                </div>
               </div>
             </div>
           </div>
 
           <div className="space-y-6">
             <div className="glass-card p-6 sticky top-24">
-              <h3 className="font-bold text-white mb-4">Score Preview</h3>
-              <div className="flex justify-center mb-4">
+              <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+                <TrendingUp className="w-4 h-4 text-emerald-400" />
+                Score Preview
+              </h3>
+              <div className="flex justify-center mb-4 relative">
+                <div className="absolute inset-0 bg-emerald-500/5 rounded-full blur-3xl" />
                 <RadarChart scores={rubricScores} size={200} />
               </div>
               <div className="text-center mb-6">
                 <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Weighted Score</div>
-                <div className="text-3xl font-black text-emerald-400 font-mono">{weightedScore}</div>
+                <div className="text-4xl font-black text-emerald-400 font-mono mb-2 transition-all duration-300">
+                  {weightedScore}
+                </div>
+                <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700">
+                  <span className={`text-xs font-bold uppercase ${
+                    scoreLevel === 'excellent' ? 'text-emerald-400' :
+                    scoreLevel === 'good' ? 'text-amber-400' : 'text-rose-400'
+                  }`}>
+                    {scoreLevel === 'excellent' ? 'Excellent' : scoreLevel === 'good' ? 'Good' : 'Needs Work'}
+                  </span>
+                </div>
               </div>
+
+              {/* Score breakdown */}
+              <div className="space-y-2 mb-6">
+                {RUBRIC_DIMENSIONS.map((dim, index) => (
+                  <div
+                    key={dim.key}
+                    className="flex items-center justify-between text-xs"
+                    style={{ animationDelay: `${index * 50}ms` }}
+                  >
+                    <span className="text-slate-400">{dim.label}</span>
+                    <span className="font-mono text-emerald-400 font-bold">{rubricScores[dim.key]}/5</span>
+                  </div>
+                ))}
+              </div>
+
               <button
                 type="button"
-                className="btn-primary w-full mb-3"
+                className={`btn-primary w-full mb-3 transition-all duration-300 ${
+                  feedbackValid
+                    ? 'shadow-[0_0_20px_rgba(255,76,37,0.4)]'
+                    : 'opacity-50 cursor-not-allowed'
+                }`}
                 disabled={!feedbackValid || submitting}
                 onClick={handleSubmit}
               >
-                {submitting ? 'Submitting...' : 'Submit Review'}
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Clock className="w-4 h-4 animate-spin" />
+                    Submitting...
+                  </span>
+                ) : (
+                  'Submit Review'
+                )}
               </button>
               {error && (
-                <div className="text-rose-400 text-xs mb-3">{error}</div>
+                <div className="text-rose-400 text-xs mb-3 p-2 bg-rose-500/10 rounded border border-rose-500/20 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4" />
+                  {error}
+                </div>
               )}
               <FlagButton reviewId="rev001" />
             </div>

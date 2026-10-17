@@ -63,7 +63,24 @@ export const CasesPage: React.FC = () => {
           ))}
 
         {filteredCases.length === 0 && (
-          <div className="col-span-full py-20 text-center text-slate-400">No cases match your filters.</div>
+          <div className="col-span-full py-20 text-center">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-900 mb-4">
+              <span className="text-3xl">🔍</span>
+            </div>
+            <p className="text-slate-400 mb-2">No cases match your filters.</p>
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('');
+                setTypeFilter('All');
+                setDifficultyFilter('All');
+                setSectorFilter('All');
+              }}
+              className="text-emerald-400 hover:text-emerald-300 font-medium transition-colors"
+            >
+              Clear all filters
+            </button>
+          </div>
         )}
       </div>
     </PageWrapper>

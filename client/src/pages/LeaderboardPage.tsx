@@ -57,7 +57,7 @@ export const LeaderboardPage: React.FC = () => {
               key={tab}
               type="button"
               onClick={() => setActiveTab(tab)}
-              className={`px-4 py-2 text-sm rounded-md transition-colors ${activeTab === tab ? 'bg-slate-800 text-white font-bold' : 'text-slate-400 hover:text-white'}`}
+              className={`px-4 py-2 text-sm rounded-md transition-all ${activeTab === tab ? 'bg-emerald-500 text-white font-bold shadow-lg shadow-emerald-500/20' : 'text-slate-400 hover:text-white hover:bg-slate-800'}`}
             >
               {tab}
             </button>
@@ -85,7 +85,8 @@ export const LeaderboardPage: React.FC = () => {
             key={track.id}
             type="button"
             onClick={() => setTrackFilter(track.id)}
-            className={`btn-ghost text-xs ${trackFilter === track.id ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+            className={`btn-ghost text-xs transition-all ${trackFilter === track.id ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : ''}`}
+            style={trackFilter === track.id ? { borderColor: track.color } : {}}
           >
             {track.label}
           </button>
@@ -99,7 +100,7 @@ export const LeaderboardPage: React.FC = () => {
             key={tier}
             type="button"
             onClick={() => setTierFilter(tier)}
-            className={`btn-ghost text-xs ${tierFilter === tier ? 'bg-emerald-500/10 text-emerald-400' : ''}`}
+            className={`btn-ghost text-xs transition-all ${tierFilter === tier ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : ''}`}
           >
             {tier}
           </button>
@@ -133,12 +134,15 @@ export const LeaderboardPage: React.FC = () => {
         <h3 className="text-sm font-bold text-white mb-4 uppercase tracking-widest">Tier Distribution</h3>
         <div className="space-y-3">
           {tierDistribution.map(({ tier, pct }) => (
-            <div key={tier} className="flex items-center gap-3">
-              <span className="text-xs text-slate-400 w-28">{tier}</span>
+            <div key={tier} className="flex items-center gap-3 group">
+              <span className="text-xs text-slate-400 w-28 group-hover:text-white transition-colors">{tier}</span>
               <div className="flex-1 progress-bar h-2">
-                <div className="progress-bar-fill h-full" style={{ width: `${pct}%` }} />
+                <div
+                  className="progress-bar-fill h-full transition-all duration-1000 ease-out"
+                  style={{ width: `${pct}%`, background: tier === 'Partner' ? 'linear-gradient(90deg, #FF4C25, #FF6B4A)' : undefined }}
+                />
               </div>
-              <span className="text-xs font-mono text-slate-500 w-10">{pct.toFixed(0)}%</span>
+              <span className="text-xs font-mono text-slate-500 w-10 group-hover:text-emerald-400 transition-colors">{pct.toFixed(0)}%</span>
             </div>
           ))}
         </div>
@@ -164,7 +168,7 @@ export const LeaderboardPage: React.FC = () => {
       />
 
       {showPinnedRow && searchQuery === '' && (
-        <div className="glass-card p-4 mt-4 border-emerald-500/30 flex items-center justify-between">
+        <div className="glass-card p-4 mt-4 border-emerald-500/30 flex items-center justify-between hover:border-emerald-500/50 transition-colors">
           <div className="flex items-center gap-3">
             <span className="font-mono text-slate-400">#{currentUserRank}</span>
             <Avatar initials={CURRENT_USER.initials} size="sm" />

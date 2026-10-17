@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Upload, X, Check } from 'lucide-react';
+import { X, Check, Image as ImageIcon, AlertCircle } from 'lucide-react';
 
 interface ImageUploaderProps {
   onImageUpload: (file: File) => void;
@@ -74,20 +74,20 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       />
 
       {preview ? (
-        <div className="relative group">
+        <div className="relative group animate-scale-in">
           <img
             src={preview}
             alt="Preview"
-            className="w-full h-48 object-cover rounded-lg border border-slate-700"
+            className="w-full h-48 object-cover rounded-lg border-2 border-emerald-500/30 shadow-[0_0_20px_rgba(16,185,129,0.2)] transition-all duration-300"
           />
           <button
             type="button"
             onClick={handleRemove}
-            className="absolute top-2 right-2 p-2 bg-rose-500/90 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+            className="absolute top-2 right-2 p-2 bg-rose-500/90 hover:bg-rose-500 rounded-full opacity-0 group-hover:opacity-100 transition-all duration-300 transform hover:scale-110"
           >
             <X className="w-4 h-4 text-white" />
           </button>
-          <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-emerald-500/90 px-2 py-1 rounded text-xs text-white">
+          <div className="absolute bottom-2 left-2 flex items-center gap-1 bg-emerald-500/90 px-3 py-1.5 rounded-full text-xs text-white font-medium shadow-lg">
             <Check className="w-3 h-3" />
             Uploaded
           </div>
@@ -95,17 +95,19 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       ) : (
         <div
           onClick={handleClick}
-          className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 hover:bg-slate-900/50 transition-all"
+          className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center cursor-pointer hover:border-emerald-500 hover:bg-slate-900/50 transition-all duration-300 group"
         >
           {uploading ? (
             <div className="text-slate-400">
-              <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-2" />
-              <p className="text-sm">Uploading...</p>
+              <div className="animate-spin w-8 h-8 border-2 border-emerald-500 border-t-transparent rounded-full mx-auto mb-2" />
+              <p className="text-sm font-medium">Uploading...</p>
             </div>
           ) : (
             <>
-              <Upload className="w-8 h-8 mx-auto mb-2 text-slate-400" />
-              <p className="text-sm text-slate-400">
+              <div className="relative inline-block mb-2">
+                <ImageIcon className="w-8 h-8 mx-auto text-slate-400 group-hover:text-emerald-400 group-hover:scale-110 transition-all duration-300" />
+              </div>
+              <p className="text-sm text-slate-400 group-hover:text-white transition-colors duration-300">
                 Click to upload or drag and drop
               </p>
               <p className="text-xs text-slate-500 mt-1">
@@ -117,7 +119,10 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
       )}
 
       {error && (
-        <div className="text-rose-400 text-xs">{error}</div>
+        <div className="text-rose-400 text-xs p-2 bg-rose-500/10 rounded border border-rose-500/20 flex items-center gap-2 animate-scale-in">
+          <AlertCircle className="w-4 h-4" />
+          {error}
+        </div>
       )}
     </div>
   );

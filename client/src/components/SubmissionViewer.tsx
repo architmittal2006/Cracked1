@@ -1,5 +1,5 @@
 import React from 'react';
-import { User, Calendar, Eye } from 'lucide-react';
+import { User, Calendar, Eye, CheckCircle2, Award } from 'lucide-react';
 import { ProblemTypeBadge } from './ProblemTypeBadge';
 import { StatusPill } from './StatusPill';
 import { TierBadge } from './TierBadge';
@@ -37,7 +37,7 @@ export const SubmissionViewer: React.FC<SubmissionViewerProps> = ({
   };
 
   return (
-    <div className="glass-card p-6 space-y-6">
+    <div className="glass-card p-6 space-y-6 transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,76,37,0.15)]">
       {/* Header */}
       <div className="flex justify-between items-start">
         <div className="flex-1">
@@ -57,8 +57,9 @@ export const SubmissionViewer: React.FC<SubmissionViewerProps> = ({
         {showScore && submission.finalScore !== null && (
           <div className="text-right">
             <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Score</div>
-            <div className="text-2xl font-black font-mono text-emerald-400">
+            <div className="text-2xl font-black font-mono text-emerald-400 flex items-center gap-2">
               {submission.finalScore}
+              <Award className="w-5 h-5 text-emerald-400" />
             </div>
           </div>
         )}
@@ -66,9 +67,9 @@ export const SubmissionViewer: React.FC<SubmissionViewerProps> = ({
 
       {/* Submission Content */}
       <div className="space-y-4">
-        {Object.entries(submission.content).map(([key, value]) => {
+        {Object.entries(submission.content).map(([key, value], index) => {
           if (!value || value.trim().length === 0) return null;
-          
+
           const labelMap: Record<string, string> = {
             approach: 'Approach Selection',
             assumptions: 'Key Assumptions',
@@ -103,10 +104,17 @@ export const SubmissionViewer: React.FC<SubmissionViewerProps> = ({
           };
 
           return (
-            <div key={key} className="bg-slate-900/50 rounded-lg p-4 border border-slate-800">
-              <h4 className="text-sm font-bold text-white mb-2">
-                {labelMap[key] || key}
-              </h4>
+            <div
+              key={key}
+              className="bg-slate-900/50 rounded-lg p-4 border border-slate-800 hover:border-slate-700 transition-all duration-300"
+              style={{ animationDelay: `${index * 50}ms` }}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <h4 className="text-sm font-bold text-white">
+                  {labelMap[key] || key}
+                </h4>
+              </div>
               <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
                 {value}
               </p>
