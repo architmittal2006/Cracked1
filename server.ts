@@ -291,9 +291,25 @@ app.post('/api/submissions/:submissionId/reviews', mockAuthUser, async (req: Req
 });
 
 // Serve static files from client/dist
-const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
+// Try multiple possible paths for different deployment environments
+const possiblePaths = [
+  path.join(__dirname, '..', 'client', 'dist'),           // Local development
+  path.join(__dirname, 'client', 'dist'),                // Alternative local
+  path.join(process.cwd(), 'client', 'dist'),             // Render/common
+  path.join(process.cwd(), 'dist', 'client', 'dist'),     // Alternative Render
+];
+
+let clientDistPath = possiblePaths[0];
+for (const testPath of possiblePaths) {
+  if (require('fs').existsSync(testPath)) {
+    clientDistPath = testPath;
+    break;
+  }
+}
+
 console.log('Serving static files from:', clientDistPath);
 console.log('__dirname:', __dirname);
+console.log('process.cwd():', process.cwd());
 console.log('File exists:', require('fs').existsSync(clientDistPath));
 app.use(express.static(clientDistPath));
 
