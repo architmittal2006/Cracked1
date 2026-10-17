@@ -239,17 +239,32 @@ app.post('/api/submissions/:submissionId/reviews', mockAuthUser, async (req, res
         res.status(500).json({ success: false, error: error.message });
     }
 });
-// Serve static files from client/dist in production
-if (process.env.NODE_ENV === 'production') {
-    const clientDistPath = path.join(__dirname, '..', 'client', 'dist');
-    app.use(express.static(clientDistPath));
-    // SPA fallback - serve index.html for all non-API routes
-    app.get('/*splat', (req, res) => {
-        if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
-            res.sendFile(path.join(clientDistPath, 'index.html'));
-        }
-    });
+// Serve static files from client/dist
+// Try multiple possible paths for different deployment environments
+const possiblePaths = [
+    path.join(__dirname, '..', 'client', 'dist'), // Local development
+    path.join(__dirname, 'client', 'dist'), // Alternative local
+    path.join(process.cwd(), 'client', 'dist'), // Render/common
+    path.join(process.cwd(), 'dist', 'client', 'dist'), // Alternative Render
+];
+let clientDistPath = possiblePaths[0];
+for (const testPath of possiblePaths) {
+    if (require('fs').existsSync(testPath)) {
+        clientDistPath = testPath;
+        break;
+    }
 }
+console.log('Serving static files from:', clientDistPath);
+console.log('__dirname:', __dirname);
+console.log('process.cwd():', process.cwd());
+console.log('File exists:', require('fs').existsSync(clientDistPath));
+app.use(express.static(clientDistPath));
+// SPA fallback - serve index.html for all non-API routes
+app.get('/*splat', (req, res) => {
+    if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
+        res.sendFile(path.join(clientDistPath, 'index.html'));
+    }
+});
 // Start server
 const PORT = process.env.PORT || 8080;
 app.listen(PORT, () => {
