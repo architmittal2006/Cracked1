@@ -4,6 +4,7 @@ import cookieParser from 'cookie-parser';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 import FileStore from 'session-file-store';
 import { DatabaseService } from './dbService.js';
 import { VerificationEngine } from './verificationEngine.js';
@@ -249,7 +250,7 @@ const possiblePaths = [
 ];
 let clientDistPath = possiblePaths[0];
 for (const testPath of possiblePaths) {
-    if (require('fs').existsSync(testPath)) {
+    if (fs.existsSync(testPath)) {
         clientDistPath = testPath;
         break;
     }
@@ -257,7 +258,7 @@ for (const testPath of possiblePaths) {
 console.log('Serving static files from:', clientDistPath);
 console.log('__dirname:', __dirname);
 console.log('process.cwd():', process.cwd());
-console.log('File exists:', require('fs').existsSync(clientDistPath));
+console.log('File exists:', fs.existsSync(clientDistPath));
 app.use(express.static(clientDistPath));
 // SPA fallback - serve index.html for all non-API routes
 app.get('/*splat', (req, res) => {
