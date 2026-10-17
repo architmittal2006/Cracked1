@@ -1,5 +1,5 @@
-import { DatabaseService } from './dbService.ts';
-import type { ReviewRubric } from './dbService.ts';
+import { DatabaseService } from './dbService.js';
+import type { ReviewRubric } from './dbService.js';
 
 interface ReviewRecord {
   submissionId: string;
