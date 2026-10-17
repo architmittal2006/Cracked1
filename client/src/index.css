@@ -841,6 +841,11 @@ textarea.input-field { resize: vertical; min-height: 120px; }
   text-align: center;
 }
 
+.py-24 {
+  padding-top: 96px;
+  padding-bottom: 96px;
+}
+
 .mega-heading {
   text-transform: uppercase;
   line-height: 0.9;
