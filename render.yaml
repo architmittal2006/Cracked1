@@ -9,4 +9,4 @@ services:
       - key: NODE_ENV
         value: production
       - key: BASE_URL
-        value: https://cracked1-1.onrender.com
+        value: https://cracked1-afy4.onrender.com
