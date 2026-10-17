@@ -6,8 +6,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import FileStore from 'session-file-store';
-import { DatabaseService } from './dbService';
-import { VerificationEngine } from './verificationEngine';
+import { DatabaseService } from './dbService.js';
+import { VerificationEngine } from './verificationEngine.js';
 
 // Load environment variables
 dotenv.config();
