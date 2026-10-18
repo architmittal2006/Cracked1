@@ -9,23 +9,22 @@ export const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const { login } = useAuth();
+  const [error, setError] = useState('');
+  const { signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock login - in production this would call the API
-    const mockUser = {
-      id: 'user_' + Date.now(),
-      username: email.split('@')[0],
-      name: email.split('@')[0],
-      email: email,
-    };
-    login(mockUser);
-    navigate(from, { replace: true });
+    setError('');
+    try {
+      await signIn(email, password);
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      setError(err.message || 'Login failed');
+    }
   };
 
   const handleGoogleSuccess = () => {
@@ -56,6 +55,12 @@ export const LoginPage: React.FC = () => {
             <span>or</span>
             <div className="auth-divider-line" />
           </div>
+
+          {error && (
+            <div className="mb-3 p-3 rounded-md border border-red-500/30 bg-red-500/10 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="login-clean-form">
             <div className="form-group">

@@ -8,23 +8,38 @@ import { GoogleLoginButton } from '../components/GoogleOAuth';
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { login } = useAuth();
-  const [formData, setFormData] = useState({ username: '', name: '', email: '', password: '' });
+  const { signUp } = useAuth();
+  const [formData, setFormData] = useState({ username: '', name: '', email: '', password: '', confirmPassword: '' });
   const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Mock registration - in production this would call the API
-    const mockUser = {
-      id: 'user_' + Date.now(),
-      username: formData.username,
-      name: formData.name,
-      email: formData.email,
-    };
-    login(mockUser);
-    navigate(from, { replace: true });
+    setError('');
+
+    const { username, name, email, password, confirmPassword } = formData;
+
+    if (!username || !name || !email || !password || !confirmPassword) {
+      setError('All fields are required');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
+    try {
+      await signUp({ username, name, email, password });
+      navigate(from, { replace: true });
+    } catch (err: any) {
+      setError(err.message || 'Registration failed');
+    }
   };
 
   const handleGoogleSuccess = () => {
@@ -57,6 +72,12 @@ export const RegisterPage: React.FC = () => {
             <span>or</span>
             <div className="auth-divider-line" />
           </div>
+
+          {error && (
+            <div className="mb-3 p-3 rounded-md border border-red-500/30 bg-red-500/10 text-red-400 text-sm">
+              {error}
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="login-clean-form">
             <div className="form-group">
@@ -119,6 +140,19 @@ export const RegisterPage: React.FC = () => {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="confirmPassword">Confirm Password</label>
+              <input
+                id="confirmPassword"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Confirm your password"
+                value={formData.confirmPassword}
+                onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
+                required
+                autoComplete="new-password"
+              />
             </div>
 
             <button type="submit" className="login-clean-submit">

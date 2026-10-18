@@ -2,6 +2,7 @@ import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -35,7 +36,47 @@ const app = express();
 app.use(express.json());
 app.use(cookieParser());
 
-// Session configuration with security
+// CORS — allow the Vite dev client (port 5174) to call the API (port 8080) with credentials
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5174';
+app.use((_req: Request, res: Response, next: NextFunction) => {
+  res.header('Access-Control-Allow-Origin', CLIENT_ORIGIN);
+  res.header('Access-Control-Allow-Credentials', 'true');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  if (_req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  next();
+});
+
+// ─── Password hashing (Node built-in crypto, no extra dependency) ───
+
+const hashPassword = (password: string): string => {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 100_000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+};
+
+const comparePassword = (password: string, stored: string): boolean => {
+  const [salt, hash] = stored.split(':');
+  if (!salt || !hash) return false;
+  const computed = crypto.pbkdf2Sync(password, salt, 100_000, 64, 'sha512').toString('hex');
+  return computed === hash;
+};
+
+// Extend Session type to include user
+declare module 'express-session' {
+  interface SessionData {
+    user?: {
+      id: string;
+      username: string;
+      name: string;
+      email: string;
+    };
+  }
+}
+
 app.use(session({
   secret: process.env.SESSION_SECRET || 'change-this-secret-in-production',
   resave: false,
@@ -47,7 +88,7 @@ app.use(session({
   cookie: {
     httpOnly: true, // Prevents JavaScript access to cookies
     secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-    sameSite: 'strict', // CSRF protection
+    sameSite: 'lax', // CSRF protection while allowing cross-origin dev API calls
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
@@ -186,6 +227,62 @@ app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
       email: userData.email,
     };
 
+    res.json({ success: true, user: req.session.user });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Register (email/password)
+app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
+  const { username, name, email, password } = req.body;
+
+  if (!username || !name || !email || !password) {
+    res.status(400).json({ success: false, error: 'All fields are required' });
+    return;
+  }
+  if (password.length < 8) {
+    res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
+    return;
+  }
+
+  try {
+    const id = await DatabaseService.createUser({
+      username,
+      name,
+      email,
+      passwordHash: hashPassword(password),
+    });
+
+    req.session.user = { id, username, name, email };
+    res.status(201).json({ success: true, user: req.session.user });
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: error.message });
+  }
+});
+
+// Login (email/password)
+app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    res.status(400).json({ success: false, error: 'Email and password are required' });
+    return;
+  }
+
+  try {
+    const user = await DatabaseService.getUserByEmail(email);
+    if (!user) {
+      res.status(401).json({ success: false, error: 'Invalid email or password' });
+      return;
+    }
+
+    if (!comparePassword(password, user.passwordHash)) {
+      res.status(401).json({ success: false, error: 'Invalid email or password' });
+      return;
+    }
+
+    req.session.user = { id: user.id, username: user.username, name: user.name, email: user.email };
     res.json({ success: true, user: req.session.user });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });

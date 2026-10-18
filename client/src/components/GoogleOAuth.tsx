@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 interface GoogleLoginButtonProps {
@@ -9,7 +10,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = () => {
   const handleGoogleLogin = async () => {
     try {
       // Get Google auth URL from backend
-      const response = await fetch('http://localhost:8080/api/auth/google');
+      const response = await fetch('/api/auth/google');
       const data = await response.json();
       
       if (data.authUrl) {
@@ -41,6 +42,7 @@ export const GoogleLoginButton: React.FC<GoogleLoginButtonProps> = () => {
 // This component handles the OAuth callback
 export const GoogleOAuthCallback: React.FC = () => {
   const { login } = useAuth();
+  const navigate = useNavigate();
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -57,7 +59,7 @@ export const GoogleOAuthCallback: React.FC = () => {
 
       try {
         // Send code to backend for secure token exchange
-        const response = await fetch('http://localhost:8080/api/auth/google/callback', {
+        const response = await fetch('/api/auth/google/callback', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -72,11 +74,11 @@ export const GoogleOAuthCallback: React.FC = () => {
           throw new Error(data.error || 'Authentication failed');
         }
 
-        // Login with user data from backend
+        // Login with user data from backend (session already set server-side)
         login(data.user);
         
-        // Redirect to dashboard
-        window.location.href = '/dashboard';
+        // Redirect to dashboard (client-side, preserves auth state)
+        navigate('/dashboard', { replace: true });
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Authentication failed');
         setLoading(false);
@@ -84,7 +86,7 @@ export const GoogleOAuthCallback: React.FC = () => {
     };
 
     handleCallback();
-  }, [login]);
+  }, [login, navigate]);
 
   if (loading) {
     return (

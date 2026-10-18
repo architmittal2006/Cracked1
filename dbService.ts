@@ -17,9 +17,18 @@ export interface ReviewRecord {
   isVoided?: boolean;
 }
 
+export interface UserRecord {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  passwordHash: string;
+}
+
 export class DatabaseService {
   private static readonly mockReviews: ReviewRecord[] = [];
   private static readonly mockSubmissions: any[] = [];
+  private static readonly mockUsers: UserRecord[] = [];
 
   public static async getCompletedReviewCountForCase(userId: string, caseId: string): Promise<number> {
     return this.mockReviews.filter(r => r.reviewerId === userId && r.caseId === caseId && !r.isVoided).length;
@@ -50,5 +59,28 @@ export class DatabaseService {
       sub.final_weighted_score = score;
       sub.status = status;
     }
+  }
+
+  // ─── User storage (email/password auth) ───
+
+  public static async createUser(payload: { username: string; name: string; email: string; passwordHash: string }): Promise<string> {
+    if (this.mockUsers.find(u => u.email.toLowerCase() === payload.email.toLowerCase())) {
+      throw new Error('Email already registered');
+    }
+    if (this.mockUsers.find(u => u.username.toLowerCase() === payload.username.toLowerCase())) {
+      throw new Error('Username already taken');
+    }
+    const id = 'u_' + Math.random().toString(36).slice(2, 11);
+    const user: UserRecord = { id, ...payload };
+    this.mockUsers.push(user);
+    return id;
+  }
+
+  public static async getUserByEmail(email: string): Promise<UserRecord | undefined> {
+    return this.mockUsers.find(u => u.email.toLowerCase() === email.toLowerCase());
+  }
+
+  public static async getUserById(id: string): Promise<UserRecord | undefined> {
+    return this.mockUsers.find(u => u.id === id);
   }
 }
