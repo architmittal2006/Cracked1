@@ -3,60 +3,24 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
   ArrowRight,
   BadgeCheck,
-  BriefcaseBusiness,
-  Building2,
   Eye,
+  EyeOff,
   GitPullRequest,
   LockKeyhole,
   Mail,
   ShieldCheck,
-  UserRoundCheck,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { GitHubLoginButton } from '../components/GitHubOAuth';
 import { GoogleLoginButton } from '../components/GoogleOAuth';
 
-type LoginRole = 'contributor' | 'organization';
-type AuthMode = 'password' | 'otp';
-
-const roleContent = {
-  contributor: {
-    eyebrow: 'Contributor access',
-    title: 'Solve cases. Review peers. Build proof of work.',
-    description: 'For consultants, students, and operators who want to compete and earn credibility.',
-    emailLabel: 'Email',
-    emailPlaceholder: 'you@domain.com',
-    cta: 'Enter the Arena',
-    bullets: [
-      { icon: GitPullRequest, text: 'Submit typed case solutions across 7 problem types' },
-      { icon: BadgeCheck, text: 'Complete 2 peer reviews to unlock each submission gate' },
-      { icon: ShieldCheck, text: 'Grow a live credibility score from Analyst to Partner' },
-    ],
-  },
-  organization: {
-    eyebrow: 'Organization access',
-    title: 'Post real cases and find reviewed talent.',
-    description: 'For companies that want to publish challenges and identify top contributors.',
-    emailLabel: 'Work email',
-    emailPlaceholder: 'team@company.com',
-    cta: 'Enter Organization Portal',
-    bullets: [
-      { icon: BriefcaseBusiness, text: 'Create cases with confidentiality tiers' },
-      { icon: Eye, text: 'Browse contributor portfolios and submissions' },
-      { icon: Building2, text: 'Issue Merge Bonuses to top solutions' },
-    ],
-  },
-} as const;
-
 export const LoginPage: React.FC = () => {
-  const [role, setRole] = useState<LoginRole>('contributor');
-  const [authMode, setAuthMode] = useState<AuthMode>('otp');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const active = roleContent[role];
 
   const from = (location.state as any)?.from?.pathname || '/dashboard';
 
@@ -78,92 +42,93 @@ export const LoginPage: React.FC = () => {
   };
 
   return (
-    <div className="login-stage">
-      <div className="login-bg" aria-hidden="true" />
-      <section className="page-container login-shell">
-        <div className="login-copy">
-          <p className="login-eyebrow">{active.eyebrow}</p>
-          <h1>{active.title}</h1>
-          <p>{active.description}</p>
+    <div className="login-clean-stage">
+      <section className="login-clean-shell">
+        <div className="login-clean-copy">
+          <Link to="/" className="login-brand-link">
+            <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-10 w-auto" />
+            <span>Cracked?</span>
+          </Link>
+          
+          <h1>Log in to practice</h1>
+          <p>
+            New here? <Link to="/register">Create a free account</Link> and start solving cases.
+          </p>
 
-          <div className="login-proof-grid">
-            {active.bullets.map(({ icon: Icon, text }) => (
-              <div className="login-proof" key={text}>
-                <Icon className="w-5 h-5" />
-                <span>{text}</span>
-              </div>
-            ))}
+          <div className="login-benefits">
+            <div className="login-benefit">
+              <GitPullRequest className="w-5 h-5" />
+              <span>Submit typed case solutions across 7 problem types</span>
+            </div>
+            <div className="login-benefit">
+              <BadgeCheck className="w-5 h-5" />
+              <span>Complete 2 peer reviews to unlock each submission gate</span>
+            </div>
+            <div className="login-benefit">
+              <ShieldCheck className="w-5 h-5" />
+              <span>Grow a live credibility score from Analyst to Partner</span>
+            </div>
           </div>
         </div>
 
-        <div className="login-panel">
-          <div className="role-switch" aria-label="Choose login type">
-            <button type="button" className={role === 'contributor' ? 'active' : ''} onClick={() => setRole('contributor')}>
-              <UserRoundCheck className="w-5 h-5" /> Contributor
-            </button>
-            <button type="button" className={role === 'organization' ? 'active' : ''} onClick={() => setRole('organization')}>
-              <Building2 className="w-5 h-5" /> Organization
-            </button>
+        <div className="login-clean-panel">
+          <div className="oauth-buttons">
+            <GoogleLoginButton onSuccess={handleGoogleSuccess} />
+            <GitHubLoginButton onSuccess={handleGoogleSuccess} />
           </div>
 
-          <div className="role-switch mb-4" aria-label="Auth method">
-            <button type="button" className={authMode === 'otp' ? 'active' : ''} onClick={() => setAuthMode('otp')}>
-              Email OTP
-            </button>
-            <button type="button" className={authMode === 'password' ? 'active' : ''} onClick={() => setAuthMode('password')}>
-              Password
-            </button>
+          <div className="auth-divider">
+            <div className="auth-divider-line" />
+            <span>or</span>
+            <div className="auth-divider-line" />
           </div>
 
-          <form onSubmit={handleSubmit} className="login-form">
-            <label>
-              <span>{active.emailLabel}</span>
-              <div className="login-input-wrap">
-                <Mail className="w-5 h-5" />
-                <input 
-                  type="email" 
-                  placeholder={active.emailPlaceholder} 
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
-            </label>
-
-            {authMode === 'password' ? (
-              <label>
-                <span>Password</span>
-                <div className="login-input-wrap">
-                  <LockKeyhole className="w-5 h-5" />
-                  <input 
-                    type="password" 
-                    placeholder="Enter password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                  />
-                </div>
-              </label>
-            ) : (
-              <p className="text-xs text-slate-500 -mt-2">We&apos;ll send a one-time code to your email. No password needed.</p>
-            )}
-
-            <button type="submit" className="login-submit">
-              {authMode === 'otp' ? 'Send Login Code' : active.cta}
-              <ArrowRight className="w-5 h-5" />
-            </button>
-
-            <div className="mt-4 space-y-2">
-              <GoogleLoginButton onSuccess={handleGoogleSuccess} />
-              <GitHubLoginButton onSuccess={handleGoogleSuccess} />
+          <form onSubmit={handleSubmit} className="login-clean-form">
+            <div className="form-group">
+              <label htmlFor="email">Email</label>
+              <input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                autoComplete="email"
+              />
             </div>
+
+            <div className="form-group">
+              <label htmlFor="password">Password</label>
+              <div className="password-input-wrap">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  autoComplete="current-password"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="password-toggle"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <Link to="/forgot-password" className="forgot-password">Forgot password?</Link>
+            </div>
+
+            <button type="submit" className="login-clean-submit">
+              Log in
+            </button>
           </form>
 
-          <div className="login-footnote">
-            <span>{role === 'contributor' ? 'New here?' : 'Want to post cases?'}</span>
-            <Link to={role === 'contributor' ? '/register' : '/how-it-works'}>
-              {role === 'contributor' ? 'Create account' : 'See organization flow'}
-            </Link>
+          <div className="login-clean-footnote">
+            <span>Don't have an account?</span>
+            <Link to="/register">Sign up</Link>
           </div>
         </div>
       </section>
