@@ -1,13 +1,10 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
-  ArrowRight,
   BadgeCheck,
   Eye,
   EyeOff,
   GitPullRequest,
-  LockKeyhole,
-  Mail,
   ShieldCheck,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
