@@ -28,6 +28,55 @@ npm run preview      # Preview production build
 ### Road to Offer (Conceptual + Implementation Analysis)
 **Tech Stack:** Next.js with SSG, Vercel hosting, Tailwind CSS (likely), custom CSS build
 
+**SEO & Metadata Strategy:**
+- Comprehensive meta description (148 characters, keyword-rich)
+- Open Graph tags for social sharing (og:type, og:title, og:description, og:image, og:url)
+- Twitter Card tags (twitter:card, twitter:title, twitter:description, twitter:image, twitter:creator)
+- Proper viewport settings with interactive-widget optimization
+- SEO keywords targeting consulting interview niche
+- og:image with optimal dimensions (1200x630)
+- Favicon with proper favicon.ico
+- Robots directives (index, follow)
+- Googlebot directives with preview limits
+- Structured data (implied by metadata format)
+- Language and locale tags (en_US)
+- Category and publisher metadata
+
+**Design System & Aesthetic:**
+- Clean, modern SaaS design with minimalist layout and generous whitespace
+- Professional B2C SaaS aesthetic (education/consulting niche)
+- Multi-step value flow narrative (numbered 1-7 with expand/collapse previews)
+- Strong use of cards as primary content container pattern
+- Consistent color palette: primary accent, white backgrounds, dark text
+- Gradient accents for buttons and CTAs
+
+**UI Patterns Identified:**
+- Sticky navigation bar with logo on left, menu items on right
+- Hero section with large headline, subheadline, primary CTAs, social proof
+- Social proof with star ratings and trusted-by counts
+- Feature grid with cards (icons, titles, descriptions, links)
+- Stat cards showing numeric metrics ("550+ Drills", "71+ Cases")
+- Multi-step process visualization with numbered steps and expandable previews
+- Pricing comparison tables with plan features, prices, CTAs
+- Content library with grid of category cards
+- Rich footer with multiple link columns
+- Modal for sign-up/login
+- Toast notifications for feedback
+
+**Key Learnings for Cracked?:**
+- Apply SEO metadata strategy (Open Graph, Twitter Cards, proper descriptions)
+- Clear numbered journey narrative (apply to 3-track explanation)
+- Card-based content organization
+- Expandable previews for complex content
+- Pricing/comparison tables for credibility tiers
+- Rich social proof presentation
+- Multi-column footer with organized links
+- Primary/secondary CTA hierarchy
+- Gradient accents for interactive elements
+
+### Road to Offer (Conceptual + Implementation Analysis)
+**Tech Stack:** Next.js with SSG, Vercel hosting, Tailwind CSS (likely), custom CSS build
+
 **Design System & Aesthetic:**
 - Clean, modern SaaS design with minimalist layout and generous whitespace
 - Professional B2C SaaS aesthetic (education/consulting niche)
@@ -245,6 +294,15 @@ npm run preview      # Preview production build
 - Verify loading, empty, error, success, disabled states
 - Run build, lint, typecheck commands
 - Address Stackra audit findings (performance, accessibility, security, SEO)
+  - ✅ SEO metadata added (Open Graph, Twitter Cards, proper descriptions, keywords)
+  - ⏳ Create sitemap.xml
+  - ⏳ Create robots.txt
+  - ⏳ Add structured data (JSON-LD) for organization, product, breadcrumbs
+  - ⏳ Add canonical URLs
+  - Performance: Investigate bottlenecks, optimize largest visible content, font loading
+  - Accessibility: Fix button names, text contrast, heading hierarchy
+  - Security: Configure X-Content-Type-Options header
+  - Prerendering/SSR: Evaluate if needed after architecture review
 
 ## Definition of Done
 
