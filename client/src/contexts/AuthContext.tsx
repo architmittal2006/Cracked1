@@ -28,7 +28,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const checkAuth = async () => {
     try {
-      const response = await fetch('http://localhost:8080/api/auth/me', {
+      const response = await fetch('/api/auth/me', {
         credentials: 'include',
       });
       const data = await response.json();
