@@ -25,12 +25,39 @@ npm run preview      # Preview production build
 
 ## Key Design Principles from References
 
-### Road to Offer (Conceptual)
-- Clear numbered journey: "One path from resume to offer"
-- Transparent value propositions
-- Progress-focused messaging (550+ drills, 71+ cases)
-- Verified social proof
-- Detailed product explanations without marketing fluff
+### Road to Offer (Conceptual + Implementation Analysis)
+**Tech Stack:** Next.js with SSG, Vercel hosting, Tailwind CSS (likely), custom CSS build
+
+**Design System & Aesthetic:**
+- Clean, modern SaaS design with minimalist layout and generous whitespace
+- Professional B2C SaaS aesthetic (education/consulting niche)
+- Multi-step value flow narrative (numbered 1-7 with expand/collapse previews)
+- Strong use of cards as primary content container pattern
+- Consistent color palette: primary accent, white backgrounds, dark text
+- Gradient accents for buttons and CTAs
+
+**UI Patterns Identified:**
+- Sticky navigation bar with logo on left, menu items on right
+- Hero section with large headline, subheadline, primary CTAs, social proof
+- Social proof with star ratings and trusted-by counts
+- Feature grid with cards (icons, titles, descriptions, links)
+- Stat cards showing numeric metrics ("550+ Drills", "71+ Cases")
+- Multi-step process visualization with numbered steps and expandable previews
+- Pricing comparison tables with plan features, prices, CTAs
+- Content library with grid of category cards
+- Rich footer with multiple link columns
+- Modal for sign-up/login
+- Toast notifications for feedback
+
+**Key Learnings for Cracked?:**
+- Clear numbered journey narrative (apply to 3-track explanation)
+- Card-based content organization
+- Expandable previews for complex content
+- Pricing/comparison tables for credibility tiers
+- Rich social proof presentation
+- Multi-column footer with organized links
+- Primary/secondary CTA hierarchy
+- Gradient accents for interactive elements
 
 ### Trackk (Visual/Interaction)
 - Bold, confident headlines
@@ -184,9 +211,10 @@ npm run preview      # Preview production build
 
 ### Phase 1: Audit (COMPLETE)
 - ✅ Inspect repository, routes, components, data models, API contracts
-- ✅ Study reference websites
+- ✅ Study reference websites (including detailed Road to Offer analysis)
 - ✅ Identify visual inconsistencies and UX problems
-- ⏳ Establish baseline by running application
+- ✅ Establish baseline by running application
+- ✅ Fix critical layout bugs (header, padding, filters, fonts, accents, empty states, timer)
 
 ### Phase 2: Design Foundation
 - Establish visual direction, typography, design tokens
@@ -221,10 +249,10 @@ npm run preview      # Preview production build
 ## Definition of Done
 
 The redesign is complete when:
-- Landing page communicates product clearly
+- Landing page communicates product clearly with Road to Offer-inspired patterns
 - Visual language is coherent and professionally executed
 - Core application pages follow same design system
-- Three tracks are understandable and visually distinct
+- Three tracks are understandable and visually distinct with assigned icons/colors
 - Two-review gate is clearly communicated
 - Submission and review flows remain functional
 - Credibility indicators use real application data
@@ -234,6 +262,7 @@ The redesign is complete when:
 - Existing routes, authentication, backend behavior intact
 - Application builds successfully
 - Critical user journeys tested
+- Visual QA completed (screenshots at 375px, 768px, 1440px)
 - Remaining limitations documented honestly
 
 ## Files Changed
