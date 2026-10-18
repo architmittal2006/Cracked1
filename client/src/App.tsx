@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { HelmetProvider } from 'react-helmet-async';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SmoothScroll } from './components/SmoothScroll';
 import { Navbar } from './components/Navbar';
@@ -44,88 +45,90 @@ const ScrollToTop = () => {
 const App: React.FC = () => {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <Router>
-          <ScrollToTop />
-          <SmoothScroll>
-          <div className="min-h-screen text-slate-100 flex flex-col font-sans selection:bg-[#2D87FF]/30">
-            <Navbar />
-            <main className="flex-grow pt-16 relative z-10">
-              <Routes>
-                <Route path="/" element={<LandingPage />} />
-                <Route path="/arena" element={<ArenaPage />} />
-                <Route path="/arena/:id" element={<ArenaDetailPage />} />
-                <Route path="/arena/:id/submit" element={<ArenaSubmitPage />} />
-                <Route path="/questions" element={<QuestionsPage />} />
-                <Route path="/questions/ask" element={<QuestionsAskPage />} />
-                <Route path="/questions/:id" element={<QuestionsDetailPage />} />
-                <Route path="/questions/:id/answer" element={<QuestionsAnswerPage />} />
-                <Route path="/cases" element={<CasesPage />} />
-                <Route path="/cases/type/:type" element={<CasesByTypePage />} />
-                <Route path="/cases/:id/submit" element={
-                  <ProtectedRoute>
-                    <SubmitPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/cases/:id/followup" element={
-                  <ProtectedRoute>
-                    <FollowUpPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/cases/:id/review" element={
-                  <ProtectedRoute>
-                    <ReviewPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/cases/:id" element={
-                  <ProtectedRoute>
-                    <CaseDetailPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/dashboard" element={
-                  <ProtectedRoute>
-                    <DashboardPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/reviews/:id" element={
-                  <ProtectedRoute>
-                    <ReviewDetailPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/leaderboard" element={<LeaderboardPage />} />
-                <Route path="/leaderboard/:type" element={<LeaderboardByTypePage />} />
-                <Route path="/profile" element={
-                  <ProtectedRoute>
-                    <ProfilePage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/profile/:username" element={<ProfilePage />} />
-                <Route path="/certificate/:username" element={<CertificatePage />} />
-                <Route path="/how-it-works" element={<HowItWorksPage />} />
-                <Route path="/company/dashboard" element={
-                  <ProtectedRoute>
-                    <CompanyDashboardPage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/company/cases/new" element={
-                  <ProtectedRoute>
-                    <CompanyPostCasePage />
-                  </ProtectedRoute>
-                } />
-                <Route path="/login" element={<LoginPage />} />
-                <Route path="/register" element={<RegisterPage />} />
-                <Route path="/callback/github" element={<GitHubOAuthCallback />} />
-                <Route path="/callback/google" element={<GoogleOAuthCallback />} />
-                <Route path="*" element={<NotFoundPage />} />
-              </Routes>
-            </main>
-            <div className="relative z-10">
-              <Footer />
+      <HelmetProvider>
+        <AuthProvider>
+          <Router>
+            <ScrollToTop />
+            <SmoothScroll>
+            <div className="min-h-screen text-slate-100 flex flex-col font-sans selection:bg-[#2D87FF]/30">
+              <Navbar />
+              <main className="flex-grow pt-16 relative z-10">
+                <Routes>
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/arena" element={<ArenaPage />} />
+                  <Route path="/arena/:id" element={<ArenaDetailPage />} />
+                  <Route path="/arena/:id/submit" element={<ArenaSubmitPage />} />
+                  <Route path="/questions" element={<QuestionsPage />} />
+                  <Route path="/questions/ask" element={<QuestionsAskPage />} />
+                  <Route path="/questions/:id" element={<QuestionsDetailPage />} />
+                  <Route path="/questions/:id/answer" element={<QuestionsAnswerPage />} />
+                  <Route path="/cases" element={<CasesPage />} />
+                  <Route path="/cases/type/:type" element={<CasesByTypePage />} />
+                  <Route path="/cases/:id/submit" element={
+                    <ProtectedRoute>
+                      <SubmitPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/cases/:id/followup" element={
+                    <ProtectedRoute>
+                      <FollowUpPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/cases/:id/review" element={
+                    <ProtectedRoute>
+                      <ReviewPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/cases/:id" element={
+                    <ProtectedRoute>
+                      <CaseDetailPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <DashboardPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/reviews/:id" element={
+                    <ProtectedRoute>
+                      <ReviewDetailPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/leaderboard" element={<LeaderboardPage />} />
+                  <Route path="/leaderboard/:type" element={<LeaderboardByTypePage />} />
+                  <Route path="/profile" element={
+                    <ProtectedRoute>
+                      <ProfilePage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/profile/:username" element={<ProfilePage />} />
+                  <Route path="/certificate/:username" element={<CertificatePage />} />
+                  <Route path="/how-it-works" element={<HowItWorksPage />} />
+                  <Route path="/company/dashboard" element={
+                    <ProtectedRoute>
+                      <CompanyDashboardPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/company/cases/new" element={
+                    <ProtectedRoute>
+                      <CompanyPostCasePage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/login" element={<LoginPage />} />
+                  <Route path="/register" element={<RegisterPage />} />
+                  <Route path="/callback/github" element={<GitHubOAuthCallback />} />
+                  <Route path="/callback/google" element={<GoogleOAuthCallback />} />
+                  <Route path="*" element={<NotFoundPage />} />
+                </Routes>
+              </main>
+              <div className="relative z-10">
+                <Footer />
+              </div>
             </div>
-          </div>
-          </SmoothScroll>
-        </Router>
-      </AuthProvider>
+            </SmoothScroll>
+          </Router>
+        </AuthProvider>
+      </HelmetProvider>
     </ErrorBoundary>
   );
 };

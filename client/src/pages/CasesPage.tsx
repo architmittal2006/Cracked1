@@ -5,6 +5,7 @@ import { CaseCard } from '../components/CaseCard';
 import { CaseFilterBar } from '../components/CaseFilterBar';
 import { ChaosBanner } from '../components/ChaosBanner';
 import { PageWrapper } from '../components/PageWrapper';
+import { SEO } from '../components/SEO';
 
 export const CasesPage: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -28,14 +29,20 @@ export const CasesPage: React.FC = () => {
   const featuredCase = filteredCases.find(c => c.isFeatured);
 
   return (
-    <PageWrapper>
-      <div className="page-header">
-        <div className="section-label mb-2">CASE LIBRARY</div>
-        <h1 className="section-title mb-4">Active Cases</h1>
-        <p className="section-subtitle">
-          Browse, filter, and read case briefs across 7 problem types. Review peers to unlock submissions.
-        </p>
-      </div>
+    <>
+      <SEO
+        title="Case Library"
+        description="Browse consulting cases graded by peer review on five dimensions. Filter by industry, type, difficulty, or track. Complete 2 peer reviews to unlock submissions."
+        ogUrl="/cases"
+      />
+      <PageWrapper>
+        <div className="page-header">
+          <div className="section-label mb-2">CASE LIBRARY</div>
+          <h1 className="section-title mb-4">Active Cases</h1>
+          <p className="section-subtitle">
+            Browse, filter, and read case briefs across 7 problem types. Review peers to unlock submissions.
+          </p>
+        </div>
 
       <ChaosBanner cases={MOCK_CASES} />
 
@@ -85,5 +92,6 @@ export const CasesPage: React.FC = () => {
         )}
       </div>
     </PageWrapper>
+    </>
   );
 };

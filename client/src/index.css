@@ -104,6 +104,11 @@ h1, h2, h3, .font-display {
   font-family: var(--font-mono);
 }
 
+/* Remove old font references */
+.font-serif {
+  font-family: var(--font-sans);
+}
+
 /* ─── Scroll Reveal (used by <Reveal>) ─── */
 .reveal {
   opacity: 0;
