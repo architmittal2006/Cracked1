@@ -1,12 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import {
-  BadgeCheck,
-  Eye,
-  EyeOff,
-  GitPullRequest,
-  ShieldCheck,
-} from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { GitHubLoginButton } from '../components/GitHubOAuth';
 import { GoogleLoginButton } from '../components/GoogleOAuth';
@@ -43,29 +37,12 @@ export const LoginPage: React.FC = () => {
       <section className="login-clean-shell">
         <div className="login-clean-copy">
           <Link to="/" className="login-brand-link">
-            <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-10 w-auto" />
+            <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-8 w-auto" />
             <span>Cracked?</span>
           </Link>
           
-          <h1>Log in to practice</h1>
-          <p>
-            New here? <Link to="/register">Create a free account</Link> and start solving cases.
-          </p>
-
-          <div className="login-benefits">
-            <div className="login-benefit">
-              <GitPullRequest className="w-5 h-5" />
-              <span>Submit typed case solutions across 7 problem types</span>
-            </div>
-            <div className="login-benefit">
-              <BadgeCheck className="w-5 h-5" />
-              <span>Complete 2 peer reviews to unlock each submission gate</span>
-            </div>
-            <div className="login-benefit">
-              <ShieldCheck className="w-5 h-5" />
-              <span>Grow a live credibility score from Analyst to Partner</span>
-            </div>
-          </div>
+          <h1>Welcome back</h1>
+          <p>Log in to continue practicing</p>
         </div>
 
         <div className="login-clean-panel">
@@ -95,7 +72,10 @@ export const LoginPage: React.FC = () => {
             </div>
 
             <div className="form-group">
-              <label htmlFor="password">Password</label>
+              <div className="form-header">
+                <label htmlFor="password">Password</label>
+                <Link to="/forgot-password" className="forgot-password">Forgot password?</Link>
+              </div>
               <div className="password-input-wrap">
                 <input
                   id="password"
@@ -115,7 +95,6 @@ export const LoginPage: React.FC = () => {
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
               </div>
-              <Link to="/forgot-password" className="forgot-password">Forgot password?</Link>
             </div>
 
             <button type="submit" className="login-clean-submit">

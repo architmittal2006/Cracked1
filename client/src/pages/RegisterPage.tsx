@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { User, Mail, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { GitHubLoginButton } from '../components/GitHubOAuth';
 import { GoogleLoginButton } from '../components/GoogleOAuth';
@@ -36,7 +36,7 @@ export const RegisterPage: React.FC = () => {
       <section className="login-clean-shell">
         <div className="login-clean-copy">
           <Link to="/" className="login-brand-link">
-            <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-10 w-auto" />
+            <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-8 w-auto" />
             <span>Cracked?</span>
           </Link>
           
@@ -44,17 +44,6 @@ export const RegisterPage: React.FC = () => {
           <p>
             Already have an account? <Link to="/login">Sign in</Link>
           </p>
-
-          <div className="login-benefits">
-            <div className="login-benefit">
-              <User className="w-5 h-5" />
-              <span>Public profile at /profile/your-username</span>
-            </div>
-            <div className="login-benefit">
-              <Mail className="w-5 h-5" />
-              <span>Email OTP or Google OAuth sign-in</span>
-            </div>
-          </div>
         </div>
 
         <div className="login-clean-panel">

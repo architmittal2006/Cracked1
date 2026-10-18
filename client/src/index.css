@@ -1392,26 +1392,26 @@ textarea.input-field { resize: vertical; min-height: 120px; }
   text-decoration: none;
   color: #0a0e1a;
   font-weight: 600;
-  font-size: 1rem;
+  font-size: 0.875rem;
   margin-bottom: 24px;
   align-self: flex-start;
 }
 
 .login-clean-copy h1 {
   font-family: var(--font-sans);
-  font-size: 3.75rem;
+  font-size: 3rem;
   font-weight: 600;
   line-height: 0.92;
   letter-spacing: -0.02em;
   color: #0a0e1a;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .login-clean-copy > p {
   font-size: 1.125rem;
   line-height: 1.75;
   color: #64748b;
-  margin-bottom: 32px;
+  margin-bottom: 0;
 }
 
 .login-clean-copy a {
@@ -1423,25 +1423,6 @@ textarea.input-field { resize: vertical; min-height: 120px; }
 
 .login-clean-copy a:hover {
   text-decoration: none;
-}
-
-.login-benefits {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.login-benefit {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  color: #0a0e1a;
-  font-size: 0.9375rem;
-}
-
-.login-benefit svg {
-  color: var(--accent-primary);
-  flex-shrink: 0;
 }
 
 .login-clean-panel {
@@ -1492,6 +1473,12 @@ textarea.input-field { resize: vertical; min-height: 120px; }
   display: flex;
   flex-direction: column;
   gap: 8px;
+}
+
+.form-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .form-group label {
@@ -1551,11 +1538,14 @@ textarea.input-field { resize: vertical; min-height: 120px; }
 }
 
 .forgot-password {
-  align-self: flex-end;
   font-size: 0.875rem;
   color: #64748b;
   text-decoration: none;
-  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px;
+  border-radius: 4px;
+  transition: color 150ms ease;
 }
 
 .forgot-password:hover {
