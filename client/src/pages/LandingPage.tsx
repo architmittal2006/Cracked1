@@ -17,7 +17,12 @@ import { Button } from '../components/Button';
 import { CrackedQuestionMark } from '../components/CrackedQuestionMark';
 import { ProofStrip } from '../components/ProofStrip';
 import { WordSwapSection } from '../components/WordSwapSection';
+import { TestimonialsCarousel } from '../components/TestimonialsCarousel';
 import { ProductStorySection } from '../components/ProductStorySection';
+import { TracksSection } from '../components/sections/TracksSection';
+import { TiersSection } from '../components/sections/TiersSection';
+import { ManifestoSection } from '../components/sections/ManifestoSection';
+import { FinalCTASection } from '../components/sections/ManifestoSection';
 
 const timeline = [
   {
@@ -79,6 +84,11 @@ export const LandingPage: React.FC = () => {
       <ProofStrip />
       <WordSwapSection />
       <ProductStorySection />
+      <TracksSection />
+      <TiersSection />
+      <TestimonialsCarousel />
+      <ManifestoSection />
+      <FinalCTASection />
 
 
       <ScrollTextCycle />
