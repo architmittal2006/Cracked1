@@ -43,6 +43,91 @@ const pool = new Pool({
 
 const pgStore = pgStoreFactory(session);
 
+// Ensure all database tables exist on startup (idempotent)
+async function ensureTables() {
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS users (
+      id VARCHAR(255) PRIMARY KEY,
+      username VARCHAR(100) NOT NULL UNIQUE,
+      email VARCHAR(255) NOT NULL UNIQUE,
+      password_hash VARCHAR(255) NOT NULL,
+      name VARCHAR(255) NOT NULL,
+      role VARCHAR(50) NOT NULL DEFAULT 'General',
+      credibility_score INTEGER NOT NULL DEFAULT 0,
+      solve_score INTEGER NOT NULL DEFAULT 0,
+      review_score INTEGER NOT NULL DEFAULT 0,
+      cases_solved INTEGER NOT NULL DEFAULT 0,
+      merge_bonus_count INTEGER NOT NULL DEFAULT 0,
+      bio TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS sessions (
+      sid VARCHAR(255) PRIMARY KEY,
+      sess JSONB NOT NULL,
+      expire TIMESTAMPTZ NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS cases (
+      id VARCHAR(255) PRIMARY KEY,
+      title VARCHAR(255) NOT NULL,
+      type VARCHAR(100) NOT NULL,
+      sector VARCHAR(100) NOT NULL,
+      difficulty VARCHAR(50) NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'Open',
+      description TEXT NOT NULL,
+      deliverables TEXT[] NOT NULL DEFAULT '{}',
+      pts INTEGER NOT NULL DEFAULT 0,
+      submission_count INTEGER NOT NULL DEFAULT 0,
+      review_count INTEGER NOT NULL DEFAULT 0,
+      deadline TIMESTAMPTZ,
+      tags TEXT[] NOT NULL DEFAULT '{}',
+      is_chaos BOOLEAN DEFAULT FALSE,
+      timer_deadline TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS submissions (
+      id VARCHAR(255) PRIMARY KEY,
+      case_id VARCHAR(255) NOT NULL REFERENCES cases(id),
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id),
+      content_json JSONB NOT NULL,
+      citations_count INTEGER NOT NULL DEFAULT 0,
+      word_count INTEGER NOT NULL DEFAULT 0,
+      status VARCHAR(50) NOT NULL DEFAULT 'Pending_Review',
+      structural_compliant BOOLEAN DEFAULT FALSE,
+      final_weighted_score INTEGER,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS reviews (
+      id VARCHAR(255) PRIMARY KEY,
+      submission_id VARCHAR(255) NOT NULL REFERENCES submissions(id),
+      reviewer_id VARCHAR(255) NOT NULL REFERENCES users(id),
+      case_id VARCHAR(255) REFERENCES cases(id),
+      reviewer_tier VARCHAR(50) NOT NULL,
+      scores JSONB NOT NULL,
+      is_voided BOOLEAN DEFAULT FALSE NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS votes (
+      id VARCHAR(255) PRIMARY KEY,
+      submission_id VARCHAR(255) NOT NULL REFERENCES submissions(id),
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id),
+      direction VARCHAR(10) NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+
+    CREATE TABLE IF NOT EXISTS credibility_scores (
+      id VARCHAR(255) PRIMARY KEY,
+      user_id VARCHAR(255) NOT NULL REFERENCES users(id),
+      score INTEGER NOT NULL,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+  `);
+}
+
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
@@ -426,9 +511,14 @@ app.get('/*splat', (req: Request, res: Response) => {
 
 // Start server only when run directly (not when imported for tests)
 if (process.env.NODE_ENV !== 'test') {
-  const PORT = process.env.PORT || 8080;
-  app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
+  ensureTables().then(() => {
+    const PORT = process.env.PORT || 8080;
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  }).catch((err) => {
+    console.error('Failed to initialize database tables:', err);
+    process.exit(1);
   });
 }
 
