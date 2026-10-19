@@ -17,6 +17,7 @@ import { Button } from '../components/Button';
 import { CrackedQuestionMark } from '../components/CrackedQuestionMark';
 import { ProofStrip } from '../components/ProofStrip';
 import { WordSwapSection } from '../components/WordSwapSection';
+import { ProductStorySection } from '../components/ProductStorySection';
 
 const timeline = [
   {
@@ -77,6 +78,7 @@ export const LandingPage: React.FC = () => {
       </section>
       <ProofStrip />
       <WordSwapSection />
+      <ProductStorySection />
 
 
       <ScrollTextCycle />
