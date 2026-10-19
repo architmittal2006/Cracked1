@@ -1,12 +1,26 @@
 services:
   - type: web
-    name: cracked
+    name: cracked-api
     env: node
     plan: free
-    buildCommand: npm install && npm run build
-    startCommand: node dist/server.js
+    buildCommand: npm install --legacy-peer-deps && cd client && npm install --legacy-peer-deps && npm run build && cd .. && npx tsc
+    startCommand: npx tsx db/migrate.ts && node dist/server.js
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: cracked-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: CLIENT_ORIGIN
+        sync: false
       - key: NODE_ENV
         value: production
-      - key: BASE_URL
-        value: https://cracked1-afy4.onrender.com
+      - key: PORT
+        value: 8080
+
+databases:
+  - name: cracked-db
+    databaseName: cracked
+    user: cracked
+    plan: free

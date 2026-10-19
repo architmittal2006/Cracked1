@@ -2,13 +2,15 @@ import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
-import FileStore from 'session-file-store';
-import { DatabaseService } from './dbService.js';
+import pgStoreFactory from 'connect-pg-simple';
+import rateLimit from 'express-rate-limit';
+import { z } from 'zod';
+import { Pool } from 'pg';
+import { DatabaseService, hashPassword, comparePassword } from './dbService.js';
 import { VerificationEngine } from './verificationEngine.js';
 
 // Load environment variables
@@ -32,11 +34,20 @@ declare module 'express-session' {
 
 const app = express();
 
+app.set('trust proxy', 1);
+
+// Database connection pool (for session store)
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+});
+
+const pgStore = pgStoreFactory(session);
+
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
 
-// CORS — allow the Vite dev client (port 5174) to call the API (port 8080) with credentials
+// CORS — allow configured client origin to call the API with credentials
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5174';
 app.use((_req: Request, res: Response, next: NextFunction) => {
   res.header('Access-Control-Allow-Origin', CLIENT_ORIGIN);
@@ -50,47 +61,45 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
   next();
 });
 
-// ─── Password hashing (Node built-in crypto, no extra dependency) ───
+// Rate limiting for auth endpoints
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  message: { success: false, error: 'Too many attempts, please try again later' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
-const hashPassword = (password: string): string => {
-  const salt = crypto.randomBytes(16).toString('hex');
-  const hash = crypto.pbkdf2Sync(password, salt, 100_000, 64, 'sha512').toString('hex');
-  return `${salt}:${hash}`;
-};
+// Zod validation schemas
+const signupSchema = z.object({
+  username: z.string().min(3).max(100),
+  name: z.string().min(1).max(255),
+  email: z.string().email(),
+  password: z.string().min(8),
+});
 
-const comparePassword = (password: string, stored: string): boolean => {
-  const [salt, hash] = stored.split(':');
-  if (!salt || !hash) return false;
-  const computed = crypto.pbkdf2Sync(password, salt, 100_000, 64, 'sha512').toString('hex');
-  return computed === hash;
-};
+const loginSchema = z.object({
+  email: z.string().email(),
+  password: z.string().min(1),
+});
 
-// Extend Session type to include user
-declare module 'express-session' {
-  interface SessionData {
-    user?: {
-      id: string;
-      username: string;
-      name: string;
-      email: string;
-    };
-  }
-}
-
+// Session configuration with PostgreSQL-backed store
 app.use(session({
+  store: new pgStore({
+    pool,
+    tableName: 'sessions',
+    createTableIfMissing: true,
+  }),
   secret: process.env.SESSION_SECRET || 'change-this-secret-in-production',
+  name: 'connect.sid',
   resave: false,
   saveUninitialized: false,
-  store: new (FileStore(session))({
-    path: path.join(__dirname, 'sessions'),
-    logFn: () => {} // Disable logging
-  }),
   cookie: {
-    httpOnly: true, // Prevents JavaScript access to cookies
-    secure: process.env.NODE_ENV === 'production', // HTTPS only in production
-    sameSite: 'lax', // CSRF protection while allowing cross-origin dev API calls
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+  },
 }));
 
 // Contextual Middleware simulating authenticated session user
@@ -234,24 +243,21 @@ app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
 });
 
 // Register (email/password)
-app.post('/api/auth/register', async (req: Request, res: Response): Promise<void> => {
-  const { username, name, email, password } = req.body;
-
-  if (!username || !name || !email || !password) {
-    res.status(400).json({ success: false, error: 'All fields are required' });
+app.post('/api/auth/register', authLimiter, async (req: Request, res: Response): Promise<void> => {
+  const parse = signupSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid input' });
     return;
   }
-  if (password.length < 8) {
-    res.status(400).json({ success: false, error: 'Password must be at least 8 characters' });
-    return;
-  }
+  const { username, name, email, password } = parse.data;
 
   try {
+    const passwordHash = await hashPassword(password);
     const id = await DatabaseService.createUser({
       username,
       name,
       email,
-      passwordHash: hashPassword(password),
+      passwordHash,
     });
 
     req.session.user = { id, username, name, email };
@@ -262,13 +268,13 @@ app.post('/api/auth/register', async (req: Request, res: Response): Promise<void
 });
 
 // Login (email/password)
-app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> => {
-  const { email, password } = req.body;
-
-  if (!email || !password) {
-    res.status(400).json({ success: false, error: 'Email and password are required' });
+app.post('/api/auth/login', authLimiter, async (req: Request, res: Response): Promise<void> => {
+  const parse = loginSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid input' });
     return;
   }
+  const { email, password } = parse.data;
 
   try {
     const user = await DatabaseService.getUserByEmail(email);
@@ -277,7 +283,7 @@ app.post('/api/auth/login', async (req: Request, res: Response): Promise<void> =
       return;
     }
 
-    if (!comparePassword(password, user.passwordHash)) {
+    if (!(await comparePassword(password, user.passwordHash))) {
       res.status(401).json({ success: false, error: 'Invalid email or password' });
       return;
     }
@@ -418,8 +424,12 @@ app.get('/*splat', (req: Request, res: Response) => {
   }
 });
 
-// Start server
-const PORT = process.env.PORT || 8080;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Start server only when run directly (not when imported for tests)
+if (process.env.NODE_ENV !== 'test') {
+  const PORT = process.env.PORT || 8080;
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+export { app };
