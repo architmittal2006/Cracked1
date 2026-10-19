@@ -36,6 +36,12 @@ export interface UserRecord {
   name: string;
   email: string;
   passwordHash: string;
+  credibilityScore: number;
+  solveScore: number;
+  reviewScore: number;
+  casesSolved: number;
+  mergeBonusCount: number;
+  role: string;
 }
 
 // ─── Password hashing (argon2) ───

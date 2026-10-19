@@ -6,6 +6,12 @@ interface User {
   username: string;
   name: string;
   email: string;
+  credibilityScore?: number;
+  solveScore?: number;
+  reviewScore?: number;
+  casesSolved?: number;
+  mergeBonusCount?: number;
+  role?: string;
 }
 
 interface AuthContextType {

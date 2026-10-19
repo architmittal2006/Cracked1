@@ -28,6 +28,12 @@ declare module 'express-session' {
       username: string;
       name: string;
       email: string;
+      credibilityScore?: number;
+      solveScore?: number;
+      reviewScore?: number;
+      casesSolved?: number;
+      mergeBonusCount?: number;
+      role?: string;
     };
   }
 }
@@ -266,6 +272,12 @@ app.post('/api/auth/github/callback', async (req: Request, res: Response) => {
       username: userData.login,
       name: userData.name || userData.login,
       email: userData.email || `${userData.login}@github.com`,
+      credibilityScore: 0,
+      solveScore: 0,
+      reviewScore: 0,
+      casesSolved: 0,
+      mergeBonusCount: 0,
+      role: 'General',
     };
 
     res.json({ success: true, user: req.session.user });
@@ -327,6 +339,12 @@ app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
       username: userData.email.split('@')[0], // Use email prefix as username
       name: userData.name,
       email: userData.email,
+      credibilityScore: 0,
+      solveScore: 0,
+      reviewScore: 0,
+      casesSolved: 0,
+      mergeBonusCount: 0,
+      role: 'General',
     };
 
     res.json({ success: true, user: req.session.user });
@@ -353,7 +371,19 @@ app.post('/api/auth/register', authLimiter, async (req: Request, res: Response):
       passwordHash,
     });
 
-    req.session.user = { id, username, name, email };
+    const newUser = await DatabaseService.getUserById(id);
+    req.session.user = {
+      id: newUser.id,
+      username: newUser.username,
+      name: newUser.name,
+      email: newUser.email,
+      credibilityScore: newUser.credibilityScore,
+      solveScore: newUser.solveScore,
+      reviewScore: newUser.reviewScore,
+      casesSolved: newUser.casesSolved,
+      mergeBonusCount: newUser.mergeBonusCount,
+      role: newUser.role,
+    };
     res.status(201).json({ success: true, user: req.session.user });
   } catch (error: any) {
     res.status(400).json({ success: false, error: error.message });
@@ -381,7 +411,18 @@ app.post('/api/auth/login', authLimiter, async (req: Request, res: Response): Pr
       return;
     }
 
-    req.session.user = { id: user.id, username: user.username, name: user.name, email: user.email };
+    req.session.user = {
+      id: user.id,
+      username: user.username,
+      name: user.name,
+      email: user.email,
+      credibilityScore: user.credibilityScore,
+      solveScore: user.solveScore,
+      reviewScore: user.reviewScore,
+      casesSolved: user.casesSolved,
+      mergeBonusCount: user.mergeBonusCount,
+      role: user.role,
+    };
     res.json({ success: true, user: req.session.user });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
