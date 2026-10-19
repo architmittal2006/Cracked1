@@ -37,6 +37,14 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Database connection pool (for session store)
+if (!process.env.DATABASE_URL) {
+  console.error(
+    'FATAL: DATABASE_URL environment variable is not set. ' +
+    'Provide a PostgreSQL connection string (Render Postgres, Neon, or Supabase).'
+  );
+  process.exit(1);
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
