@@ -6,6 +6,7 @@ import { CaseFilterBar } from '../components/CaseFilterBar';
 import { ChaosBanner } from '../components/ChaosBanner';
 import { PageWrapper } from '../components/PageWrapper';
 import { SEO } from '../components/SEO';
+import { Button } from '../components/Button';
 
 export const CasesPage: React.FC = () => {
   const [search, setSearch] = useState('');
@@ -76,18 +77,14 @@ export const CasesPage: React.FC = () => {
             </div>
             <h3 className="text-xl font-bold text-white mb-2">No cases found</h3>
             <p className="text-slate-400 mb-6">Try adjusting your filters or search terms</p>
-            <button
-              type="button"
-              onClick={() => {
+              <Button variant="primary" size="sm" onClick={() => {
                 setSearch('');
                 setTypeFilter('All');
                 setDifficultyFilter('All');
                 setSectorFilter('All');
-              }}
-              className="btn-primary"
-            >
-              Clear all filters
-            </button>
+              }}>
+                Clear all filters
+              </Button>
           </div>
         )}
       </div>

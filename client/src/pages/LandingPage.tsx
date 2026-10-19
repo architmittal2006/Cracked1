@@ -5,50 +5,18 @@ import {
   ArrowRight,
   CheckCircle2,
   FileText,
-  GitPullRequest,
   Scale,
   ShieldCheck,
   Sparkles,
   Trophy,
   Users,
-  Zap,
 } from 'lucide-react';
-import { AnimatedCounter } from '../components/AnimatedCounter';
 import { Reveal } from '../components/Reveal';
 import { ScrollTextCycle } from '../components/ScrollTextCycle';
-import { TestimonialsCarousel } from '../components/TestimonialsCarousel';
 import { Button } from '../components/Button';
-import { PLATFORM_STATS } from '../data/mockData';
-
-const tracks = [
-  { 
-    title: 'Track 1 — Open Arena', 
-    meta: 'No gate · submit immediately · community upvote ranking', 
-    icon: Trophy,
-    color: '#1D9E75',
-    bgColor: '#E1F5EE',
-    borderColor: '#0F6E56',
-    weight: '0.5× credibility weight'
-  },
-  { 
-    title: 'Track 2 — Community Questions', 
-    meta: 'User-posted problems · poster accepts best answer · 2× acceptance bonus', 
-    icon: GitPullRequest,
-    color: '#D4537E',
-    bgColor: '#FBEAF0',
-    borderColor: '#993556',
-    weight: '0.8× credibility weight'
-  },
-  { 
-    title: 'Track 3 — Curated Cases', 
-    meta: '2-review gate · 5-dimension rubric · merge bonus from companies', 
-    icon: Zap,
-    color: '#7F77DD',
-    bgColor: '#EEEDFE',
-    borderColor: '#534AB7',
-    weight: '1.0× credibility weight'
-  },
-];
+import { CrackedQuestionMark } from '../components/CrackedQuestionMark';
+import { ProofStrip } from '../components/ProofStrip';
+import { WordSwapSection } from '../components/WordSwapSection';
 
 const timeline = [
   {
@@ -85,120 +53,31 @@ export const LandingPage: React.FC = () => {
 
   return (
     <div className="landing-stage">
-      <section className="poster-hero">
-        <div className="poster-bg" aria-hidden="true">
-          <span className="poly poly-1" />
-          <span className="poly poly-2" />
-          <span className="poly poly-3" />
-          <span className="poly poly-4" />
-          <span className="scanline scanline-1" />
-          <span className="scanline scanline-2" />
-          <div className="glow-orb glow-orb-1" />
-          <div className="glow-orb glow-orb-2" />
+      <section className="relative min-h-screen flex items-center pt-24 overflow-hidden">
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
+          <div className="absolute w-[600px] h-[600px] rounded-full bg-orange-500/20 blur-3xl" />
         </div>
-
-        <div className="page-container poster-content">
-          <Reveal variant="fade" delay={0}>
-            <div className="presented-strip">
-              <span>Open source</span>
-              <span>Case competitions</span>
-            </div>
-          </Reveal>
-
-          <Reveal variant="up" delay={100}>
-            <div className="poster-mark" aria-hidden="true">
-              <div className="mark-ring">
-                <span className="text-3xl md:text-5xl font-black">?</span>
-              </div>
-              <div className="mark-copy">
-                <span>are you</span>
-                <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-24 w-auto" />
-              </div>
-            </div>
-          </Reveal>
-
-          <Reveal variant="up" delay={200}>
-            <h1 className="poster-title">
-              <span>Peer-Reviewed</span>
-              <strong>Consulting Arena</strong>
+        <div className="page-container grid md:grid-cols-2 gap-12 items-center relative z-10">
+          <div>
+            <h1 className="text-white font-bold" style={{ fontSize: 'clamp(40px,5vw,72px)', lineHeight: 1.1 }}>
+              Peer-reviewed consulting arena
             </h1>
-          </Reveal>
-
-          <Reveal variant="up" delay={300}>
-            <p className="poster-kicker">
-              Solve real business cases. Get scored by peers. Build proof-of-work credibility
-              that hiring managers actually trust.
+            <p className="text-slate-300 mt-4 text-lg max-w-xl">
+              Solve real business cases, get scored by peers, and build proof-of-work credibility hiring managers trust.
             </p>
-          </Reveal>
-
-          <Reveal variant="up" delay={400}>
-            <div className="poster-statline" aria-label="Platform stats">
-              <span>
-                <AnimatedCounter target={PLATFORM_STATS.totalCasesSolved} suffix="+" /> cases solved
-              </span>
-              <span>
-                <AnimatedCounter target={PLATFORM_STATS.activeConsultants} suffix="+" /> contributors
-              </span>
-              <span>
-                <AnimatedCounter target={PLATFORM_STATS.mergeBonusesAwarded} suffix="" /> merge bonuses
-              </span>
+            <div className="flex flex-wrap gap-4 mt-8">
+              <Button variant="primary" size="lg" onClick={handleGetStarted}>Solve your first case free</Button>
+              <Button variant="secondary" size="lg" as="a" href="/how-it-works">See how it works</Button>
             </div>
-          </Reveal>
-
-          <Reveal variant="up" delay={450}>
-            <div className="flex items-center justify-center gap-6 mt-8 flex-wrap">
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Live cases updated daily</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span>Peer-reviewed submissions</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <svg className="w-4 h-4 text-emerald-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span>Company merge bonuses</span>
-              </div>
-            </div>
-          </Reveal>
-
-          <Reveal variant="up" delay={500}>
-            <div className="poster-actions">
-              <Button variant="primary" size="lg" onClick={handleGetStarted} className="btn-magnetic group min-w-[260px]">
-                Solve your first case free
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-              </Button>
-              <Button variant="secondary" size="lg" as="a" href="/how-it-works" className="min-w-[200px]">
-                How It Works
-                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-              </Button>
-            </div>
-          </Reveal>
-
-          <Reveal variant="up" delay={600}>
-            <div className="track-strip">
-              {tracks.map(({ title, meta, icon: Icon, color, bgColor, borderColor, weight }) => (
-                <div
-                  key={title}
-                  className="track-chip group"
-                  style={{ background: bgColor, border: `0.5px solid ${borderColor}` }}
-                >
-                  <Icon style={{ color }} className="w-5 h-5 group-hover:scale-110 transition-transform duration-300" />
-                  <div>
-                    <strong style={{ color }}>{title}</strong>
-                    <span>{meta}</span>
-                    <span style={{ color, fontWeight: 500, marginTop: 2 }}>{weight}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Reveal>
+          </div>
+          <div className="flex justify-center">
+            <CrackedQuestionMark />
+          </div>
         </div>
       </section>
+      <ProofStrip />
+      <WordSwapSection />
+
 
       <ScrollTextCycle />
 
@@ -503,7 +382,7 @@ export const LandingPage: React.FC = () => {
         </Reveal>
 
         <Reveal variant="up" delay={100}>
-          <TestimonialsCarousel />
+
         </Reveal>
       </section>
 

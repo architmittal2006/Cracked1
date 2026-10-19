@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Bot, CheckCircle, AlertTriangle, XCircle } from 'lucide-react';
+import { Button } from './Button';
 
 interface ValidationIssue {
   type: 'error' | 'warning' | 'info';
@@ -36,14 +37,14 @@ export const AIValidator: React.FC<AIValidatorProps> = ({ onValidate }) => {
           <Bot className="w-5 h-5 text-violet-400" />
           <span className="font-bold text-white text-sm">AI Validator</span>
         </div>
-        <button
-          type="button"
+        <Button
+          variant="secondary"
+          size="sm"
           onClick={handleValidate}
           disabled={validating}
-          className="text-xs btn-secondary"
         >
           {validating ? 'Validating...' : 'Run Check'}
-        </button>
+        </Button>
       </div>
 
       {issues.length > 0 && (

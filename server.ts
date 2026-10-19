@@ -551,6 +551,31 @@ console.log('process.cwd():', process.cwd());
 console.log('File exists:', fs.existsSync(clientDistPath));
 app.use(express.static(clientDistPath));
 
+// In-memory stats cache (5 minutes)
+let statsCache: { data: { solutionsScored: number; contributors: number; mergeBonuses: number }; expires: number } | null = null;
+
+app.get('/api/stats', async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (statsCache && statsCache.expires > Date.now()) {
+      res.json(statsCache.data);
+      return;
+    }
+    const r1 = await pool.query("SELECT COUNT(*)::int AS c FROM submissions WHERE final_weighted_score IS NOT NULL");
+    const r2 = await pool.query("SELECT COUNT(DISTINCT u)::int AS c FROM (SELECT user_id AS u FROM submissions UNION SELECT reviewer_id AS u FROM reviews) t");
+    const r3 = await pool.query("SELECT COALESCE(SUM(merge_bonus_count),0)::int AS c FROM users");
+    const data = {
+      solutionsScored: r1.rows[0].c,
+      contributors: r2.rows[0].c,
+      mergeBonuses: r3.rows[0].c,
+    };
+    statsCache = { data, expires: Date.now() + 5 * 60 * 1000 };
+    res.json(data);
+  } catch (err) {
+    console.error('Stats error:', err);
+    res.status(500).json({ error: 'stats unavailable' });
+  }
+});
+
 // SPA fallback - serve index.html for all non-API routes
 app.get('/*splat', (req: Request, res: Response) => {
   if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
