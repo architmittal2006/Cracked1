@@ -441,7 +441,7 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
       res.status(500).json({ success: false, error: 'Logout failed' });
       return;
     }
-    res.clearCookie('connect.sid');
+    res.clearCookie('connect.sid', { path: '/' });
     res.json({ success: true });
   });
 });
