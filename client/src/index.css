@@ -77,6 +77,12 @@ body {
 }
 
 /* ─── Custom Scrollbar (Eureka Style) ─── */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #FF4C25 #000000;
+  overflow-y: scroll !important;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
 }
