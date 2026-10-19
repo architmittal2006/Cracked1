@@ -1,14 +1,16 @@
 import React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { HelpCircle, CheckCircle, ArrowRight, MessageCircle } from 'lucide-react';
 import { MOCK_QUESTIONS, MOCK_USERS } from '../data/mockData';
 import { PageWrapper } from '../components/PageWrapper';
 import { TrackBadge } from '../components/TrackBadge';
 import { ProblemTypeBadge } from '../components/ProblemTypeBadge';
 import { Avatar } from '../components/Avatar';
+import { Button } from '../components/Button';
 
 export const QuestionsDetailPage: React.FC = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const question = MOCK_QUESTIONS.find(q => q.id === id);
   const poster = question ? MOCK_USERS.find(u => u.id === question.posterId) : null;
 
@@ -99,9 +101,9 @@ export const QuestionsDetailPage: React.FC = () => {
         </div>
 
         <div className="text-center">
-          <Link to={`/questions/${question.id}/answer`} className="btn-primary">
+          <Button variant="primary" size="md" onClick={() => navigate(`/questions/${question.id}/answer`)} className="w-full justify-center">
             Submit Your Answer <ArrowRight className="w-4 h-4" />
-          </Link>
+          </Button>
           <p className="text-xs text-slate-500 mt-2">No gate required · submit immediately after login</p>
         </div>
       </div>

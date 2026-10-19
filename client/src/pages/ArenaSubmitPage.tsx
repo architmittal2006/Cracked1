@@ -6,6 +6,7 @@ import { PageWrapper } from '../components/PageWrapper';
 import { TrackBadge } from '../components/TrackBadge';
 import { ProblemTypeBadge } from '../components/ProblemTypeBadge';
 import { DeliverablesList } from '../components/DeliverablesList';
+import { Button } from '../components/Button';
 
 export const ArenaSubmitPage: React.FC = () => {
   const { id } = useParams();
@@ -34,7 +35,7 @@ export const ArenaSubmitPage: React.FC = () => {
       <PageWrapper>
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Arena Case Not Found</h2>
-          <Link to="/arena" className="btn-primary">Browse Arena</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/arena')}>Browse Arena</Button>
         </div>
       </PageWrapper>
     );
@@ -98,24 +99,26 @@ export const ArenaSubmitPage: React.FC = () => {
           ))}
 
           <div className="flex items-center gap-4 mt-8">
-            <button
-              type="button"
+            <Button
+              variant="secondary"
+              size="md"
               onClick={handleSave}
               disabled={saving}
-              className="btn-secondary flex items-center gap-2"
+              className="flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
               {saving ? 'Saving...' : 'Save Draft'}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
               onClick={handleSubmit}
               disabled={submitting}
-              className="btn-primary flex items-center gap-2 flex-1 justify-center"
+              className="flex items-center gap-2 flex-1 justify-center"
             >
               <Send className="w-4 h-4" />
               {submitting ? 'Publishing...' : 'Publish Solution'}
-            </button>
+            </Button>
           </div>
         </div>
       </div>

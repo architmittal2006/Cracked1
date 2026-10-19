@@ -6,6 +6,7 @@ import { ScoreRing } from '../components/ScoreRing';
 import { TierBadge } from '../components/TierBadge';
 import { PageWrapper } from '../components/PageWrapper';
 import { useAuth } from '../contexts/AuthContext';
+import { Button } from '../components/Button';
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
@@ -86,7 +87,7 @@ export const DashboardPage: React.FC = () => {
         <div className="glass-card p-6 hover:border-emerald-500/30 transition-colors">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-white">Active Submissions</h2>
-            <Link to="/cases" className="btn-ghost text-xs hover:text-emerald-400 transition-colors">Browse cases</Link>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/cases')} className="hover:text-emerald-400 transition-colors">Browse cases</Button>
           </div>
           <div className="space-y-4">
             <p className="text-slate-400 text-sm">No active submissions. <Link to="/cases" className="text-emerald-400 hover:text-emerald-300 transition-colors">Pick a case</Link></p>
@@ -112,9 +113,9 @@ export const DashboardPage: React.FC = () => {
             <div className="text-sm text-slate-400">Live credibility score with verification hash</div>
           </div>
         </div>
-        <Link to={`/certificate/${user.username}`} className="btn-primary hover:scale-105 transition-transform">
+        <Button variant="primary" size="md" onClick={() => navigate(`/certificate/${user.username}`)} className="hover:scale-105 transition-transform">
           View Certificate <ArrowRight className="w-4 h-4" />
-        </Link>
+        </Button>
       </div>
     </PageWrapper>
   );

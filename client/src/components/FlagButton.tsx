@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Flag, Check, AlertTriangle } from 'lucide-react';
 import { flagReview } from '../services/api';
+import { Button } from './Button';
 
 interface FlagButtonProps {
   reviewId: string;
@@ -30,25 +31,27 @@ export const FlagButton: React.FC<FlagButtonProps> = ({ reviewId, onFlagged }) =
 
   if (flagged) {
     return (
-      <button
-        type="button"
-        className="btn-ghost w-full flex items-center justify-center gap-2 text-emerald-400 opacity-50 cursor-not-allowed bg-emerald-500/10 border border-emerald-500/20"
+      <Button
+        variant="ghost"
+        size="md"
         disabled
+        className="w-full text-emerald-400 opacity-100 bg-emerald-500/10 border border-emerald-500/20"
       >
         <Check className="w-4 h-4" /> Flagged
-      </button>
+      </Button>
     );
   }
 
   return (
     <div className="relative">
-      <button
-        type="button"
-        className="btn-ghost w-full flex items-center justify-center gap-2 text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-300"
+      <Button
+        variant="ghost"
+        size="md"
+        className="w-full text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 transition-all duration-300"
         onClick={() => setShowConfirm(!showConfirm)}
       >
         <Flag className="w-4 h-4" /> Flag as Low-Effort
-      </button>
+      </Button>
 
       {showConfirm && (
         <div className="absolute bottom-full left-0 right-0 mb-2 p-4 bg-slate-900 border border-rose-500/30 rounded-lg shadow-xl z-10 animate-scale-in">
@@ -59,28 +62,24 @@ export const FlagButton: React.FC<FlagButtonProps> = ({ reviewId, onFlagged }) =
             </p>
           </div>
           <div className="flex gap-2">
-            <button
-              type="button"
-              className="flex-1 px-3 py-2 bg-rose-500 text-white text-xs rounded hover:bg-rose-600 disabled:opacity-50 transition-colors duration-200 flex items-center justify-center gap-1"
+            <Button
+              variant="primary"
+              size="sm"
               onClick={handleFlag}
+              loading={flagging}
               disabled={flagging}
+              className="flex-1"
             >
-              {flagging ? (
-                <>
-                  <div className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Flagging...
-                </>
-              ) : (
-                'Confirm Flag'
-              )}
-            </button>
-            <button
-              type="button"
-              className="flex-1 px-3 py-2 bg-slate-700 text-white text-xs rounded hover:bg-slate-600 transition-colors duration-200"
+              {flagging ? 'Flagging...' : 'Confirm Flag'}
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setShowConfirm(false)}
+              className="flex-1 text-white hover:bg-slate-600/50"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </div>
       )}

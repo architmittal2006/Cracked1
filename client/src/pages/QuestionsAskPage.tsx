@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { HelpCircle, Send } from 'lucide-react';
 import { PageWrapper } from '../components/PageWrapper';
 import { TrackBadge } from '../components/TrackBadge';
+import { Button } from '../components/Button';
 
 export const QuestionsAskPage: React.FC = () => {
   const navigate = useNavigate();
@@ -95,15 +96,16 @@ export const QuestionsAskPage: React.FC = () => {
             />
           </label>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="md"
             onClick={handleSubmit}
             disabled={submitting}
-            className="btn-primary w-full flex items-center justify-center gap-2"
+            className="w-full"
           >
             <Send className="w-4 h-4" />
             Post Question
-          </button>
+          </Button>
         </div>
       </div>
     </PageWrapper>

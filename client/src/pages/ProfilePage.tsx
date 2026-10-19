@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { CURRENT_USER, MOCK_SUBMISSIONS, MOCK_REVIEWS, getUserByUsername } from '../data/mockData';
 import { TierBadge } from '../components/TierBadge';
 import { ReviewerBadge } from '../components/ReviewerBadge';
@@ -9,9 +9,11 @@ import { Avatar } from '../components/Avatar';
 import { TierProgressBar } from '../components/TierProgressBar';
 import { Diamond, Trophy, Star, Share2 } from 'lucide-react';
 import { PageWrapper } from '../components/PageWrapper';
+import { Button } from '../components/Button';
 
 export const ProfilePage: React.FC = () => {
   const { username } = useParams();
+  const navigate = useNavigate();
   const user = username ? getUserByUsername(username) : CURRENT_USER;
   const isOwnProfile = !username || user?.id === CURRENT_USER.id;
 
@@ -20,7 +22,7 @@ export const ProfilePage: React.FC = () => {
       <PageWrapper>
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Profile Not Found</h2>
-          <Link to="/leaderboard" className="btn-primary">View Leaderboard</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/leaderboard')}>View Leaderboard</Button>
         </div>
       </PageWrapper>
     );
@@ -67,9 +69,9 @@ export const ProfilePage: React.FC = () => {
               <TierProgressBar score={user.credibility_score} compact />
             </div>
           </div>
-          <Link to={`/certificate/${user.username}`} className="btn-secondary self-center">
+          <Button variant="secondary" size="md" onClick={() => navigate(`/certificate/${user.username}`)} className="self-center">
             <Share2 className="w-4 h-4" /> Certificate
-          </Link>
+          </Button>
         </div>
       </div>
 
@@ -196,7 +198,7 @@ export const ProfilePage: React.FC = () => {
           </div>
 
           {isOwnProfile && (
-            <Link to="/dashboard" className="btn-primary w-full justify-center">Go to Dashboard</Link>
+            <Button variant="primary" size="md" onClick={() => navigate('/dashboard')} className="w-full justify-center">Go to Dashboard</Button>
           )}
         </div>
       </div>

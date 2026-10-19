@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Lock, Save, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react';
 import { MOCK_CASES, SUBMISSION_TEMPLATES } from '../data/mockData';
 import { GateIndicator } from '../components/GateIndicator';
 import { PageWrapper } from '../components/PageWrapper';
+import { Button } from '../components/Button';
 import { createSubmission, getGateStatus } from '../services/api';
 
 function countWords(text: string): number {
@@ -99,7 +100,7 @@ export const SubmitPage: React.FC = () => {
       <PageWrapper>
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Case Not Found</h2>
-          <Link to="/cases" className="btn-primary">Back to Cases</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/cases')}>Back to Cases</Button>
         </div>
       </PageWrapper>
     );
@@ -116,8 +117,8 @@ export const SubmitPage: React.FC = () => {
           <p className="text-slate-400 mb-6">Complete 2 peer reviews for this case before submitting.</p>
           <GateIndicator reviewsCompleted={gateReviews} />
           <div className="flex gap-3 justify-center mt-6">
-            <Link to={`/cases/${caseData.id}/review`} className="btn-secondary">Review Submissions</Link>
-            <Link to={`/cases/${caseData.id}`} className="btn-ghost">Back to Case</Link>
+            <Button variant="secondary" size="md" onClick={() => navigate(`/cases/${caseData.id}/review`)}>Review Submissions</Button>
+            <Button variant="ghost" size="md" onClick={() => navigate(`/cases/${caseData.id}`)}>Back to Case</Button>
           </div>
         </div>
       </PageWrapper>
@@ -126,7 +127,7 @@ export const SubmitPage: React.FC = () => {
 
   return (
     <PageWrapper>
-      <Link to={`/cases/${caseData.id}`} className="btn-ghost mb-6 text-sm inline-flex">← Back to Case</Link>
+      <Button variant="ghost" size="sm" onClick={() => navigate(`/cases/${caseData.id}`)} className="mb-6 inline-flex">← Back to Case</Button>
 
       <div className="page-header pb-6">
         <div className="section-label mb-2">{caseData.type.toUpperCase()} TEMPLATE</div>
@@ -141,7 +142,7 @@ export const SubmitPage: React.FC = () => {
           </div>
           <h3 className="text-2xl font-bold text-white mb-2">Submission Received</h3>
           <p className="text-slate-400 mb-6">Structural validation passed. Your solution enters the review queue.</p>
-          <Link to="/dashboard" className="btn-primary">Go to Dashboard</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -269,15 +270,13 @@ export const SubmitPage: React.FC = () => {
                 ))}
               </ul>
 
-              <button
-                type="button"
-                className={`btn-primary w-full mb-3 transition-all duration-300 ${
-                  allSectionsValid
-                    ? 'shadow-[0_0_20px_rgba(255,76,37,0.4)]'
-                    : 'opacity-50 cursor-not-allowed'
-                }`}
-                disabled={!allSectionsValid || submitting}
+              <Button
+                variant="primary"
+                size="md"
                 onClick={handleSubmit}
+                disabled={!allSectionsValid || submitting}
+                loading={submitting}
+                className={`w-full mb-3 ${allSectionsValid ? 'shadow-[0_0_20px_rgba(255,76,37,0.4)]' : 'opacity-50 cursor-not-allowed'}`}
               >
                 {submitting ? (
                   <span className="flex items-center justify-center gap-2">
@@ -287,20 +286,21 @@ export const SubmitPage: React.FC = () => {
                 ) : (
                   'Submit for Review'
                 )}
-              </button>
+              </Button>
               {error && (
                 <div className="text-rose-400 text-xs mb-3 p-2 bg-rose-500/10 rounded border border-rose-500/20 flex items-center gap-2">
                   <AlertCircle className="w-4 h-4" />
                   {error}
                 </div>
               )}
-              <button
-                type="button"
-                className="btn-ghost w-full"
+              <Button
+                variant="ghost"
+                size="md"
                 onClick={() => navigate(`/cases/${caseData.id}`)}
+                className="w-full"
               >
                 Save Draft & Exit
-              </button>
+              </Button>
             </div>
           </div>
         </div>

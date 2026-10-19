@@ -1,14 +1,16 @@
 import React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useNavigate } from 'react-router-dom';
 import { Trophy, ArrowRight, TrendingUp, TrendingDown } from 'lucide-react';
 import { MOCK_ARENA_CASES } from '../data/mockData';
 import { PageWrapper } from '../components/PageWrapper';
 import { TrackBadge } from '../components/TrackBadge';
 import { ProblemTypeBadge } from '../components/ProblemTypeBadge';
 import { DeliverablesList } from '../components/DeliverablesList';
+import { Button } from '../components/Button';
 
 export const ArenaDetailPage: React.FC = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const arenaCase = MOCK_ARENA_CASES.find(c => c.id === id);
 
   if (!arenaCase) {
@@ -16,7 +18,7 @@ export const ArenaDetailPage: React.FC = () => {
       <PageWrapper>
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Arena Case Not Found</h2>
-          <Link to="/arena" className="btn-primary">Browse Arena</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/arena')}>Browse Arena</Button>
         </div>
       </PageWrapper>
     );
@@ -82,12 +84,13 @@ export const ArenaDetailPage: React.FC = () => {
                     </div>
                     <p className="text-sm text-slate-400 line-clamp-2">{solution.excerpt}</p>
                   </div>
-                  <Link
-                    to={`/arena/${arenaCase.id}/solutions/${solution.id}`}
-                    className="btn-secondary text-sm"
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate(`/arena/${arenaCase.id}/solutions/${solution.id}`)}
                   >
                     Read Full
-                  </Link>
+                  </Button>
                 </div>
               </div>
             ))}
@@ -95,9 +98,9 @@ export const ArenaDetailPage: React.FC = () => {
         </div>
 
         <div className="text-center">
-          <Link to={`/arena/${arenaCase.id}/submit`} className="btn-primary">
+          <Button variant="primary" size="md" onClick={() => navigate(`/arena/${arenaCase.id}/submit`)} className="w-full">
             Submit Your Solution <ArrowRight className="w-4 h-4" />
-          </Link>
+          </Button>
           <p className="text-xs text-slate-500 mt-2">No gate required · submit immediately after login</p>
         </div>
       </div>

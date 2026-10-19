@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Building2, Send } from 'lucide-react';
 import { PageWrapper } from '../components/PageWrapper';
+import { Button } from '../components/Button';
 
 export const CompanyPostCasePage: React.FC = () => {
   const [formData, setFormData] = useState({
@@ -99,14 +100,10 @@ export const CompanyPostCasePage: React.FC = () => {
             </select>
           </label>
 
-          <button
-            type="button"
-            onClick={handleSubmit}
-            className="btn-primary w-full flex items-center justify-center gap-2"
-          >
+          <Button variant="primary" size="md" onClick={handleSubmit} className="w-full">
             <Send className="w-4 h-4" />
             Post Case
-          </button>
+          </Button>
         </div>
       </div>
     </PageWrapper>

@@ -1,10 +1,10 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 import { Clock, FileText, Zap } from 'lucide-react';
 import type { Case } from '../data/mockData';
 import { GATE_STATE } from '../data/mockData';
 import { ProblemTypeBadge } from './ProblemTypeBadge';
 import { GateIndicator } from './GateIndicator';
+import { Button } from './Button';
 
 interface CaseCardProps {
   caseData: Case;
@@ -78,13 +78,16 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
         </div>
       </div>
 
-      <div className={`${caseData.isFeatured ? 'md:col-span-1 flex items-center justify-center mt-6 md:mt-0' : 'mt-4'}`}>
-        <Link
-          to={`/cases/${caseData.id}`}
-          className={`w-full text-center ${caseData.isFeatured ? 'btn-primary py-4' : 'btn-secondary py-2'} group-hover:scale-105 transition-transform`}
+      <div className={`${caseData.isFeatured ? 'md:col-span-1 flex items-center justify-center mt-6 md:mt-0' : 'mt-4 flex items-center'}`}>
+        <Button
+          variant="primary"
+          size="md"
+          as="a"
+          href={`/cases/${caseData.id}`}
+          className="w-full"
         >
           View Case
-        </Link>
+        </Button>
       </div>
     </div>
   );

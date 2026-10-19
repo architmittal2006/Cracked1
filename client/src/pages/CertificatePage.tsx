@@ -1,10 +1,11 @@
 import React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { QrCode, Share2, ShieldCheck } from 'lucide-react';
 import { getUserByUsername, getCredibilityTier, CREDIBILITY_TIER_THRESHOLDS } from '../data/mockData';
 import { TierBadge } from '../components/TierBadge';
 import { ScoreRing } from '../components/ScoreRing';
 import { PageWrapper } from '../components/PageWrapper';
+import { Button } from '../components/Button';
 
 function generateVerificationHash(username: string, score: number): string {
   let hash = 0;
@@ -18,6 +19,7 @@ function generateVerificationHash(username: string, score: number): string {
 
 export const CertificatePage: React.FC = () => {
   const { username } = useParams();
+  const navigate = useNavigate();
   const user = username ? getUserByUsername(username) : undefined;
 
   if (!user) {
@@ -25,7 +27,7 @@ export const CertificatePage: React.FC = () => {
       <PageWrapper>
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Certificate Not Found</h2>
-          <Link to="/leaderboard" className="btn-primary">View Leaderboard</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/leaderboard')}>View Leaderboard</Button>
         </div>
       </PageWrapper>
     );
@@ -90,10 +92,10 @@ export const CertificatePage: React.FC = () => {
         </div>
 
         <div className="flex justify-center gap-4 mt-8">
-          <Link to={`/profile/${user.username}`} className="btn-secondary">View Profile</Link>
-          <button type="button" className="btn-primary flex items-center gap-2">
+          <Button variant="secondary" size="md" onClick={() => navigate(`/profile/${user.username}`)}>View Profile</Button>
+          <Button variant="primary" size="md" className="flex items-center gap-2">
             <Share2 className="w-4 h-4" /> Share on LinkedIn
-          </button>
+          </Button>
         </div>
       </div>
     </PageWrapper>

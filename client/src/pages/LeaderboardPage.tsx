@@ -3,11 +3,12 @@ import { Search } from 'lucide-react';
 import { MOCK_USERS, CREDIBILITY_TIER_THRESHOLDS, getCredibilityTier } from '../data/mockData';
 import type { CredibilityTier, TrackType } from '../data/mockData';
 import { Avatar } from '../components/Avatar';
+import { TrackBadge } from '../components/TrackBadge';
 import { CURRENT_USER } from '../data/mockData';
 import { PageWrapper } from '../components/PageWrapper';
 import { PodiumTop3 } from '../components/PodiumTop3';
 import { LeaderboardTable } from '../components/LeaderboardTable';
-import { TrackBadge } from '../components/TrackBadge';
+import { Button } from '../components/Button';
 
 const TRACKS: { id: TrackType | 'all'; label: string; color: string }[] = [
   { id: 'all', label: 'All Tracks', color: '#7F77DD' },
@@ -81,29 +82,31 @@ export const LeaderboardPage: React.FC = () => {
       <div className="flex flex-wrap gap-2 mb-8">
         <span className="text-xs text-slate-500 uppercase font-bold self-center mr-1">Track</span>
         {TRACKS.map(track => (
-          <button
+          <Button
             key={track.id}
-            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setTrackFilter(track.id)}
-            className={`btn-ghost text-xs transition-all ${trackFilter === track.id ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : ''}`}
+            className={trackFilter === track.id ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : ''}
             style={trackFilter === track.id ? { borderColor: track.color } : {}}
           >
             {track.label}
-          </button>
+          </Button>
         ))}
       </div>
 
       <div className="flex flex-wrap gap-2 mb-8">
         <span className="text-xs text-slate-500 uppercase font-bold self-center mr-1">Tier</span>
         {(['All', ...CREDIBILITY_TIER_THRESHOLDS.map(t => t.tier)] as const).map(tier => (
-          <button
+          <Button
             key={tier}
-            type="button"
+            variant="ghost"
+            size="sm"
             onClick={() => setTierFilter(tier)}
-            className={`btn-ghost text-xs transition-all ${tierFilter === tier ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : ''}`}
+            className={tierFilter === tier ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30' : ''}
           >
             {tier}
-          </button>
+          </Button>
         ))}
       </div>
 

@@ -1,7 +1,9 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '../components/Button';
 
 export const NotFoundPage: React.FC = () => {
+  const navigate = useNavigate();
   return (
     <div className="min-h-[80vh] flex flex-col items-center justify-center text-center px-4 animate-scale-in">
       <h1 className="text-7xl md:text-9xl font-black gradient-text mb-4">404</h1>
@@ -9,9 +11,7 @@ export const NotFoundPage: React.FC = () => {
       <p className="text-slate-400 max-w-md mx-auto mb-8">
         The case you're looking for doesn't exist in our system, or you don't have the necessary clearance to view it.
       </p>
-      <Link to="/" className="btn-primary">
-        Back to Home
-      </Link>
+      <Button variant="primary" size="md" onClick={() => navigate('/')}>Back to Home</Button>
     </div>
   );
 };

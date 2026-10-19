@@ -5,6 +5,7 @@ import { MOCK_QUESTIONS } from '../data/mockData';
 import { PageWrapper } from '../components/PageWrapper';
 import { TrackBadge } from '../components/TrackBadge';
 import { ProblemTypeBadge } from '../components/ProblemTypeBadge';
+import { Button } from '../components/Button';
 
 export const QuestionsAnswerPage: React.FC = () => {
   const { id } = useParams();
@@ -85,15 +86,16 @@ export const QuestionsAnswerPage: React.FC = () => {
             />
           </label>
 
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="md"
             onClick={handleSubmit}
             disabled={submitting || !content}
-            className="btn-primary w-full flex items-center justify-center gap-2"
+            className="w-full"
           >
             <Send className="w-4 h-4" />
             {submitting ? 'Submitting...' : 'Submit Answer'}
-          </button>
+          </Button>
         </div>
       </div>
     </PageWrapper>

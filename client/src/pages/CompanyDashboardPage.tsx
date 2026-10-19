@@ -1,10 +1,12 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Building2, Plus, Users, FileText, TrendingUp, Award } from 'lucide-react';
 import { PageWrapper } from '../components/PageWrapper';
 import { TrackBadge } from '../components/TrackBadge';
+import { Button } from '../components/Button';
 
 export const CompanyDashboardPage: React.FC = () => {
+  const navigate = useNavigate();
   // Mock company data
   const companyCases = [
     { id: 'c001', title: 'D2C Brand Margin Erosion', submissions: 12, status: 'In Review', track: 'curated_case' as const },
@@ -25,9 +27,9 @@ export const CompanyDashboardPage: React.FC = () => {
             <Building2 className="w-8 h-8 text-amber-400" />
             <h1 className="text-3xl font-bold text-white">Company Dashboard</h1>
           </div>
-          <Link to="/company/cases/new" className="btn-primary flex items-center gap-2">
+          <Button variant="primary" size="md" onClick={() => navigate('/company/cases/new')} className="flex items-center gap-2">
             <Plus className="w-4 h-4" /> Post Case
-          </Link>
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">

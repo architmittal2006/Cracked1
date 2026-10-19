@@ -1,13 +1,15 @@
 import React, { useMemo, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { MOCK_CASES, SLUG_TO_PROBLEM_TYPE } from '../data/mockData';
 import { CaseCard } from '../components/CaseCard';
 import { CaseFilterBar } from '../components/CaseFilterBar';
 import { ChaosBanner } from '../components/ChaosBanner';
 import { PageWrapper } from '../components/PageWrapper';
+import { Button } from '../components/Button';
 
 export const CasesByTypePage: React.FC = () => {
   const { type } = useParams();
+  const navigate = useNavigate();
   const problemType = type ? SLUG_TO_PROBLEM_TYPE[type] : undefined;
 
   const [search, setSearch] = useState('');
@@ -32,7 +34,7 @@ export const CasesByTypePage: React.FC = () => {
       <PageWrapper>
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Problem type not found</h2>
-          <Link to="/cases" className="btn-primary">Browse all cases</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/cases')}>Browse all cases</Button>
         </div>
       </PageWrapper>
     );

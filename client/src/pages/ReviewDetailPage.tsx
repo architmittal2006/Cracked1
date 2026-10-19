@@ -1,11 +1,13 @@
 import React from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { MOCK_REVIEWS, RUBRIC_DIMENSIONS } from '../data/mockData';
 import { RadarChart } from '../components/RadarChart';
 import { PageWrapper } from '../components/PageWrapper';
+import { Button } from '../components/Button';
 
 export const ReviewDetailPage: React.FC = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const review = MOCK_REVIEWS.find(r => r.id === id);
 
   if (!review) {
@@ -13,7 +15,7 @@ export const ReviewDetailPage: React.FC = () => {
       <PageWrapper>
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Review Not Found</h2>
-          <Link to="/dashboard" className="btn-primary">Back to Dashboard</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/dashboard')}>Back to Dashboard</Button>
         </div>
       </PageWrapper>
     );
@@ -29,7 +31,7 @@ export const ReviewDetailPage: React.FC = () => {
 
   return (
     <PageWrapper>
-      <Link to="/dashboard" className="btn-ghost mb-6 text-sm inline-flex">← Back to Dashboard</Link>
+      <Button variant="ghost" size="sm" onClick={() => navigate('/dashboard')} className="mb-6 inline-flex">← Back to Dashboard</Button>
 
       <div className="page-header pb-6">
         <div className="section-label mb-2">REVIEW BREAKDOWN</div>

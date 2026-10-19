@@ -1,5 +1,5 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import {
   ArrowRight,
@@ -17,7 +17,7 @@ import { AnimatedCounter } from '../components/AnimatedCounter';
 import { Reveal } from '../components/Reveal';
 import { ScrollTextCycle } from '../components/ScrollTextCycle';
 import { TestimonialsCarousel } from '../components/TestimonialsCarousel';
-import { useMagnetic } from '../hooks/useMagnetic';
+import { Button } from '../components/Button';
 import { PLATFORM_STATS } from '../data/mockData';
 
 const tracks = [
@@ -72,7 +72,6 @@ const timeline = [
 ];
 
 export const LandingPage: React.FC = () => {
-  const magneticFinal = useMagnetic<HTMLButtonElement>(0.3);
   const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -169,14 +168,14 @@ export const LandingPage: React.FC = () => {
 
           <Reveal variant="up" delay={500}>
             <div className="poster-actions">
-              <button onClick={handleGetStarted} className="poster-btn poster-btn-primary btn-magnetic group" {...magneticFinal}>
-                Get Started
+              <Button variant="primary" size="lg" onClick={handleGetStarted} className="btn-magnetic group min-w-[260px]">
+                Solve your first case free
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-              </button>
-              <Link to="/how-it-works" className="poster-btn poster-btn-secondary group">
+              </Button>
+              <Button variant="secondary" size="lg" as="a" href="/how-it-works" className="min-w-[200px]">
                 How It Works
-                <ArrowRight className="w-5 h-5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all duration-300" />
-              </Link>
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
+              </Button>
             </div>
           </Reveal>
 
@@ -453,14 +452,17 @@ export const LandingPage: React.FC = () => {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  to="/register"
-                  className={`btn-primary w-full justify-center ${
+                <Button
+                  variant="primary"
+                  size="md"
+                  as="a"
+                  href="/register"
+                  className={`w-full justify-center ${
                     tier.popular ? 'shadow-[0_0_20px_rgba(255,76,37,0.4)]' : ''
                   }`}
                 >
-                  Start as {tier.name}
-                </Link>
+                  Start as {tier.name}: free
+                </Button>
               </div>
             </Reveal>
           ))}
@@ -512,10 +514,10 @@ export const LandingPage: React.FC = () => {
             <h2>Ready to find out if you&apos;re <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-20 w-auto inline" />?</h2>
             <p>Start with one case. Let the review system make your work visible.</p>
           </div>
-          <button onClick={handleGetStarted} className="poster-btn poster-btn-primary btn-magnetic group" {...magneticFinal}>
-            Get Started
+          <Button variant="primary" size="lg" onClick={handleGetStarted} className="btn-magnetic group min-w-[260px]">
+            Explore the Arena
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform duration-300" />
-          </button>
+          </Button>
         </section>
       </Reveal>
     </div>

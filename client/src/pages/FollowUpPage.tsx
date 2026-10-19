@@ -4,6 +4,7 @@ import { Send, Building2, MessageSquare } from 'lucide-react';
 import { MOCK_CASES } from '../data/mockData';
 import { PageWrapper } from '../components/PageWrapper';
 import { FollowUpCard } from '../components/FollowUpCard';
+import { Button } from '../components/Button';
 
 export const FollowUpPage: React.FC = () => {
   const { id } = useParams();
@@ -47,7 +48,7 @@ export const FollowUpPage: React.FC = () => {
       <PageWrapper>
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Case Not Found</h2>
-          <Link to="/cases" className="btn-primary">Back to Cases</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/cases')}>Back to Cases</Button>
         </div>
       </PageWrapper>
     );
@@ -92,15 +93,16 @@ export const FollowUpPage: React.FC = () => {
             placeholder="Provide a detailed answer to the company's follow-up question..."
             className="w-full bg-slate-800 border border-slate-700 rounded-lg p-4 text-white min-h-[150px] focus:outline-none focus:border-[#7F77DD]"
           />
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="md"
             onClick={handleSubmit}
             disabled={!newAnswer.trim()}
-            className="btn-primary w-full flex items-center justify-center gap-2 mt-4"
+            className="w-full mt-4"
           >
             <Send className="w-4 h-4" />
             Submit Answer
-          </button>
+          </Button>
         </div>
       </div>
     </PageWrapper>

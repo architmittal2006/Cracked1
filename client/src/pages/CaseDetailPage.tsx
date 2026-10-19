@@ -1,5 +1,5 @@
 import React from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { Clock, FileText, Users, Zap, PenLine, Eye } from 'lucide-react';
 import { MOCK_CASES, GATE_STATE } from '../data/mockData';
 import { StatusPill } from '../components/StatusPill';
@@ -7,9 +7,11 @@ import { ProblemTypeBadge } from '../components/ProblemTypeBadge';
 import { DeliverablesList } from '../components/DeliverablesList';
 import { GateIndicator } from '../components/GateIndicator';
 import { PageWrapper } from '../components/PageWrapper';
+import { Button } from '../components/Button';
 
 export const CaseDetailPage: React.FC = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const caseData = MOCK_CASES.find(c => c.id === id);
 
   if (!caseData) {
@@ -17,7 +19,7 @@ export const CaseDetailPage: React.FC = () => {
       <PageWrapper>
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Case Not Found</h2>
-          <Link to="/cases" className="btn-primary">Back to Cases</Link>
+          <Button variant="primary" size="md" onClick={() => navigate('/cases')}>Back to Cases</Button>
         </div>
       </PageWrapper>
     );
@@ -36,7 +38,7 @@ export const CaseDetailPage: React.FC = () => {
 
   return (
     <PageWrapper className="py-8">
-      <Link to="/cases" className="btn-ghost mb-6 text-sm inline-flex">← Back to Cases</Link>
+      <Button variant="ghost" size="sm" onClick={() => navigate('/cases')} className="mb-6 inline-flex">← Back to Cases</Button>
 
       <div className={`glass-card p-8 mb-8 ${caseData.is_chaos ? 'border-t-4 border-t-rose-500' : ''}`}>
         <div className="flex flex-wrap gap-3 mb-4">
@@ -88,9 +90,9 @@ export const CaseDetailPage: React.FC = () => {
             </p>
             <GateIndicator reviewsCompleted={gateReviews} />
             {!gateCleared && (
-              <Link to={`/cases/${caseData.id}/review`} className="btn-secondary mt-6 inline-flex">
+              <Button variant="secondary" size="md" onClick={() => navigate(`/cases/${caseData.id}/review`)} className="mt-6 inline-flex">
                 <Eye className="w-4 h-4" /> Start Reviewing
-              </Link>
+              </Button>
             )}
           </div>
         </div>
@@ -98,25 +100,34 @@ export const CaseDetailPage: React.FC = () => {
         <div className="space-y-6">
           <div className="glass-card p-6">
             <h3 className="text-lg font-bold text-white mb-4">Actions</h3>
-            <div className="space-y-3">
-              <Link
-                to={`/cases/${caseData.id}/review`}
-                className="btn-secondary w-full justify-center"
-              >
-                <Eye className="w-4 h-4" /> Review a Submission
-              </Link>
-              {gateCleared ? (
-                <Link
-                  to={`/cases/${caseData.id}/submit`}
-                  className="btn-primary w-full justify-center"
+              <div className="space-y-3">
+                <Button
+                  variant="secondary"
+                  size="md"
+                  onClick={() => navigate(`/cases/${caseData.id}/review`)}
+                  className="w-full justify-center"
                 >
-                  <PenLine className="w-4 h-4" /> Submit Solution
-                </Link>
-              ) : (
-                <span className="btn-primary w-full justify-center opacity-50 cursor-not-allowed flex items-center gap-2">
-                  <PenLine className="w-4 h-4" /> Submit Solution
-                </span>
-              )}
+                  <Eye className="w-4 h-4" /> Review a Submission
+                </Button>
+                {gateCleared ? (
+                  <Button
+                    variant="primary"
+                    size="md"
+                    onClick={() => navigate(`/cases/${caseData.id}/submit`)}
+                    className="w-full justify-center"
+                  >
+                    <PenLine className="w-4 h-4" /> Submit Solution
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="md"
+                    disabled
+                    className="w-full justify-center opacity-50 cursor-not-allowed"
+                  >
+                    <PenLine className="w-4 h-4" /> Submit Solution
+                  </Button>
+                )}
               {!gateCleared && (
                 <p className="text-xs text-slate-500 text-center">Complete {2 - gateReviews} more review(s) to unlock</p>
               )}

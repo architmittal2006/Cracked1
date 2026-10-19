@@ -5,8 +5,55 @@
    ═══════════════════════════════════════════════════ */
 
 @theme {
+  /* Font families */
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+  --font-serif: 'Georgia', 'Times New Roman', serif;
+
+  /* Brand colors (orange accent) */
+  --color-brand: #FF4C25;
+  --color-brand-hover: #FF6B4A;
+  --color-brand-soft: rgba(255, 76, 37, 0.12);
+  --color-brand-soft-hover: rgba(255, 76, 37, 0.2);
+  --color-brand-inverse: #000000;
+
+  /* Track accents */
+  --color-track-arena: #10B981;
+  --color-track-questions: #8B5CF6;
+  --color-track-cases: #F59E0B;
+
+  /* Semantic colors */
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+
+  /* Neutrals */
+  --color-bg-deep: #000000;
+  --color-bg-surface: #0A0A0A;
+  --color-card: rgba(15, 23, 42, 0.5);
+  --color-text-primary: #FFFFFF;
+  --color-text-secondary: #E2E8F0;
+  --color-text-muted: #94A3B8;
+  --color-border-subtle: rgba(255, 255, 255, 0.1);
+  --color-border-medium: rgba(255, 255, 255, 0.15);
+  --color-border-strong: rgba(255, 255, 255, 0.2);
+
+  /* Radii */
+  --radius-button: 12px;
+  --radius-card: 12px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-full: 9999px;
+
+  /* Shadows */
+  --shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-btn-glow: 0 0 20px rgba(255, 76, 37, 0.35);
+  --shadow-btn-hover: 0 8px 24px rgba(255, 76, 37, 0.45);
+
+  /* Transitions */
+  --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 :root {
