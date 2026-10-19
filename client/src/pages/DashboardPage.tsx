@@ -52,7 +52,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="glass-card p-6 flex items-center gap-4 hover:border-emerald-500/30 transition-colors">
+        <div className="glass-card p-6 flex items-center gap-4 hover:border-orange-500/30 transition-colors">
           <ScoreRing score={userScores.credibilityScore / 1000} maxScore={10} size={72} />
           <div>
             <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Credibility</div>
@@ -60,7 +60,7 @@ export const DashboardPage: React.FC = () => {
             <TierBadge score={userScores.credibilityScore} />
           </div>
         </div>
-        <div className="glass-card p-6 hover:border-emerald-500/30 transition-colors">
+        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
           <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Tier Progress</div>
           <div className="text-lg font-bold text-white mb-2">{tierProgress.current}</div>
           {tierProgress.next && (
@@ -72,7 +72,7 @@ export const DashboardPage: React.FC = () => {
             </>
           )}
         </div>
-        <div className="glass-card p-6 hover:border-emerald-500/30 transition-colors">
+        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
           <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Quick Stats</div>
           <div className="grid grid-cols-2 gap-3 mt-2 text-sm">
             <div className="hover:bg-slate-800/50 p-2 rounded transition-colors"><span className="text-slate-500">Solve</span><div className="font-mono font-bold">{userScores.solveScore.toLocaleString()}</div></div>
@@ -84,17 +84,17 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="glass-card p-6 hover:border-emerald-500/30 transition-colors">
+        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-white">Active Submissions</h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/cases')} className="hover:text-emerald-400 transition-colors">Browse cases</Button>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/cases')} className="hover:text-orange-400 transition-colors">Browse cases</Button>
           </div>
           <div className="space-y-4">
-            <p className="text-slate-400 text-sm">No active submissions. <Link to="/cases" className="text-emerald-400 hover:text-emerald-300 transition-colors">Pick a case</Link></p>
+            <p className="text-slate-400 text-sm">No active submissions. <Link to="/cases" className="text-orange-400 hover:text-orange-300 transition-colors">Pick a case</Link></p>
           </div>
         </div>
 
-        <div className="glass-card p-6 hover:border-emerald-500/30 transition-colors">
+        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
           <div className="flex justify-between items-center mb-6">
             <h2 className="text-xl font-bold text-white">Review Queue</h2>
             <span className="text-xs text-slate-500">Unlock gates by reviewing</span>

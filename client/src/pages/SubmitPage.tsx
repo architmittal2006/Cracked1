@@ -19,24 +19,21 @@ export const SubmitPage: React.FC = () => {
   // Mock authentication check - in production, use actual auth state
   const isAuthenticated = true;
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
-
-  if (!isAuthenticated) {
-    return null; // Will redirect
-  }
   const [gateReviews, setGateReviews] = useState(0);
   const gateCleared = gateReviews >= 2;
 
-  const sections = caseData ? SUBMISSION_TEMPLATES[caseData.type] : [];
+  const sections = useMemo(() => (caseData ? SUBMISSION_TEMPLATES[caseData.type] : []), [caseData]);
   const [content, setContent] = useState<Record<string, string>>({});
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     if (!caseData) return;
@@ -94,6 +91,10 @@ export const SubmitPage: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (!caseData) {
     return (

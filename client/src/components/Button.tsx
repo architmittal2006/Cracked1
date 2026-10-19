@@ -54,12 +54,15 @@ export const Button: React.FC<ButtonProps> = ({
   ].filter(Boolean).join(' ');
 
   if (isLink) {
+    const isLinkDisabled = disabled || loading;
     return (
       <a
-        href={href}
+        href={isLinkDisabled ? undefined : href}
         className={classes}
         aria-busy={loading || undefined}
-        aria-disabled={disabled || loading || undefined}
+        aria-disabled={isLinkDisabled || undefined}
+        tabIndex={isLinkDisabled ? -1 : undefined}
+        onClick={isLinkDisabled ? (e) => e.preventDefault() : (rest as React.AnchorHTMLAttributes<HTMLAnchorElement>).onClick}
         {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
       >
         {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : children}

@@ -16,6 +16,10 @@ export const ArenaSubmitPage: React.FC = () => {
   // Mock authentication check - in production, use actual auth state
   const isAuthenticated = true;
 
+  const [content, setContent] = useState<Record<string, string>>({});
+  const [saving, setSaving] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
   useEffect(() => {
     if (!isAuthenticated) {
       navigate('/login');
@@ -25,10 +29,6 @@ export const ArenaSubmitPage: React.FC = () => {
   if (!isAuthenticated) {
     return null; // Will redirect
   }
-
-  const [content, setContent] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
 
   if (!arenaCase) {
     return (

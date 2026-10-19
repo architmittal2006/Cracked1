@@ -5,5 +5,10 @@
       "type": "remote",
       "url": "http://127.0.0.1:49777/mcp"
     }
+  },
+  "indexing": {
+    "provider": "kilo",
+    "enabled": true,
+    "model": "mistralai/mistral-embed-2312"
   }
 }

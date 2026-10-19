@@ -28,7 +28,7 @@ export const Reveal: React.FC<RevealProps> = ({ children, delay = 0, variant = '
           observer.disconnect();
         }
       },
-      { threshold: 0.15, rootMargin: '0px 0px -60px 0px' }
+      { threshold: 0.1, rootMargin: '0px 0px -30px 0px' }
     );
 
     observer.observe(node);

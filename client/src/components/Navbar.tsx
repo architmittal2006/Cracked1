@@ -101,7 +101,7 @@ export const Navbar: React.FC = () => {
                   to={link.to}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all duration-300 ${isActive ? 'bg-emerald-500/10 text-emerald-400' : 'text-slate-300 hover:bg-white/5 hover:text-white'}`
+                    `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-all duration-300 ${isActive ? 'bg-orange-500/10 text-orange-400' : 'text-slate-300 hover:bg-white/5 hover:text-white'}`
                   }
                   style={{ animationDelay: `${index * 50}ms` }}
                 >

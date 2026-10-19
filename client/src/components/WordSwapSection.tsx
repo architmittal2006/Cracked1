@@ -30,7 +30,7 @@ export const WordSwapSection: React.FC = () => {
 
   if (reduce || isMobile) {
     return (
-      <section className="py-20 px-6">
+      <section className="py-12 px-6">
         <div className="max-w-5xl mx-auto">
           <div className="flex flex-wrap gap-2">
             {WORDS.map((w) => (
@@ -46,14 +46,14 @@ export const WordSwapSection: React.FC = () => {
   const navH = 64;
 
   return (
-    <section ref={containerRef} style={{ height: '150vh' }} className="relative">
+    <section ref={containerRef} style={{ height: '100vh' }} className="relative">
       <div
         className="sticky top-0 h-screen flex items-center"
         style={{ paddingTop: navH }}
       >
         <div className="max-w-5xl mx-auto px-6 w-full">
           <div className="flex flex-col gap-2" style={{ lineHeight: 1.1 }}>
-            <span className="text-white font-bold" style={{ fontSize: 'clamp(40px,6vw,80px)' }}>
+            <span className="text-white font-bold" style={{ fontSize: 'clamp(32px,5vw,48px)' }}>
               Cracked? is for
             </span>
             <div className="relative h-[1.1em] overflow-hidden" aria-hidden="true">
@@ -68,7 +68,7 @@ export const WordSwapSection: React.FC = () => {
                     animate={{ y: `${y}%`, opacity }}
                     transition={{ duration: 0.35, ease: 'easeInOut' }}
                     className="absolute left-0 top-0 font-bold whitespace-nowrap"
-                    style={{ fontSize: 'clamp(40px,6vw,80px)', color }}
+                    style={{ fontSize: 'clamp(32px,5vw,48px)', color }}
                   >
                     {w.word}
                   </motion.span>

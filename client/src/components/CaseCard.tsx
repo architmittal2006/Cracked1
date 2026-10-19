@@ -41,7 +41,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
             </div>
           )}
 
-          <h3 className={`${caseData.isFeatured ? 'text-2xl md:text-3xl' : 'text-lg'} font-bold text-white mb-1 line-clamp-2 group-hover:text-emerald-400 transition-colors`}>
+          <h3 className={`${caseData.isFeatured ? 'text-2xl md:text-3xl' : 'text-lg'} font-bold text-white mb-1 line-clamp-2 group-hover:text-orange-400 transition-colors`}>
             {caseData.title}
           </h3>
           <p className="text-sm text-slate-400 mb-1">{caseData.sector} · {caseData.companyType}</p>
@@ -52,7 +52,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
 
           <div className="flex flex-wrap gap-2 mb-4">
             {caseData.tags.map(tag => (
-              <span key={tag} className="text-[10px] px-2 py-1 bg-slate-900/50 border border-slate-800 text-slate-400 rounded hover:border-emerald-500/50 hover:text-emerald-400 transition-colors cursor-default">
+              <span key={tag} className="text-[10px] px-2 py-1 bg-slate-900/50 border border-slate-800 text-slate-400 rounded hover:border-orange-500/50 hover:text-orange-400 transition-colors cursor-default">
                 {tag}
               </span>
             ))}
@@ -69,7 +69,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
               <FileText className="w-3 h-3" />
               <span>{caseData.submissionCount}</span>
             </div>
-            <span className="text-xs font-mono font-bold text-emerald-400">{caseData.pts} pts</span>
+            <span className="text-xs font-mono font-bold text-orange-400">{caseData.pts} pts</span>
           </div>
           <div className="flex items-center text-xs text-slate-400 gap-1">
             <Clock className="w-3 h-3" />

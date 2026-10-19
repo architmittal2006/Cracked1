@@ -36,7 +36,7 @@ export const ProofStrip: React.FC = () => {
   const showStats = !failed && !allZero && stats;
 
   return (
-    <section className="py-16 border-y border-white/10">
+    <section className="py-12 border-y border-white/10">
       {showStats ? (
         <div className="max-w-5xl mx-auto px-6 grid grid-cols-3 gap-6 text-center">
           {[

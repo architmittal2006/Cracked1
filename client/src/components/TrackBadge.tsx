@@ -10,21 +10,21 @@ interface TrackBadgeProps {
 const TRACK_CONFIG = {
   open_arena: {
     label: 'Arena',
-    color: '#1D9E75',
-    bgColor: '#E1F5EE',
-    borderColor: '#0F6E56',
+    color: '#10B981',
+    bgColor: 'rgba(16, 185, 129, 0.15)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
   },
   community_question: {
     label: 'Questions',
-    color: '#D4537E',
-    bgColor: '#FBEAF0',
-    borderColor: '#993556',
+    color: '#8B5CF6',
+    bgColor: 'rgba(139, 92, 246, 0.15)',
+    borderColor: 'rgba(139, 92, 246, 0.3)',
   },
   curated_case: {
     label: 'Curated',
-    color: '#7F77DD',
-    bgColor: '#EEEDFE',
-    borderColor: '#534AB7',
+    color: '#F59E0B',
+    bgColor: 'rgba(245, 158, 11, 0.15)',
+    borderColor: 'rgba(245, 158, 11, 0.3)',
   },
 };
 

@@ -57,7 +57,7 @@ export const ProductStorySection: React.FC = () => {
   }
 
   return (
-    <section ref={containerRef} style={{ height: '250vh' }} className="relative">
+    <section ref={containerRef} style={{ height: '180vh' }} className="relative">
       <div className="sticky top-0 h-screen flex items-center">
         <div className="max-w-6xl mx-auto px-6 w-full grid grid-cols-2 gap-12">
           <div className="space-y-4">

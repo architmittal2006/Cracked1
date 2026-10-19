@@ -26,16 +26,6 @@ export const ReviewPage: React.FC = () => {
   // Mock authentication check - in production, use actual auth state
   const isAuthenticated = true; // Change to false to test redirect
 
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
-
-  if (!isAuthenticated) {
-    return null; // Will redirect
-  }
-
   const [rubricScores, setRubricScores] = useState({
     problem_framing: 3,
     framework_fit: 3,
@@ -48,6 +38,12 @@ export const ReviewPage: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [submissionId, setSubmissionId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+    }
+  }, [isAuthenticated, navigate]);
 
   useEffect(() => {
     if (!caseData) return;
@@ -88,6 +84,10 @@ export const ReviewPage: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  if (!isAuthenticated) {
+    return null;
+  }
 
   if (!caseData) {
     return (
