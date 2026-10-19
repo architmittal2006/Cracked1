@@ -32,9 +32,6 @@ export const WordSwapSection: React.FC = () => {
     return (
       <section className="py-20 px-6">
         <div className="max-w-5xl mx-auto">
-          <h2 className="text-white font-bold mb-4" style={{ fontSize: 'clamp(40px,6vw,80px)' }}>
-            Cracked? is for everyone
-          </h2>
           <div className="flex flex-wrap gap-2">
             {WORDS.map((w) => (
               <span key={w.word} className="px-3 py-1 rounded-full bg-white/10 text-slate-200 text-sm">{w.word}</span>
