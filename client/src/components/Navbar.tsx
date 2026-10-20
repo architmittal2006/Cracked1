@@ -91,13 +91,13 @@ export const Navbar: React.FC = () => {
 
             <div className="flex flex-col gap-2 flex-1">
               <div className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-4">Navigation</div>
-              {navLinks.map((link, index) => (
+              {navLinks.map((link) => (
                 <NavLink
                   key={link.to}
                   to={link.to}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) =>
-                    `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors ${isActive ? 'bg-white/5 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`
+                    `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors ${isActive ? 'bg-white/5 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`}
                 >
                   {link.label}
                 </NavLink>
