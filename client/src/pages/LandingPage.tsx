@@ -1,42 +1,76 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import {
-  ArrowRight,
-  CheckCircle2,
-  Scale,
-  ShieldCheck,
-  Sparkles,
-  Users,
-} from 'lucide-react';
-import { Reveal } from '../components/Reveal';
-import { Button } from '../components/Button';
+import { Trophy, Zap, GitPullRequest } from 'lucide-react';
 import { CrackedQuestionMark } from '../components/CrackedQuestionMark';
-import { ProofStrip } from '../components/ProofStrip';
-import { WordSwapSection } from '../components/WordSwapSection';
-import { ProductStorySection } from '../components/ProductStorySection';
-import { TracksSection } from '../components/sections/TracksSection';
-import { TiersSection } from '../components/sections/TiersSection';
-import { ManifestoSection } from '../components/sections/ManifestoSection';
+import { Button } from '../components/Button';
+import { Section } from '../components/Section';
+import { Container } from '../components/Container';
+import { Card } from '../components/Card';
 
-const timeline = [
+const steps = [
   {
-    phase: '01',
+    number: '01',
     title: 'Review 2 submissions',
-    date: 'Unlock gate',
     copy: 'Complete peer reviews on any case before you can submit your own solution to that case.',
   },
   {
-    phase: '02',
-    title: 'Submit typed solution',
-    date: 'Structured templates',
-    copy: 'Each problem type has mandatory sections — Market Sizing, Profitability, M&A, and more.',
+    number: '02',
+    title: 'Submit a typed solution',
+    copy: 'Each problem type has mandatory sections — Market Sizing, Profitability, M\u0026A, and more.',
   },
   {
-    phase: '03',
+    number: '03',
     title: 'Earn credibility',
-    date: 'Peer consensus',
     copy: 'Five-dimension rubric scoring. Merge bonuses when companies select your solution.',
+  },
+];
+
+const tracks = [
+  {
+    title: 'Open Arena',
+    desc: 'Jump straight into open case prompts. No review gate needed to submit.',
+    icon: Trophy,
+    color: '#10B981',
+    slug: '/arena',
+  },
+  {
+    title: 'Community Questions',
+    desc: 'Crowdsourced consulting queries and brainteasers. The poster reviews and accepts the best answer.',
+    icon: GitPullRequest,
+    color: '#8B5CF6',
+    slug: '/questions',
+  },
+  {
+    title: 'Curated Cases',
+    desc: 'Rigorous corporate briefs. Complete 2 peer reviews to unlock submissions and earn merge bonuses.',
+    icon: Zap,
+    color: '#F59E0B',
+    slug: '/cases',
+  },
+];
+
+const tiers = [
+  {
+    name: 'Analyst',
+    description: 'Entry-level contributors',
+    score: '0\u20131,000 pts',
+    features: ['Solve up to 5 cases', 'Earn peer reviews', 'Basic profile visibility'],
+    popular: false,
+  },
+  {
+    name: 'Consultant',
+    description: 'Proven case solvers',
+    score: '1,000\u20135,000 pts',
+    features: ['Unlimited submissions', 'Advanced rubric access', 'Priority review queue', 'Featured profiles'],
+    popular: true,
+  },
+  {
+    name: 'Partner',
+    description: 'Top-tier experts',
+    score: '5,000+ pts',
+    features: ['Curated case access', 'Company merge bonuses', 'Mentorship privileges', 'Verified expert badge'],
+    popular: false,
   },
 ];
 
@@ -53,133 +87,148 @@ export const LandingPage: React.FC = () => {
   };
 
   return (
-    <div className="landing-stage">
-      <section className="relative min-h-screen flex items-center pt-24 overflow-hidden">
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none" aria-hidden="true">
-          <div className="absolute w-[600px] h-[600px] rounded-full bg-orange-500/20 blur-3xl" />
-        </div>
-        <div className="page-container grid md:grid-cols-2 gap-12 items-center relative z-10">
-          <div>
-            <h1 className="text-white font-bold" style={{ fontSize: 'clamp(32px,4vw,48px)', lineHeight: 1.1 }}>
-              Peer-reviewed consulting arena
-            </h1>
-            <p className="text-slate-300 mt-4 text-lg max-w-xl">
-              Solve real business cases, get scored by peers, and build proof-of-work credibility hiring managers trust.
-            </p>
-            <div className="mt-6 p-4 bg-orange-500/10 border border-orange-500/20 rounded-xl">
-              <div className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2 flex items-center gap-1.5">
-                <ShieldCheck className="w-4 h-4" /> Proof-of-Review Gate
-              </div>
-              <div className="flex items-center gap-2 text-xs md:text-sm text-slate-300">
-                <span className="px-2 py-0.5 rounded bg-orange-500/20 text-orange-300 font-mono font-semibold">1. Review 2 solutions</span>
-                <span className="text-slate-500">→</span>
-                <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono font-semibold">2. Unlock Case</span>
-                <span className="text-slate-500">→</span>
-                <span className="px-2 py-0.5 rounded bg-white/10 text-white font-mono font-semibold">3. Submit & Score</span>
+    <div className='min-h-screen flex flex-col'>
+      {/* Hero */}
+      <Section className='pt-20 pb-32 md:pb-48'>
+        <Container>
+          <div className='grid md:grid-cols-2 gap-12 md:gap-16 items-center'>
+            <div className='max-w-[65ch]'>
+              <div className='section-label mb-3'>The consulting arena</div>
+              <h1 className='mb-6'>Peer-reviewed consulting arena</h1>
+              <p className='mb-8 text-base-lg md:text-lg leading-relaxed'>
+                Solve real business cases, get scored by peers, and build proof-of-work credibility hiring managers trust.
+              </p>
+              <div className='flex flex-col sm:flex-row gap-4'>
+                <Button variant='primary' size='lg' onClick={handleGetStarted} className='w-full sm:w-auto'>
+                  Solve your first case free
+                </Button>
+                <a href='/how-it-works' className='accent-underline text-sm font-medium hover:text-white transition-colors'>
+                  See how it works
+                </a>
               </div>
             </div>
-            <div className="flex flex-wrap gap-4 mt-8">
-              <Button variant="primary" size="lg" onClick={handleGetStarted}>Solve your first case free</Button>
-              <Button variant="secondary" size="lg" as="a" href="/how-it-works">See how it works</Button>
+            <div className='flex justify-center'>
+              <div className='relative'>
+                <CrackedQuestionMark className='w-[280px] h-[280px] md:w-[320px] md:h-[320px] opacity-90' />
+                <div className='absolute -inset-1 bg-[#FF4C25]/10 rounded-full blur-[80px]' />
+              </div>
             </div>
           </div>
-          <div className="flex justify-center">
-            <CrackedQuestionMark />
-          </div>
-        </div>
-      </section>
-      <ProofStrip />
-      <TracksSection />
-      <WordSwapSection />
-      <ProductStorySection />
-      <TiersSection />
-      <ManifestoSection />
+        </Container>
+      </Section>
 
-      <section className="page-container py-12 intro-block">
-        <Reveal variant="up">
-          <div className="text-center max-w-3xl mx-auto mb-10">
-            <h2 className="section-title text-3xl md:text-4xl font-bold text-white mb-4">
-              What is <span className="text-brand">Cracked?</span>
-            </h2>
-            <p className="text-slate-300 text-base md:text-lg leading-relaxed">
-              An open-source platform for case prep and consulting competitions. Instead of static resumes,
-              contributors prove judgment by solving live business problems and reviewing each other
-              against a transparent five-dimension rubric.
-            </p>
+      {/* Cracked? is for — static audience cards */}
+      <Section className='border-t border-white/8'>
+        <Container>
+          <div className='flex flex-col md:flex-row gap-8 items-start md:items-center'>
+            <div className='flex-shrink-0'>
+              <div className='section-label mb-3'>Who it\'s for</div>
+              <h2 className='mb-6'>Four paths to credibility</h2>
+            </div>
+            <div className='grid md:grid-cols-4 gap-6 flex-grow'>
+              {[
+                { title: 'Aspiring consultants', copy: 'Build verified case scores before your first interview.' },
+                { title: 'Career switchers', copy: 'Prove consulting thinking with peer-reviewed work.' },
+                { title: 'MBA candidates', copy: 'Practice cases with real rubric feedback, not just peers.' },
+                { title: 'Hiring managers', copy: 'See verifiable proof of work on every candidate profile.' },
+              ].map((audience, i) => (
+                <Card key={i} className='flex flex-col gap-3'>
+                  <h3 className='text-base font-semibold text-white mb-1'>{audience.title}</h3>
+                  <p className='text-small text-slate-400 leading-relaxed'>{audience.copy}</p>
+                </Card>
+              ))}
+            </div>
           </div>
-        </Reveal>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <Reveal delay={0} variant="up">
-            <div className="glass-card p-6 h-full flex flex-col justify-between">
-              <div>
-                <ShieldCheck className="w-8 h-8 text-brand mb-4" />
-                <h3 className="text-lg font-bold text-white mb-2">Proof-of-Review Gate</h3>
-                <p className="text-sm text-slate-300">Complete 2 peer reviews on a case before you can submit your own solution to it.</p>
-              </div>
-            </div>
-          </Reveal>
-          <Reveal delay={100} variant="up">
-            <div className="glass-card p-6 h-full flex flex-col justify-between">
-              <div>
-                <Users className="w-8 h-8 text-brand mb-4" />
-                <h3 className="text-lg font-bold text-white mb-2">Peer Consensus</h3>
-                <p className="text-sm text-slate-300">Every submission scored across framing, framework, data, insight, and feasibility.</p>
-              </div>
-            </div>
-          </Reveal>
-          <Reveal delay={200} variant="up">
-            <div className="glass-card p-6 h-full flex flex-col justify-between">
-              <div>
-                <Scale className="w-8 h-8 text-brand mb-4" />
-                <h3 className="text-lg font-bold text-white mb-2">Live Credibility</h3>
-                <p className="text-sm text-slate-300">Analyst to Partner tiers. Shareable certificates with cryptographic verification hashes.</p>
-              </div>
-            </div>
-          </Reveal>
-        </div>
-      </section>
+        </Container>
+      </Section>
 
-      <section className="py-12 border-t border-b border-white/10 bg-slate-900/30">
-        <div className="page-container">
-          <Reveal variant="up">
-            <div className="text-center max-w-2xl mx-auto mb-8">
-              <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">How You Compete</h2>
-              <p className="text-slate-400 text-sm">Three simple steps to build verified proof of work.</p>
-            </div>
-          </Reveal>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {timeline.map((item, i) => (
-              <Reveal key={item.phase} delay={i * 120} variant="up">
-                <article className="glass-card p-6 relative h-full">
-                  <div className="text-4xl font-mono font-black text-white/15 mb-4">{item.phase}</div>
-                  <div className="text-brand text-xs font-bold uppercase tracking-wider mb-1">{item.date}</div>
-                  <h3 className="text-lg font-bold text-white mb-2">{item.title}</h3>
-                  <p className="text-sm text-slate-300">{item.copy}</p>
-                  <CheckCircle2 className="w-5 h-5 text-brand/40 absolute top-6 right-6" />
-                </article>
-              </Reveal>
+      {/* How it works */}
+      <Section className='border-t border-white/8'>
+        <Container>
+          <div className='section-label mb-3'>How it works</div>
+          <h2 className='mb-10'>Three steps, one gate</h2>
+          <div className='grid md:grid-cols-3 gap-8'>
+            {steps.map((step, i) => (
+              <Card key={i} className='flex flex-col gap-4'>
+                <div className='flex items-center gap-3'>
+                  <span className='w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-sm font-mono font-bold text-white'>
+                    {step.number}
+                  </span>
+                  <h3 className='text-lg font-semibold text-white'>{step.title}</h3>
+                </div>
+                <p className='text-slate-400 leading-relaxed'>{step.copy}</p>
+              </Card>
             ))}
           </div>
-        </div>
-      </section>
+        </Container>
+      </Section>
 
-      <Reveal variant="scale">
-        <section className="page-container py-12 my-6">
-          <div className="glass-card p-8 md:p-12 border border-brand/30 flex flex-col md:flex-row items-center justify-between gap-6">
-            <div className="max-w-xl">
-              <div className="flex items-center gap-2 text-brand text-xs uppercase font-bold tracking-widest mb-2">
-                <Sparkles className="w-4 h-4" /> Ready to Prove Your Thinking?
-              </div>
-              <h2 className="text-2xl md:text-3xl font-bold text-white mb-2">Find out if you&apos;re Cracked</h2>
-              <p className="text-slate-300 text-sm md:text-base">Start with one case. Let the peer review system make your consulting judgment visible.</p>
-            </div>
-            <Button variant="primary" size="lg" onClick={handleGetStarted} className="min-w-[220px]">
-              Explore the Arena
-              <ArrowRight className="w-5 h-5" />
-            </Button>
+      {/* Tracks */}
+      <Section className='border-t border-white/8'>
+        <Container>
+          <div className='section-label mb-3'>Tracks</div>
+          <h2 className='mb-10'>Choose your track</h2>
+          <div className='grid md:grid-cols-3 gap-8'>
+            {tracks.map((track, i) => (
+              <Card key={i} className='flex flex-col gap-4'>
+                <div className='flex items-center gap-3 mb-2'>
+                  <div className='w-8 h-8 rounded-lg flex items-center justify-center' style={{ backgroundColor: track.color + '20' }}>
+                    <track.icon className='w-5 h-5' style={{ color: track.color, strokeWidth: 1.75 }} />
+                  </div>
+                  <h3 className='text-lg font-semibold text-white'>{track.title}</h3>
+                </div>
+                <p className='text-slate-400 leading-relaxed mb-6'>{track.desc}</p>
+                <a href={track.slug} className='text-sm font-medium accent-underline'>
+                  Explore {track.title}
+                </a>
+              </Card>
+            ))}
           </div>
-        </section>
-      </Reveal>
+        </Container>
+      </Section>
+
+      {/* Tiers */}
+      <Section className='border-t border-white/8'>
+        <Container>
+          <div className='section-label mb-3'>Credibility tiers</div>
+          <h2 className='mb-10'>Progress from Analyst to Partner</h2>
+          <div className='grid md:grid-cols-3 gap-8'>
+            {tiers.map((tier, i) => (
+              <Card key={i} className={`flex flex-col gap-4 relative ${tier.popular ? 'border-white/12' : ''}`}>
+                {tier.popular && (
+                  <span className='absolute -top-3 left-1/2 -translate-x-1/2 text-[10px] font-bold uppercase tracking-wider text-[#FF4C25] bg-white/5 px-3 py-1 rounded-full border border-white/8 backdrop-blur-sm'>
+                    Most common
+                  </span>
+                )}
+                <h3 className='text-lg font-semibold text-white'>{tier.name}</h3>
+                <p className='text-sm text-slate-400 mb-2'>{tier.description}</p>
+                <div className='text-sm font-mono font-bold text-[#FF4C25] mb-6'>{tier.score}</div>
+                <ul className='space-y-2 mb-6 flex-grow'>
+                  {tier.features.map((feature, idx) => (
+                    <li key={idx} className='flex items-start gap-2 text-sm text-slate-400'>
+                      <span className='text-[#FF4C25]/60'>•</span>
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <Button variant={tier.popular ? 'primary' : 'secondary'} size='md' className='w-full'>
+                  Start as {tier.name}
+                </Button>
+              </Card>
+            ))}
+          </div>
+        </Container>
+      </Section>
+
+      {/* Closing CTA */}
+      <Section className='border-t border-white/8 py-24 md:py-32 text-center'>
+        <Container>
+          <h2 className='mb-6'>Ready to find out if you&apos;re Cracked?</h2>
+          <Button variant='primary' size='lg' onClick={handleGetStarted} className='mx-auto'>
+            Solve your first case free
+          </Button>
+        </Container>
+      </Section>
     </div>
   );
 };
