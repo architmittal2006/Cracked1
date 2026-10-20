@@ -97,7 +97,7 @@ export const Navbar: React.FC = () => {
                   to={link.to}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) =>
-                    lex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors }
+                    `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors ${isActive ? 'bg-white/5 text-white' : 'text-slate-400 hover:text-white hover:bg-white/5'}`
                 >
                   {link.label}
                 </NavLink>
