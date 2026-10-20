@@ -64,21 +64,21 @@ export const Button: React.FC<ButtonProps> = ({
         onClick={isLinkDisabled ? (e) => e.preventDefault() : (rest as React.AnchorHTMLAttributes<HTMLAnchorElement>).onClick}
         {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
       >
-        {loading ? <Loader2 className=\"w-4 h-4 animate-spin\" /> : children}
+        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : children}
       </a>
     );
   }
 
   return (
     <button
-      type=\"button\"
+      type="button"
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       aria-disabled={disabled || loading || undefined}
       className={classes}
       {...rest}
     >
-      {loading ? <Loader2 className=\"w-4 h-4 animate-spin\" /> : children}
+      {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : children}
     </button>
   );
 };

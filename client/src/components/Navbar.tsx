@@ -36,7 +36,7 @@ export const Navbar: React.FC = () => {
                 key={link.to}
                 to={link.to}
                 className={({ isActive }) =>
-                  	ext-sm font-medium text-slate-400 transition-colors  hover:text-white
+                  `text-sm font-medium text-slate-400 transition-colors ${isActive ? 'text-white' : ''} hover:text-white`
                 }
               >
                 {link.label}
@@ -47,7 +47,7 @@ export const Navbar: React.FC = () => {
           <div className="flex items-center gap-3">
             {isAuthenticated && user ? (
               <>
-                <Link to={/profile/} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
+                <Link to={`/profile/${user.username}`} className="flex items-center gap-2 hover:opacity-80 transition-opacity">
                   <Avatar initials={user.name.split(' ').map(n => n[0]).join('')} size="sm" />
                   <span className="hidden sm:inline text-sm font-medium text-white">{user.name}</span>
                 </Link>
@@ -110,7 +110,7 @@ export const Navbar: React.FC = () => {
               <div className="text-xs text-slate-500 uppercase tracking-widest font-bold mb-4">Account</div>
               {isAuthenticated && user ? (
                 <>
-                  <Link to={/profile/} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-white/5 transition-colors">
+                  <Link to={`/profile/${user.username}`} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-white/5 transition-colors">
                     <User className="w-4 h-4" />
                     <span className="text-sm">{user.name}</span>
                   </Link>
