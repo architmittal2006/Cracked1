@@ -83,7 +83,7 @@ export const LoginPage: React.FC = () => {
       <section className="page-container login-shell">
         <div className="login-copy">
           <p className="login-eyebrow">{active.eyebrow}</p>
-          <h1>{active.title}</h1>
+          <h1 className='font-serif text-3xl font-bold leading-tight text-white sm:text-4xl'>{active.title}</h1>
           <p>{active.description}</p>
 
           <div className="login-proof-grid">
