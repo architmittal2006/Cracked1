@@ -1,122 +1,48 @@
-import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, ArrowRight } from 'lucide-react';
-import { getTierProgress } from '../data/mockData';
-import { ScoreRing } from '../components/ScoreRing';
-import { TierBadge } from '../components/TierBadge';
-import { PageWrapper } from '../components/PageWrapper';
-import { useAuth } from '../contexts/AuthContext';
-import { Button } from '../components/Button';
+import React from 'react';
+import { Link } from 'react-router-dom';
 
-export const DashboardPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading } = useAuth();
-
-  const [userScores, setUserScores] = useState({
-    credibilityScore: 0,
-    solveScore: 0,
-    reviewScore: 0,
-    casesSolved: 0,
-    mergeBonusCount: 0,
-  });
-
-  useEffect(() => {
-    if (user) {
-      setUserScores({
-        credibilityScore: user.credibilityScore ?? 0,
-        solveScore: user.solveScore ?? 0,
-        reviewScore: user.reviewScore ?? 0,
-        casesSolved: user.casesSolved ?? 0,
-        mergeBonusCount: user.mergeBonusCount ?? 0,
-      });
-    }
-  }, [user]);
-
-  if (isLoading) {
-    return null;
-  }
-
-  if (!isAuthenticated || !user) {
-    navigate('/login');
-    return null;
-  }
-
-  const tierProgress = getTierProgress(userScores.credibilityScore);
-
+export const Footer: React.FC = () => {
   return (
-    <PageWrapper>
-      <div className="page-header">
-        <div className="section-label mb-2">YOUR ARENA</div>
-        <h1 className="section-title mb-2">Dashboard</h1>
-        <p className="section-subtitle">Active submissions, review queue, and score snapshot.</p>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="glass-card p-6 flex items-center gap-4 hover:border-orange-500/30 transition-colors">
-          <ScoreRing score={userScores.credibilityScore / 1000} maxScore={10} size={72} />
+    <footer className='relative mt-16 border-t border-white/10 bg-[#0a0c13] pt-12 pb-8'>
+      <div className='page-container'>
+        <div className='mb-12 grid gap-10 md:grid-cols-3'>
           <div>
-            <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Credibility</div>
-            <div className="text-2xl font-black font-mono text-white">{userScores.credibilityScore.toLocaleString()}</div>
-            <TierBadge score={userScores.credibilityScore} />
+            <div className='mb-4 flex items-center gap-3'>
+              <img src='/logo-with--cracked-----one-should-get-an-idea-that.png' alt='Cracked?' className='h-9 w-auto' />
+              <span className='text-base font-bold text-white'>Cracked?</span>
+            </div>
+            <p className='max-w-xs text-sm leading-relaxed text-slate-400'>
+              Open-source case arena where peer review and rubric scoring build genuine consulting credibility.
+            </p>
           </div>
-        </div>
-        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
-          <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Tier Progress</div>
-          <div className="text-lg font-bold text-white mb-2">{tierProgress.current}</div>
-          {tierProgress.next && (
-            <>
-              <div className="progress-bar mb-2">
-                <div className="progress-bar-fill" style={{ width: `${tierProgress.percent}%` }} />
-              </div>
-              <div className="text-xs text-slate-500">Next: {tierProgress.next}</div>
-            </>
-          )}
-        </div>
-        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
-          <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Quick Stats</div>
-          <div className="grid grid-cols-2 gap-3 mt-2 text-sm">
-            <div className="hover:bg-slate-800/50 p-2 rounded transition-colors"><span className="text-slate-500">Solve</span><div className="font-mono font-bold">{userScores.solveScore.toLocaleString()}</div></div>
-            <div className="hover:bg-slate-800/50 p-2 rounded transition-colors"><span className="text-slate-500">Review</span><div className="font-mono font-bold">{userScores.reviewScore.toLocaleString()}</div></div>
-            <div className="hover:bg-slate-800/50 p-2 rounded transition-colors"><span className="text-slate-500">Cases</span><div className="font-mono font-bold">{userScores.casesSolved.toLocaleString()}</div></div>
-            <div className="hover:bg-slate-800/50 p-2 rounded transition-colors"><span className="text-slate-500">Merges</span><div className="font-mono font-bold text-amber-400">{userScores.mergeBonusCount}</div></div>
-          </div>
-        </div>
-      </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-white">Active Submissions</h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/cases')} className="hover:text-orange-400 transition-colors">Browse cases</Button>
-          </div>
-          <div className="space-y-4">
-            <p className="text-slate-400 text-sm">No active submissions. <Link to="/cases" className="text-orange-400 hover:text-orange-300 transition-colors">Pick a case</Link></p>
-          </div>
-        </div>
-
-        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-white">Review Queue</h2>
-            <span className="text-xs text-slate-500">Unlock gates by reviewing</span>
-          </div>
-          <div className="space-y-4">
-            <p className="text-slate-400 text-sm">No reviews available yet.</p>
-          </div>
-        </div>
-      </div>
-
-      <div className="glass-card p-6 mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-amber-500/30 transition-colors">
-        <div className="flex items-center gap-3">
-          <Trophy className="w-6 h-6 text-amber-400" />
           <div>
-            <div className="font-bold text-white">Share your certificate</div>
-            <div className="text-sm text-slate-400">Live credibility score with verification hash</div>
+            <h4 className='mb-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400'>Platform</h4>
+            <ul className='space-y-3'>
+              <li><Link to='/cases' className='text-sm text-slate-400 transition-colors hover:text-white'>Case Library</Link></li>
+              <li><Link to='/arena' className='text-sm text-slate-400 transition-colors hover:text-white'>Open Arena</Link></li>
+              <li><Link to='/leaderboard' className='text-sm text-slate-400 transition-colors hover:text-white'>Leaderboard</Link></li>
+              <li><Link to='/how-it-works' className='text-sm text-slate-400 transition-colors hover:text-white'>How It Works</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className='mb-4 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400'>Community</h4>
+            <ul className='space-y-3'>
+              <li><a href='https://github.com' target='_blank' rel='noreferrer' className='text-sm text-slate-400 transition-colors hover:text-white'>GitHub Repository</a></li>
+              <li><Link to='/questions' className='text-sm text-slate-400 transition-colors hover:text-white'>Community Questions</Link></li>
+              <li><Link to='/register' className='text-sm text-slate-400 transition-colors hover:text-white'>Create Account</Link></li>
+            </ul>
           </div>
         </div>
-        <Button variant="primary" size="md" onClick={() => navigate(`/certificate/${user.username}`)} className="hover:scale-105 transition-transform">
-          View Certificate <ArrowRight className="w-4 h-4" />
-        </Button>
+
+        <div className='flex flex-col items-center justify-between gap-4 border-t border-white/8 pt-6 md:flex-row'>
+          <p className='text-xs text-slate-500'>© 2025 Cracked? — Peer-reviewed case solving.</p>
+          <div className='inline-flex items-center rounded-full border border-white/10 bg-white/[0.02] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.18em] text-slate-300'>
+            Proof of work beats promise
+          </div>
+        </div>
       </div>
-    </PageWrapper>
+    </footer>
   );
 };
