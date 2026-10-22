@@ -1,640 +1,85 @@
-﻿@import "tailwindcss";
+﻿import React from 'react';
+import { Clock, FileText, Zap } from 'lucide-react';
+import type { Case } from '../data/mockData';
+import { GATE_STATE } from '../data/mockData';
+import { ProblemTypeBadge } from './ProblemTypeBadge';
+import { GateIndicator } from './GateIndicator';
+import { Button } from './Button';
 
-/* PEER PLATFORM — CRACKED? DESIGN SYSTEM */
-
-@theme {
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-  --font-serif: 'Georgia', 'Times New Roman', serif;
-
-  --color-accent: #FF4C25;
-  --color-accent-hover: #FF6B4A;
-  --color-track-arena: #10B981;
-  --color-track-questions: #8B5CF6;
-  --color-track-cases: #F59E0B;
-
-  --color-success: #10B981;
-  --color-error: #EF4444;
-
-  --color-bg: #0B0B0F;
-  --color-bg-surface: #121217;
-  --color-text-primary: #F5F5F0;
-  --color-text-secondary: #D4D4D0;
-  --color-text-muted: #8A8A85;
-  --color-border: rgba(255, 255, 255, 0.08);
-
-  --radius-card: 16px;
-  --radius-button: 12px;
-  --radius-sm: 6px;
+interface CaseCardProps {
+  caseData: Case;
 }
 
-:root {
-  --bg: #0B0B0F;
-  --bg-surface: #121217;
-  --accent: #FF4C25;
-  --accent-hover: #FF6B4A;
-  --track-arena: #10B981;
-  --track-questions: #8B5CF6;
-  --track-cases: #F59E0B;
-  --text-primary: #F5F5F0;
-  --text-secondary: #D4D4D0;
-  --text-muted: #8A8A85;
-  --border: rgba(255, 255, 255, 0.08);
-  --radius-card: 16px;
-  --radius-button: 12px;
-
-  --text-h1: clamp(40px, 6vw, 72px);
-  --text-h2: clamp(28px, 4vw, 44px);
-  --text-body: 17px;
-  --text-body-lg: 18px;
-  --text-small: 14px;
-  --line-body: 1.6;
-  --line-tight: 1.15;
-}
-
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html {
-  scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-}
-
-body {
-  font-family: var(--font-sans);
-  background:
-    radial-gradient(circle at top, rgba(255, 76, 37, 0.08), transparent 30%),
-    #0B0B0F;
-  color: var(--text-primary);
-  font-size: var(--text-body);
-  line-height: var(--line-body);
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-}
-
-h1 {
-  font-size: var(--text-h1);
-  line-height: var(--line-tight);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-}
-
-h2 {
-  font-size: var(--text-h2);
-  line-height: var(--line-tight);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-}
-
-h3 {
-  font-size: clamp(20px, 3vw, 28px);
-  line-height: 1.3;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--text-primary);
-}
-
-p {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-img {
-  max-width: 100%;
-  display: block;
-}
-
-button, input { font: inherit; }
-
-a {
-  color: var(--text-primary);
-  text-decoration: none;
-  transition: color 150ms ease;
-}
-
-a:hover {
-  color: var(--accent);
-}
-
-.section-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.accent-underline {
-  position: relative;
-  display: inline-block;
-}
-
-.accent-underline::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: -2px;
-  width: 100%;
-  height: 1px;
-  background-color: var(--accent);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 200ms ease;
-}
-
-.accent-underline:hover::after {
-  transform: scaleX(1);
-}
-
-.serif-italic {
-  font-family: var(--font-serif);
-  font-style: italic;
-}
-
-::selection {
-  background: rgba(255, 76, 37, 0.28);
-}
-
-@media (max-width: 640px) {
-  body {
-    background: #0B0B0F;
-  }
-}
-
-#root {
-  min-height: 100vh;
-}
-
-.line-clamp-3 {
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-2 {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-.line-clamp-4 {
-  display: -webkit-box;
-  -webkit-line-clamp: 4;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.
-
-
-
-
-
-
-
-
+export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
+  const getDifficultyClass = () => {
+    switch (caseData.difficulty) {
+      case 'High': return 'bg-[#FF4C25]/10 text-[#FF8F72] border border-[#FF4C25]/20';
+      case 'Chaos': return 'bg-rose-500/10 text-rose-300 border border-rose-500/20';
+      default: return 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20';
+    }
+  };
+
+  const gateReviews = GATE_STATE[caseData.id] ?? 0;
+  const featuredClass = caseData.isFeatured ? 'md:col-span-2 lg:col-span-3' : '';
+  const chaosAccent = caseData.is_chaos ? 'border-l-4 border-l-rose-500' : '';
+
+  return (
+    <div className={`group rounded-2xl border border-white/8 bg-[#0d0d12] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-all duration-200 hover:border-[#FF4C25]/30 hover:shadow-[0_18px_40px_rgba(255,76,37,0.12)] ${featuredClass} ${chaosAccent}`}>
+      <div className='flex items-start justify-between gap-3'>
+        <ProblemTypeBadge type={caseData.type} linked />
+        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${getDifficultyClass()}`}>
+          {caseData.difficulty}
+        </span>
+      </div>
+
+      {caseData.is_chaos && (
+        <div className='mt-4 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-rose-300'>
+          <Zap className='h-3 w-3' /> Chaos case
+        </div>
+      )}
+
+      <h3 className='mt-4 text-xl font-semibold tracking-[-0.03em] text-white'>{caseData.title}</h3>
+      <p className='mt-1 text-sm text-slate-400'>{caseData.sector} · {caseData.companyType}</p>
+
+      <p className='mt-3 text-sm leading-relaxed text-slate-300 line-clamp-3'>
+        {caseData.description}
+      </p>
+
+      <div className='mt-4 flex flex-wrap gap-2'>
+        {caseData.tags.slice(0, 3).map((tag) => (
+          <span key={tag} className='rounded-full border border-white/8 bg-white/[0.02] px-2 py-1 text-[10px] font-medium text-slate-300'>
+            {tag}
+          </span>
+        ))}
+      </div>
+
+      <div className='mt-5'>
+        <GateIndicator reviewsCompleted={gateReviews} compact />
+      </div>
+
+      <div className='mt-5 flex items-center justify-between border-t border-white/8 pt-4'>
+        <div className='flex items-center gap-4 text-xs text-slate-400'>
+          <span className='inline-flex items-center gap-1.5'>
+            <FileText className='h-3.5 w-3.5' />
+            {caseData.submissionCount}
+          </span>
+          <span className='font-mono font-semibold text-[#FF4C25]'>{caseData.pts} pts</span>
+        </div>
+        <span className='inline-flex items-center gap-1.5 text-xs text-slate-400'>
+          <Clock className='h-3.5 w-3.5' />
+          {new Date(caseData.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+        </span>
+      </div>
+
+      <Button
+        variant='primary'
+        size='md'
+        as='a'
+        href={`/cases/${caseData.id}`}
+        className='mt-5 w-full'
+      >
+        View Case
+      </Button>
+    </div>
+  );
+};
