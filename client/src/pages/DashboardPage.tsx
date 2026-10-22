@@ -47,7 +47,7 @@ export const DashboardPage: React.FC = () => {
     <PageWrapper>
       <div className="page-header">
         <div className="section-label mb-2">YOUR ARENA</div>
-        <h1 className="section-title mb-2">Dashboard</h1>
+        <h1 className="font-serif text-3xl font-bold tracking-tight text-white mb-2">Dashboard</h1>
         <p className="section-subtitle">Active submissions, review queue, and score snapshot.</p>
       </div>
 
