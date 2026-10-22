@@ -5,6 +5,7 @@ import { getTierProgress } from '../data/mockData';
 import { ScoreRing } from '../components/ScoreRing';
 import { TierBadge } from '../components/TierBadge';
 import { PageWrapper } from '../components/PageWrapper';
+import { Card } from '../components/Card';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/Button';
 
@@ -52,17 +53,17 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <div className="glass-card p-6 flex items-center gap-4 hover:border-orange-500/30 transition-colors">
+        <Card className="flex items-center gap-4">
           <ScoreRing score={userScores.credibilityScore / 1000} maxScore={10} size={72} />
           <div>
             <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Credibility</div>
-            <div className="text-2xl font-black font-mono text-white">{userScores.credibilityScore.toLocaleString()}</div>
+            <div className="text-2xl font-semibold font-mono text-white">{userScores.credibilityScore.toLocaleString()}</div>
             <TierBadge score={userScores.credibilityScore} />
           </div>
-        </div>
-        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
+        </Card>
+        <Card>
           <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Tier Progress</div>
-          <div className="text-lg font-bold text-white mb-2">{tierProgress.current}</div>
+          <div className="text-lg font-semibold text-white mb-2">{tierProgress.current}</div>
           {tierProgress.next && (
             <>
               <div className="progress-bar mb-2">
@@ -71,52 +72,52 @@ export const DashboardPage: React.FC = () => {
               <div className="text-xs text-slate-500">Next: {tierProgress.next}</div>
             </>
           )}
-        </div>
-        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
+        </Card>
+        <Card>
           <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Quick Stats</div>
           <div className="grid grid-cols-2 gap-3 mt-2 text-sm">
-            <div className="hover:bg-slate-800/50 p-2 rounded transition-colors"><span className="text-slate-500">Solve</span><div className="font-mono font-bold">{userScores.solveScore.toLocaleString()}</div></div>
-            <div className="hover:bg-slate-800/50 p-2 rounded transition-colors"><span className="text-slate-500">Review</span><div className="font-mono font-bold">{userScores.reviewScore.toLocaleString()}</div></div>
-            <div className="hover:bg-slate-800/50 p-2 rounded transition-colors"><span className="text-slate-500">Cases</span><div className="font-mono font-bold">{userScores.casesSolved.toLocaleString()}</div></div>
-            <div className="hover:bg-slate-800/50 p-2 rounded transition-colors"><span className="text-slate-500">Merges</span><div className="font-mono font-bold text-amber-400">{userScores.mergeBonusCount}</div></div>
+            <div className="hover:bg-white/5 p-2 rounded transition-colors"><span className="text-slate-500">Solve</span><div className="font-mono font-semibold">{userScores.solveScore.toLocaleString()}</div></div>
+            <div className="hover:bg-white/5 p-2 rounded transition-colors"><span className="text-slate-500">Review</span><div className="font-mono font-semibold">{userScores.reviewScore.toLocaleString()}</div></div>
+            <div className="hover:bg-white/5 p-2 rounded transition-colors"><span className="text-slate-500">Cases</span><div className="font-mono font-semibold">{userScores.casesSolved.toLocaleString()}</div></div>
+            <div className="hover:bg-white/5 p-2 rounded transition-colors"><span className="text-slate-500">Merges</span><div className="font-mono font-semibold text-amber-400">{userScores.mergeBonusCount}</div></div>
           </div>
-        </div>
+        </Card>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
+        <Card>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-white">Active Submissions</h2>
-            <Button variant="ghost" size="sm" onClick={() => navigate('/cases')} className="hover:text-orange-400 transition-colors">Browse cases</Button>
+            <h2 className="text-xl font-semibold text-white">Active Submissions</h2>
+            <Button variant="ghost" size="sm" onClick={() => navigate('/cases')}>Browse cases</Button>
           </div>
           <div className="space-y-4">
-            <p className="text-slate-400 text-sm">No active submissions. <Link to="/cases" className="text-orange-400 hover:text-orange-300 transition-colors">Pick a case</Link></p>
+            <p className="text-slate-400 text-sm">No active submissions. <Link to="/cases" className="text-[#FF4C25] hover:text-[#FF6B4A] transition-colors">Pick a case</Link></p>
           </div>
-        </div>
+        </Card>
 
-        <div className="glass-card p-6 hover:border-orange-500/30 transition-colors">
+        <Card>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-bold text-white">Review Queue</h2>
+            <h2 className="text-xl font-semibold text-white">Review Queue</h2>
             <span className="text-xs text-slate-500">Unlock gates by reviewing</span>
           </div>
           <div className="space-y-4">
             <p className="text-slate-400 text-sm">No reviews available yet.</p>
           </div>
-        </div>
+        </Card>
       </div>
 
-      <div className="glass-card p-6 mt-8 flex flex-col sm:flex-row items-center justify-between gap-4 hover:border-amber-500/30 transition-colors">
+      <Card className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <Trophy className="w-6 h-6 text-amber-400" />
           <div>
-            <div className="font-bold text-white">Share your certificate</div>
+            <div className="font-semibold text-white">Share your certificate</div>
             <div className="text-sm text-slate-400">Live credibility score with verification hash</div>
           </div>
         </div>
-        <Button variant="primary" size="md" onClick={() => navigate(`/certificate/${user.username}`)} className="hover:scale-105 transition-transform">
+        <Button variant="primary" size="md" onClick={() => navigate(`/certificate/${user.username}`)}>
           View Certificate <ArrowRight className="w-4 h-4" />
         </Button>
-      </div>
+      </Card>
     </PageWrapper>
   );
 };

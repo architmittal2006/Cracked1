@@ -14,20 +14,20 @@ interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const sizeStyles: Record<ButtonSize, string> = {
-  sm: 'h-9 px-3 text-xs',
-  md: 'h-12 px-6 text-sm',
-  lg: 'h-14 px-6 text-base',
+  sm: 'h-9 px-4 text-sm',
+  md: 'h-11 px-5 text-sm',
+  lg: 'h-12 px-6 text-base',
 };
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[#FF4C25] text-black font-semibold hover:bg-[#FF6B4A] hover:scale-[1.02] active:scale-[0.98] ' +
+    'bg-[#FF4C25] text-white font-medium hover:bg-[#FF6B4A] ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4C25]/50 focus-visible:ring-offset-2',
   secondary:
-    'bg-transparent border border-white/25 text-white font-semibold hover:bg-white/10 ' +
+    'bg-transparent border border-white/20 text-white font-medium hover:bg-white/5 hover:border-white/30 ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2',
   ghost:
-    'bg-transparent text-slate-400 font-semibold hover:text-white hover:bg-white/5 ' +
+    'bg-transparent text-slate-400 font-medium hover:text-white hover:bg-white/5 ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2',
 };
 
