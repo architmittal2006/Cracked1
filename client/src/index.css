@@ -1,164 +1,88 @@
-﻿@import "tailwindcss";
+import React from 'react';
+import { Loader2 } from 'lucide-react';
 
-/* PEER PLATFORM — CRACKED? MINIMAL DESIGN SYSTEM */
+type ButtonVariant = 'primary' | 'secondary' | 'ghost';
+type ButtonSize = 'sm' | 'md' | 'lg';
 
-@theme {
-  /* Font families */
-  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
-  --font-serif: 'Georgia', 'Times New Roman', serif;
-
-  /* Brand colors — one accent only */
-  --color-accent: #FF4C25;
-  --color-accent-hover: #FF6B4A;
-
-  /* Track accents (icon dots only) */
-  --color-track-arena: #10B981;
-  --color-track-questions: #8B5CF6;
-  --color-track-cases: #F59E0B;
-
-  /* Semantic colors */
-  --color-success: #10B981;
-  --color-error: #EF4444;
-
-  /* Neutrals — near-black background, off-white text */
-  --color-bg: #0B0B0F;
-  --color-bg-surface: #121217;
-  --color-text-primary: #F5F5F0;
-  --color-text-secondary: #D4D4D0;
-  --color-text-muted: #8A8A85;
-  --color-border: rgba(255, 255, 255, 0.08);
-
-  /* Radii */
-  --radius-card: 16px;
-  --radius-button: 12px;
-  --radius-sm: 6px;
+interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  loading?: boolean;
+  as?: 'button' | 'a';
+  href?: string;
+  className?: string;
 }
 
-:root {
-  --bg: #0B0B0F;
-  --bg-surface: #121217;
-  --accent: #FF4C25;
-  --accent-hover: #FF6B4A;
+const sizeStyles: Record<ButtonSize, string> = {
+  sm: 'h-9 px-3 text-xs',
+  md: 'h-12 px-5 text-sm',
+  lg: 'h-14 px-6 text-base',
+};
 
-  /* Track accents */
-  --track-arena: #10B981;
-  --track-questions: #8B5CF6;
-  --track-cases: #F59E0B;
+const variantStyles: Record<ButtonVariant, string> = {
+  primary:
+    'bg-[#FF4C25] text-black font-semibold shadow-[0_14px_30px_rgba(255,76,37,0.24)] hover:bg-[#FF6B4A] hover:-translate-y-0.5 ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4C25]/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0B0F]',
+  secondary:
+    'bg-transparent border border-white/15 text-white font-semibold hover:bg-white/8 hover:border-white/25 ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0B0F]',
+  ghost:
+    'bg-transparent text-slate-400 font-semibold hover:text-white hover:bg-white/5 ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0B0B0F]',
+};
 
-  /* Text */
-  --text-primary: #F5F5F0;
-  --text-secondary: #D4D4D0;
-  --text-muted: #8A8A85;
+export const Button: React.FC<ButtonProps> = ({
+  variant = 'primary',
+  size = 'md',
+  loading = false,
+  disabled,
+  as = 'button',
+  href,
+  className,
+  children,
+  ...rest
+}) => {
+  const isLink = as === 'a' && !!href;
 
-  /* Border */
-  --border: rgba(255, 255, 255, 0.08);
+  const classes = [
+    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border-0 outline-none transition-all duration-200',
+    sizeStyles[size],
+    variantStyles[variant],
+    disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : '',
+    className,
+  ].filter(Boolean).join(' ');
 
-  /* Radius */
-  --radius-card: 16px;
-  --radius-button: 12px;
+  if (isLink) {
+    const isLinkDisabled = disabled || loading;
+    return (
+      <a
+        href={isLinkDisabled ? undefined : href}
+        className={classes}
+        aria-busy={loading || undefined}
+        aria-disabled={isLinkDisabled || undefined}
+        tabIndex={isLinkDisabled ? -1 : undefined}
+        onClick={isLinkDisabled ? (e) => e.preventDefault() : (rest as React.AnchorHTMLAttributes<HTMLAnchorElement>).onClick}
+        {...(rest as React.AnchorHTMLAttributes<HTMLAnchorElement>)}
+      >
+        {loading ? <Loader2 className='h-4 w-4 animate-spin' /> : children}
+      </a>
+    );
+  }
 
-  /* Type scale */
-  --text-h1: clamp(40px, 6vw, 72px);
-  --text-h2: clamp(28px, 4vw, 44px);
-  --text-body: 17px;
-  --text-body-lg: 18px;
-  --text-small: 14px;
-  --line-body: 1.6;
-  --line-tight: 1.15;
-}
+  return (
+    <button
+      type='button'
+      disabled={disabled || loading}
+      aria-busy={loading || undefined}
+      aria-disabled={disabled || loading || undefined}
+      className={classes}
+      {...rest}
+    >
+      {loading ? <Loader2 className='h-4 w-4 animate-spin' /> : children}
+    </button>
+  );
+};
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+Button.displayName = 'Button';
 
-html {
-  scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-}
-
-body {
-  font-family: var(--font-sans);
-  background-color: var(--bg);
-  color: var(--text-primary);
-  font-size: var(--text-body);
-  line-height: var(--line-body);
-  -webkit-font-smoothing: antialiased;
-  overflow-x: hidden;
-}
-
-h1 {
-  font-size: var(--text-h1);
-  line-height: var(--line-tight);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-}
-
-h2 {
-  font-size: var(--text-h2);
-  line-height: var(--line-tight);
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  color: var(--text-primary);
-}
-
-h3 {
-  font-size: clamp(20px, 3vw, 28px);
-  line-height: 1.3;
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  color: var(--text-primary);
-}
-
-p {
-  margin: 0;
-  color: var(--text-secondary);
-}
-
-a {
-  color: var(--text-primary);
-  text-decoration: none;
-  transition: color 150ms ease;
-}
-
-a:hover {
-  color: var(--accent);
-}
-
-.section-label {
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--accent);
-  font-weight: 600;
-}
-
-.accent-underline {
-  position: relative;
-  display: inline-block;
-}
-
-.accent-underline::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  bottom: -2px;
-  width: 100%;
-  height: 1px;
-  background-color: var(--accent);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 200ms ease;
-}
-
-.accent-underline:hover::after {
-  transform: scaleX(1);
-}
-
-.serif-italic {
-  font-family: var(--font-serif);
-  font-style: italic;
-}
+export default Button;
