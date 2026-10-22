@@ -11,7 +11,8 @@
     "build": "cd client && npm install --legacy-peer-deps && npm run build && cd .. && tsc",
     "start": "node dist/server.js",
     "dev": "ts-node server.ts",
-    "test": "vitest run"
+    "test": "vitest run",
+    "claude": "node claude.mjs"
   },
   "keywords": [],
   "author": "",

@@ -4,12 +4,14 @@ import { Container } from './Container';
 interface SectionProps {
   children: React.ReactNode;
   className?: string;
+  noContainer?: boolean;
+  id?: string;
 }
 
-export const Section: React.FC<SectionProps> = ({ children, className = '' }) => {
+export const Section: React.FC<SectionProps> = ({ children, className = '', noContainer = false, id }) => {
   return (
-    <section className={`py-20 md:py-28 ${className}`}>
-      <Container>{children}</Container>
+    <section id={id} className={`py-16 md:py-24 ${className}`}>
+      {noContainer ? children : <Container>{children}</Container>}
     </section>
   );
 };
