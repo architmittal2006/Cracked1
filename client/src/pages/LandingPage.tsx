@@ -93,6 +93,9 @@ export const LandingPage: React.FC = () => {
           <div className='grid md:grid-cols-2 gap-12 md:gap-16 items-center'>
             <div className='max-w-[65ch]'>
               <div className='section-label mb-3'>The consulting arena</div>
+              <div className='mb-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs text-slate-300'>
+                ★★★★★ <span className='font-medium text-slate-200'>4.5/5 from consulting candidates</span>
+              </div>
               <h1 className='mb-6 font-serif text-4xl font-bold leading-[1.04] tracking-tight text-white sm:text-5xl md:text-6xl'>
                 Everything you need to earn your{' '}
                 <span className='italic text-[#FF4C25]'>consulting offer.</span>
