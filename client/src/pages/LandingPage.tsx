@@ -133,10 +133,10 @@ export const LandingPage: React.FC = () => {
                 { title: 'MBA candidates', copy: 'Practice cases with real rubric feedback, not just peers.' },
                 { title: 'Hiring managers', copy: 'See verifiable proof of work on every candidate profile.' },
               ].map((audience, i) => (
-                <Card key={i} className='flex flex-col gap-3'>
-                  <h3 className='mb-1 text-base font-semibold text-white'>{audience.title}</h3>
-                  <p className='text-sm leading-relaxed text-slate-300'>{audience.copy}</p>
-                </Card>
+              <Card key={i} className='flex flex-col gap-3 min-w-0'>
+                <h3 className='mb-1 text-base font-semibold text-white break-words'>{audience.title}</h3>
+                <p className='text-sm leading-relaxed text-slate-300 break-words'>{audience.copy}</p>
+              </Card>
               ))}
             </div>
           </div>
