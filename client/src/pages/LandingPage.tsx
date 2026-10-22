@@ -93,9 +93,12 @@ export const LandingPage: React.FC = () => {
           <div className='grid md:grid-cols-2 gap-12 md:gap-16 items-center'>
             <div className='max-w-[65ch]'>
               <div className='section-label mb-3'>The consulting arena</div>
-              <h1 className='mb-6'>Peer-reviewed consulting arena</h1>
-              <p className='mb-8 text-lg leading-relaxed text-slate-300'>
-                Solve real business cases, get scored by peers, and build proof-of-work credibility hiring managers trust.
+              <h1 className='mb-6 font-serif text-4xl font-bold leading-[1.04] tracking-tight text-white sm:text-5xl md:text-6xl'>
+                Everything you need to earn your{' '}
+                <span className='italic text-[#FF4C25]'>consulting offer.</span>
+              </h1>
+              <p className='mb-8 text-lg leading-relaxed text-slate-200'>
+                McKinsey, BCG, and Bain-style cases, peer review on standardized rubrics, and verifiable proof of work.
               </p>
               <div className='flex flex-col sm:flex-row gap-4'>
                 <Button variant='primary' size='lg' onClick={handleGetStarted} className='w-full sm:w-auto'>
@@ -132,7 +135,7 @@ export const LandingPage: React.FC = () => {
               ].map((audience, i) => (
                 <Card key={i} className='flex flex-col gap-3'>
                   <h3 className='mb-1 text-base font-semibold text-white'>{audience.title}</h3>
-                  <p className='text-sm leading-relaxed text-slate-400'>{audience.copy}</p>
+                  <p className='text-sm leading-relaxed text-slate-300'>{audience.copy}</p>
                 </Card>
               ))}
             </div>
@@ -153,7 +156,7 @@ export const LandingPage: React.FC = () => {
                   </span>
                   <h3 className='text-lg font-semibold text-white'>{step.title}</h3>
                 </div>
-                <p className='leading-relaxed text-slate-400'>{step.copy}</p>
+                <p className='leading-relaxed text-slate-300'>{step.copy}</p>
               </Card>
             ))}
           </div>
@@ -173,7 +176,7 @@ export const LandingPage: React.FC = () => {
                   </div>
                   <h3 className='text-lg font-semibold text-white'>{track.title}</h3>
                 </div>
-                <p className='mb-6 leading-relaxed text-slate-400'>{track.desc}</p>
+                <p className='mb-6 leading-relaxed text-slate-300'>{track.desc}</p>
                 <a href={track.slug} className='text-sm font-medium accent-underline'>
                   Explore {track.title}
                 </a>
@@ -196,11 +199,11 @@ export const LandingPage: React.FC = () => {
                   </span>
                 )}
                 <h3 className='text-lg font-semibold text-white'>{tier.name}</h3>
-                <p className='mb-2 text-sm text-slate-400'>{tier.description}</p>
+                <p className='mb-2 text-sm text-slate-300'>{tier.description}</p>
                 <div className='mb-6 text-sm font-mono font-bold text-[#FF4C25]'>{tier.score}</div>
                 <ul className='mb-6 flex-grow space-y-2'>
                   {tier.features.map((feature, idx) => (
-                    <li key={idx} className='flex items-start gap-2 text-sm text-slate-400'>
+                    <li key={idx} className='flex items-start gap-2 text-sm text-slate-300'>
                       <span className='text-[#FF4C25]/60'>•</span>
                       <span>{feature}</span>
                     </li>
