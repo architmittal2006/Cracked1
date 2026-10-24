@@ -30,6 +30,7 @@ import { LeaderboardByTypePage } from './pages/LeaderboardByTypePage';
 import { ProfilePage } from './pages/ProfilePage';
 import { CertificatePage } from './pages/CertificatePage';
 import { HowItWorksPage } from './pages/HowItWorksPage';
+import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -52,7 +53,7 @@ const App: React.FC = () => {
             <SmoothScroll>
             <div className="min-h-screen text-slate-100 flex flex-col font-sans selection:bg-[#2D87FF]/30">
               <Navbar />
-              <main className="flex-grow pt-16 relative z-10">
+              <main className="flex-grow pt-16 relative z-10" aria-label="Main content">
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/arena" element={<ArenaPage />} />
@@ -104,6 +105,7 @@ const App: React.FC = () => {
                   <Route path="/profile/:username" element={<ProfilePage />} />
                   <Route path="/certificate/:username" element={<CertificatePage />} />
                   <Route path="/how-it-works" element={<HowItWorksPage />} />
+                  <Route path="/privacy" element={<PrivacyPolicyPage />} />
                   <Route path="/company/dashboard" element={
                     <ProtectedRoute>
                       <CompanyDashboardPage />

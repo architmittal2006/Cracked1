@@ -25,7 +25,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <nav className="fixed top-0 z-50 h-16 w-full border-b border-white/[0.08] bg-[#0A0A0A]/90 backdrop-blur-md">
+    <nav className="fixed top-0 z-50 h-16 w-full border-b border-white/[0.08] bg-[#0A0A0A]/90 backdrop-blur-md" aria-label="Main navigation">
       <div className="h-full max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2 group transition-opacity hover:opacity-90">
           <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-8 md:h-9 w-auto" />

@@ -88,6 +88,7 @@ export const LandingPage: React.FC = () => {
 
   return (
     <div className='min-h-screen flex flex-col'>
+      <section aria-label="Hero">
       <Section className='pt-20 pb-32 md:pb-48'>
         <Container>
           <div className='grid md:grid-cols-2 gap-12 md:gap-16 items-center'>
@@ -117,7 +118,9 @@ export const LandingPage: React.FC = () => {
           </div>
         </Container>
       </Section>
+      </section>
 
+      <section aria-label="Target audience">
       <Section className='border-t border-white/8'>
         <Container>
           <div className='flex flex-col gap-8 md:flex-row md:items-center'>
@@ -141,7 +144,9 @@ export const LandingPage: React.FC = () => {
           </div>
         </Container>
       </Section>
+      </section>
 
+      <section aria-label="How it works">
       <Section className='border-t border-white/8'>
         <Container>
           <div className='section-label mb-3'>How it works</div>
@@ -161,7 +166,9 @@ export const LandingPage: React.FC = () => {
           </div>
         </Container>
       </Section>
+      </section>
 
+      <section aria-label="Tracks">
       <Section className='border-t border-white/8'>
         <Container>
           <div className='section-label mb-3'>Tracks</div>
@@ -184,7 +191,9 @@ export const LandingPage: React.FC = () => {
           </div>
         </Container>
       </Section>
+      </section>
 
+      <section aria-label="Credibility tiers">
       <Section className='border-t border-white/8'>
         <Container>
           <div className='section-label mb-3'>Credibility tiers</div>
@@ -216,7 +225,9 @@ export const LandingPage: React.FC = () => {
           </div>
         </Container>
       </Section>
+      </section>
 
+      <section aria-label="Call to action">
       <Section className='border-t border-white/8 py-24 text-center md:py-32'>
         <Container>
           <h2 className='mb-6'>Ready to find out if you&apos;re Cracked?</h2>
@@ -225,6 +236,7 @@ export const LandingPage: React.FC = () => {
           </Button>
         </Container>
       </Section>
+      </section>
     </div>
   );
 };

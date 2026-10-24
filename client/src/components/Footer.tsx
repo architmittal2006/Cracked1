@@ -3,17 +3,27 @@ import { Link } from 'react-router-dom';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="bg-[#0a0e1a] pt-12 pb-8 relative mt-16 border-t border-white/10">
+    <footer className="bg-[#0a0e1a] pt-12 pb-8 relative mt-16 border-t border-white/10" aria-label="Site footer">
       <div className="page-container">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div className="col-span-1">
             <div className="flex items-center gap-3 mb-4">
               <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-10 w-auto" />
               <span className="font-bold text-white text-base">Cracked?</span>
             </div>
-            <p className="text-slate-400 text-sm max-w-xs leading-relaxed">
+            <p className="text-slate-400 text-sm max-w-xs leading-relaxed mb-4">
               Open-source case arena where peer review and rubric scoring build genuine consulting credibility.
             </p>
+            <div className="space-y-2">
+              <p className="text-slate-400 text-sm">
+                <span className="text-slate-500">Contact:</span>{' '}
+                <a href="mailto:hello@cracked.com" className="text-slate-300 hover:text-[#FF4C25] transition-colors">hello@cracked.com</a>
+              </p>
+              <p className="text-slate-400 text-sm">
+                <span className="text-slate-500">Twitter:</span>{' '}
+                <a href="https://twitter.com/cracked_platform" target="_blank" rel="noreferrer" className="text-slate-300 hover:text-[#FF4C25] transition-colors">@cracked_platform</a>
+              </p>
+            </div>
           </div>
 
           <div>
@@ -32,6 +42,13 @@ export const Footer: React.FC = () => {
               <li><a href="https://github.com" target="_blank" rel="noreferrer" className="text-slate-400 hover:text-brand transition-colors text-sm">GitHub Repository</a></li>
               <li><Link to="/questions" className="text-slate-400 hover:text-brand transition-colors text-sm">Community Questions</Link></li>
               <li><Link to="/register" className="text-slate-400 hover:text-brand transition-colors text-sm">Create Account</Link></li>
+            </ul>
+          </div>
+
+          <div>
+            <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-xs">Legal</h4>
+            <ul className="space-y-3">
+              <li><Link to="/privacy" className="text-slate-400 hover:text-brand transition-colors text-sm">Privacy Policy</Link></li>
             </ul>
           </div>
         </div>
