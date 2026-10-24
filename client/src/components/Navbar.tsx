@@ -6,8 +6,7 @@ import { Avatar } from './Avatar';
 import { Button } from './Button';
 
 const navLinks = [
-  { to: '/cases', label: 'Cases' },
-  { to: '/arena', label: 'Arena' },
+  { to: '/cases', label: 'Practice' },
   { to: '/questions', label: 'Questions' },
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/how-it-works', label: 'How It Works' },
@@ -25,7 +24,7 @@ export const Navbar: React.FC = () => {
   };
 
   return (
-    <nav className="fixed top-0 z-50 h-16 w-full border-b border-white/[0.08] bg-[#0A0A0A]/90 backdrop-blur-md" aria-label="Main navigation">
+    <nav className="fixed top-0 z-50 h-16 w-full border-b border-white/[0.08] bg-[#0A1628]" aria-label="Main navigation">
       <div className="h-full max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2 group transition-opacity hover:opacity-90">
           <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-8 md:h-9 w-auto" />
@@ -87,7 +86,7 @@ export const Navbar: React.FC = () => {
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[60] flex">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)} />
-          <div className="relative w-full max-w-sm bg-[#0A0A0A] h-full border-l border-white/8 flex flex-col p-6 ml-auto">
+          <div className="relative w-full max-w-sm bg-[#0A1628] h-full border-l border-white/8 flex flex-col p-6 ml-auto">
             <div className="flex justify-between items-center mb-8">
               <span className="font-semibold text-white text-sm">Menu</span>
               <button type="button" onClick={() => setIsMobileMenuOpen(false)} className="text-slate-400 hover:text-white p-2 rounded-md hover:bg-white/5" aria-label="Close menu">

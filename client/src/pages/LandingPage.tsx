@@ -10,66 +10,66 @@ import { Card } from '../components/Card';
 
 const steps = [
   {
-    number: '01',
-    title: 'Review 2 submissions',
-    copy: 'Complete peer reviews on any case before you can submit your own solution to that case.',
+    number: '1',
+    title: 'Review 2 answers before you can submit your own',
+    copy: 'This ensures quality through peer evaluation.',
   },
   {
-    number: '02',
-    title: 'Submit a typed solution',
-    copy: 'Each problem type has mandatory sections — Market Sizing, Profitability, M&A, and more.',
+    number: '2',
+    title: 'Submit your answer using our structured template',
+    copy: 'Reviewers score it on 5 dimensions.',
   },
   {
-    number: '03',
-    title: 'Earn credibility',
-    copy: 'Five-dimension rubric scoring. Merge bonuses when companies select your solution.',
+    number: '3',
+    title: 'Earn credibility points with every case you solve',
+    copy: 'Higher levels unlock more features.',
   },
 ];
 
 const tracks = [
   {
-    title: 'Open Arena',
-    desc: 'Jump straight into open case prompts. No review gate needed to submit.',
-    icon: Trophy,
-    color: '#10B981',
-    slug: '/arena',
+    title: 'Practice',
+    desc: 'Rigorous business cases. Complete 2 reviews to unlock your answer. Earn merge bonuses when companies select your solution.',
+    icon: Zap,
+    color: '#C75B39',
+    slug: '/cases',
   },
   {
-    title: 'Community Questions',
-    desc: 'Crowdsourced consulting queries and brainteasers. The poster reviews and accepts the best answer.',
+    title: 'Questions',
+    desc: 'Crowdsourced consulting questions. Post a question, get answers from the community, and accept the best one.',
     icon: GitPullRequest,
-    color: '#8B5CF6',
+    color: '#3B82F6',
     slug: '/questions',
   },
   {
-    title: 'Curated Cases',
-    desc: 'Rigorous corporate briefs. Complete 2 peer reviews to unlock submissions and earn merge bonuses.',
-    icon: Zap,
-    color: '#F59E0B',
-    slug: '/cases',
+    title: 'Open Arena',
+    desc: 'Jump straight into solving. No review gate. Practice freely and build your skills.',
+    icon: Trophy,
+    color: '#10B981',
+    slug: '/arena',
   },
 ];
 
 const tiers = [
   {
     name: 'Analyst',
-    description: 'Entry-level contributors',
-    score: '0–1,000 pts',
-    features: ['Solve up to 5 cases', 'Earn peer reviews', 'Basic profile visibility'],
+    description: 'New to the platform',
+    score: '0–1,000 points',
+    features: ['Solve up to 5 cases', 'Earn reviews', 'Build your profile'],
     popular: false,
   },
   {
     name: 'Consultant',
-    description: 'Proven case solvers',
-    score: '1,000–5,000 pts',
-    features: ['Unlimited submissions', 'Advanced rubric access', 'Priority review queue', 'Featured profiles'],
+    description: 'Proven solver',
+    score: '1,000–5,000 points',
+    features: ['Unlimited submissions', 'Priority review queue', 'Featured profile visibility'],
     popular: true,
   },
   {
     name: 'Partner',
-    description: 'Top-tier experts',
-    score: '5,000+ pts',
-    features: ['Curated case access', 'Company merge bonuses', 'Mentorship privileges', 'Verified expert badge'],
+    description: 'Top contributor',
+    score: '5,000+ points',
+    features: ['Access exclusive cases', 'Earn company merge bonuses', 'Get verified expert badge'],
     popular: false,
   },
 ];
@@ -93,20 +93,18 @@ export const LandingPage: React.FC = () => {
         <Container>
           <div className='grid md:grid-cols-2 gap-12 md:gap-16 items-center'>
             <div className='max-w-[65ch]'>
-              <div className='section-label mb-3'>The consulting arena</div>
               <h1 className='mb-6 text-4xl font-semibold leading-[1.1] tracking-tight text-white sm:text-5xl md:text-6xl'>
-                Everything you need to earn your{' '}
-                <span className='text-[#FF4C25]'>consulting offer.</span>
+                Solve consulting cases, earn verifiable credibility.
               </h1>
               <p className='mb-8 text-lg leading-relaxed text-slate-300'>
-                McKinsey, BCG, and Bain-style cases, peer review on standardized rubrics, and verifiable proof of work.
+                Practice with real business problems, get peer-reviewed on standardized rubrics, and build a score you can show recruiters.
               </p>
               <div className='flex flex-col sm:flex-row gap-4'>
                 <Button variant='primary' size='lg' onClick={handleGetStarted} className='w-full sm:w-auto'>
-                  Solve your first case free
+                  Practice a case
                 </Button>
                 <a href='/how-it-works' className='accent-underline text-sm font-medium transition-colors hover:text-white'>
-                  See how it works
+                  How it works
                 </a>
               </div>
             </div>
@@ -149,8 +147,7 @@ export const LandingPage: React.FC = () => {
       <section aria-label="How it works">
       <Section className='border-t border-white/8'>
         <Container>
-          <div className='section-label mb-3'>How it works</div>
-          <h2 className='mb-10'>Three steps, one gate</h2>
+          <h2 className='mb-10 text-2xl font-semibold text-white'>How it works</h2>
           <div className='grid gap-8 md:grid-cols-3'>
             {steps.map((step, i) => (
               <Card key={i} className='flex flex-col gap-4'>
@@ -171,8 +168,7 @@ export const LandingPage: React.FC = () => {
       <section aria-label="Tracks">
       <Section className='border-t border-white/8'>
         <Container>
-          <div className='section-label mb-3'>Tracks</div>
-          <h2 className='mb-10'>Choose your track</h2>
+          <h2 className='mb-10 text-2xl font-semibold text-white'>Choose your track</h2>
           <div className='grid gap-8 md:grid-cols-3'>
             {tracks.map((track, i) => (
               <Card key={i} className='flex flex-col gap-4'>
@@ -196,23 +192,22 @@ export const LandingPage: React.FC = () => {
       <section aria-label="Credibility tiers">
       <Section className='border-t border-white/8'>
         <Container>
-          <div className='section-label mb-3'>Credibility tiers</div>
-          <h2 className='mb-10'>Progress from Analyst to Partner</h2>
+          <h2 className='mb-10 text-2xl font-semibold text-white'>Credibility levels</h2>
           <div className='grid gap-8 md:grid-cols-3'>
             {tiers.map((tier, i) => (
               <Card key={i} className={`relative flex flex-col gap-4 ${tier.popular ? 'border-white/12' : ''}`}>
                 {tier.popular && (
-                  <span className='absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#FF4C25]'>
+                  <span className='absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-white/8 bg-white/5 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.16em] text-[#C75B39]'>
                     Most common
                   </span>
                 )}
                 <h3 className='text-lg font-semibold text-white'>{tier.name}</h3>
                 <p className='mb-2 text-sm text-slate-300'>{tier.description}</p>
-                <div className='mb-6 text-sm font-mono font-bold text-[#FF4C25]'>{tier.score}</div>
+                <div className='mb-6 text-sm font-mono font-bold text-[#C75B39]'>{tier.score}</div>
                 <ul className='mb-6 flex-grow space-y-2'>
                   {tier.features.map((feature, idx) => (
                     <li key={idx} className='flex items-start gap-2 text-sm text-slate-300'>
-                      <span className='text-[#FF4C25]/60'>•</span>
+                      <span className='text-[#C75B39]/60'>•</span>
                       <span>{feature}</span>
                     </li>
                   ))}
@@ -230,9 +225,9 @@ export const LandingPage: React.FC = () => {
       <section aria-label="Call to action">
       <Section className='border-t border-white/8 py-24 text-center md:py-32'>
         <Container>
-          <h2 className='mb-6'>Ready to find out if you&apos;re Cracked?</h2>
+          <h2 className='mb-6 text-2xl font-semibold text-white'>Ready to find out if you&apos;re Cracked?</h2>
           <Button variant='primary' size='lg' onClick={handleGetStarted} className='mx-auto'>
-            Solve your first case free
+            Practice a case
           </Button>
         </Container>
       </Section>

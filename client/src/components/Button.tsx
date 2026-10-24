@@ -21,8 +21,8 @@ const sizeStyles: Record<ButtonSize, string> = {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[#FF4C25] text-white font-medium hover:bg-[#FF6B4A] ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#FF4C25]/50 focus-visible:ring-offset-2',
+    'bg-[#C75B39] text-white font-medium hover:bg-[#D66A48] ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C75B39]/50 focus-visible:ring-offset-2',
   secondary:
     'bg-transparent border border-white/20 text-white font-medium hover:bg-white/5 hover:border-white/30 ' +
     'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2',

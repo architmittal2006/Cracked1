@@ -10,7 +10,7 @@ interface SectionProps {
 
 export const Section: React.FC<SectionProps> = ({ children, className = '', noContainer = false, id }) => {
   return (
-    <section id={id} className={`py-16 md:py-24 ${className}`}>
+    <section id={id} className={`py-16 md:py-24 section-padding ${className}`}>
       {noContainer ? children : <Container>{children}</Container>}
     </section>
   );
