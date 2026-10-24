@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cracked1-afy4.onrender.com/sitemap.xml

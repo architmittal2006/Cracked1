@@ -1,0 +1,34 @@
+# Cracked? Platform
+
+Cracked? is a peer-reviewed case competition platform for consulting credibility.
+
+## Purpose
+Help aspiring consultants, career switchers, MBA candidates, and hiring managers build and verify consulting case-solving skills through peer-reviewed competitions.
+
+## Key Features
+- **Open Arena**: Jump straight into open case prompts with no review gate
+- **Community Questions**: Crowdsourced consulting queries and brainteasers
+- **Curated Cases**: Rigorous corporate briefs with peer review gates and merge bonuses
+- **Standardized Rubrics**: Five-dimension scoring across Market Sizing, Profitability, M&A, and more
+- **Credibility Tiers**: Progress from Analyst (0-1,000 pts) to Consultant (1,000-5,000 pts) to Partner (5,000+ pts)
+- **Two-Review Gate**: Complete 2 peer reviews before submitting your own solution
+- **Verifiable Certificates**: Share your credibility scores with recruiters
+
+## Technology Stack
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS 4.3, Framer Motion, React Router v7
+- **Backend**: Express.js, TypeScript, file-based storage
+- **Authentication**: GitHub OAuth, Google OAuth
+
+## Key URLs
+- Homepage: https://cracked1-afy4.onrender.com/
+- How it works: https://cracked1-afy4.onrender.com/how-it-works
+- Open Arena: https://cracked1-afy4.onrender.com/arena
+- Community Questions: https://cracked1-afy4.onrender.com/questions
+- Curated Cases: https://cracked1-afy4.onrender.com/cases
+- Leaderboard: https://cracked1-afy4.onrender.com/leaderboard
+
+## Documentation
+- Repository: https://github.com/[your-repo-url]
+
+## Contact
+- Twitter: @cracked_platform
