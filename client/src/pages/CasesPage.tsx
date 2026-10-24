@@ -38,10 +38,9 @@ export const CasesPage: React.FC = () => {
       />
       <PageWrapper>
         <div className="page-header">
-          <div className="section-label mb-2">CASE LIBRARY</div>
-          <h1 className="section-title mb-4">Active Cases</h1>
+          <h1 className="text-3xl md:text-4xl font-semibold text-white mb-2">Case Library</h1>
           <p className="section-subtitle">
-            Browse, filter, and read case briefs across 7 problem types. Review peers to unlock submissions.
+            {filteredCases.length} case{filteredCases.length !== 1 ? 's' : ''} available • Filter by type, difficulty, or sector
           </p>
         </div>
 
@@ -72,7 +71,7 @@ export const CasesPage: React.FC = () => {
 
         {filteredCases.length === 0 && (
           <div className="col-span-full py-20 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-slate-900 mb-4">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 mb-4">
               <span className="text-3xl">🔍</span>
             </div>
             <h3 className="text-xl font-bold text-white mb-2">No cases found</h3>

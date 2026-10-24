@@ -47,19 +47,28 @@ export const DashboardPage: React.FC = () => {
   return (
     <PageWrapper>
       <div className="page-header">
-        <div className="section-label mb-2">YOUR ARENA</div>
-        <h1 className="font-serif text-3xl font-bold tracking-tight text-white mb-2">Dashboard</h1>
-        <p className="section-subtitle">Active submissions, review queue, and score snapshot.</p>
+        <h1 className="text-3xl md:text-4xl font-semibold text-white mb-2">Welcome back, {user.name.split(' ')[0]}</h1>
+        <p className="section-subtitle">
+          {userScores.casesSolved} case{userScores.casesSolved !== 1 ? 's' : ''} done • {userScores.credibilityScore.toLocaleString()} credibility score
+        </p>
+      </div>
+
+      <div className="mb-8">
+        <Button variant="primary" size="lg" onClick={() => navigate('/cases')} className="w-full sm:w-auto">
+          Start a case <ArrowRight className="w-4 h-4" />
+        </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
-        <Card className="flex items-center gap-4">
-          <ScoreRing score={userScores.credibilityScore / 1000} maxScore={10} size={72} />
-          <div>
-            <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Credibility</div>
-            <div className="text-2xl font-semibold font-mono text-white">{userScores.credibilityScore.toLocaleString()}</div>
-            <TierBadge score={userScores.credibilityScore} />
+        <Card className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <ScoreRing score={userScores.credibilityScore / 1000} maxScore={10} size={48} />
+            <div>
+              <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Credibility</div>
+              <div className="text-xl font-semibold font-mono text-white">{userScores.credibilityScore.toLocaleString()}</div>
+            </div>
           </div>
+          <TierBadge score={userScores.credibilityScore} />
         </Card>
         <Card>
           <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Tier Progress</div>
@@ -91,7 +100,7 @@ export const DashboardPage: React.FC = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate('/cases')}>Browse cases</Button>
           </div>
           <div className="space-y-4">
-            <p className="text-slate-400 text-sm">No active submissions. <Link to="/cases" className="text-[#FF4C25] hover:text-[#FF6B4A] transition-colors">Pick a case</Link></p>
+            <p className="text-slate-400 text-sm">No active submissions. <Link to="/cases" className="text-orange-400 hover:text-orange-300 transition-colors">Pick a case</Link></p>
           </div>
         </Card>
 

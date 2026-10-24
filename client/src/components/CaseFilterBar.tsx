@@ -38,8 +38,8 @@ export const CaseFilterBar: React.FC<CaseFilterBarProps> = ({
       />
     </div>
 
-    <div className="flex flex-wrap gap-2">
-      <span className="text-xs text-slate-500 uppercase font-bold self-center mr-1">Type</span>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs text-slate-500 uppercase font-bold mr-1">Type</span>
       <button
         type="button"
         onClick={() => onTypeChange('All')}
@@ -67,8 +67,8 @@ export const CaseFilterBar: React.FC<CaseFilterBarProps> = ({
       ))}
     </div>
 
-    <div className="flex flex-wrap gap-2">
-      <span className="text-xs text-slate-500 uppercase font-bold self-center mr-1">Difficulty</span>
+    <div className="flex flex-wrap items-center gap-2">
+      <span className="text-xs text-slate-500 uppercase font-bold mr-1">Difficulty</span>
       {['All', 'Standard', 'High', 'Chaos'].map(diff => (
         <button
           key={diff}
@@ -84,9 +84,9 @@ export const CaseFilterBar: React.FC<CaseFilterBarProps> = ({
         </button>
       ))}
 
-      <div className="w-px h-6 bg-slate-800 mx-1 self-center hidden sm:block" />
+      <div className="w-px h-6 bg-slate-800 mx-2 self-center hidden sm:block" />
 
-      <span className="text-xs text-slate-500 uppercase font-bold self-center mr-1">Sector</span>
+      <span className="text-xs text-slate-500 uppercase font-bold mr-1">Sector</span>
       <select
         className="input-field w-auto py-1.5 text-xs min-w-[140px]"
         value={sectorFilter}

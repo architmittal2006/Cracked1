@@ -38,41 +38,41 @@
 }
 
 :root {
-  /* Backgrounds - Navy theme */
-  --bg-deep: #0A1628;
-  --bg-surface: #111C30;
-  --bg-card: #111C30;
-  --bg-card-hover: #16223B;
+  /* Backgrounds - Light theme (Road to Offer style) */
+  --bg-deep: #0A0A0A;
+  --bg-surface: #0A0A0A;
+  --bg-card: #141414;
+  --bg-card-hover: #1A1A1A;
 
-  /* Accents - Terracotta primary */
-  --accent-primary: #C75B39;
-  --accent-secondary: #3B82F6;
+  /* Accents - Orange primary (matching logo) */
+  --accent-primary: #FF4C25;
+  --accent-secondary: #E03D18;
   --accent-track-arena: #10B981;
   --accent-track-questions: #8B5CF6;
   --accent-track-cases: #F59E0B;
   --accent-rose: #EF4444;
   --accent-emerald: #10B981;
 
-  /* Text - Cream theme */
-  --text-primary: #F5F0E8;
+  /* Text - Dark theme */
+  --text-primary: #FFFFFF;
   --text-secondary: #9CA3AF;
   --text-muted: #6B7280;
 
   /* Borders */
-  --border-subtle: rgba(245, 240, 232, 0.08);
-  --border-medium: rgba(245, 240, 232, 0.12);
-  --border-focus: #C75B39;
+  --border-subtle: rgba(255, 255, 255, 0.08);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-focus: #FF4C25;
 
-  /* Shadows - Minimal */
-  --shadow-card: none;
-  --shadow-card-hover: none;
+  /* Shadows - Subtle (Road to Offer style) */
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 4px 6px rgba(0, 0, 0, 0.4);
 
-  /* Border radius - Reduced from 12px to 4px */
-  --radius-sm: 4px;
-  --radius-md: 4px;
-  --radius-lg: 8px;
+  /* Border radius - Road to Offer style */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
 
-  /* Spacing scale - 8px base */
+  /* Spacing scale - More generous for breathable feel */
   --space-1: 4px;
   --space-2: 8px;
   --space-3: 12px;
@@ -85,7 +85,7 @@
 
   /* Layout */
   --nav-height: 64px;
-  --gutter: 24px;
+  --gutter: 32px;
   --max-container: 1280px;
   --max-body-width: 65ch;
 
@@ -150,30 +150,32 @@ h1, h2, h3, .font-display {
   font-weight: 600;
 }
 
-/* ─── Minimalist Cards ─── */
+/* ─── Minimalist Cards (Road to Offer style) ─── */
 .glass-card {
   background: var(--bg-card);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-card);
-  transition: border-color var(--transition-fast);
+  transition: all var(--transition-base);
 }
 
 .glass-card-hover:hover {
   background: var(--bg-card-hover);
-  border-color: var(--accent-primary);
+  border-color: var(--border-medium);
+  box-shadow: var(--shadow-card-hover);
+  transform: translateY(-2px);
 }
 
 /* ─── Gradients & Text ─── */
 .gradient-text {
-  background: linear-gradient(135deg, var(--accent-primary), #D66A48);
+  background: linear-gradient(135deg, var(--accent-primary), #059669);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .gradient-text-gold {
-  background: linear-gradient(135deg, var(--accent-primary), #D66A48);
+  background: linear-gradient(135deg, var(--accent-primary), #059669);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
@@ -220,7 +222,7 @@ h1, h2, h3, .font-display {
   text-decoration: none;
 }
 .btn-primary:hover {
-  background: #D66A48;
+  background: #E03D18;
 }
 .btn-primary:disabled {
   opacity: 0.5;
@@ -375,10 +377,10 @@ textarea.input-field { resize: vertical; min-height: 120px; }
   gap: 8px;
   padding: 8px 18px;
   color: #ffffff;
-  font-family: 'Montserrat', sans-serif;
-  font-size: 1.05rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-family: 'Inter', sans-serif;
+  font-size: 0.95rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
   text-decoration: none;
   border: 2px solid rgba(255, 255, 255, 0.86);
   border-radius: 7px;

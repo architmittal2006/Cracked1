@@ -15,7 +15,7 @@ export const CrackedQuestionMark: React.FC<{ className?: string }> = ({ classNam
   >
     <defs>
       <radialGradient id="glow" cx="50%" cy="50%" r="50%">
-        <stop offset="0%" stopColor="#FF4C25" stopOpacity="0.35" />
+        <stop offset="0%" stopColor="#FF4C25" stopOpacity="0.5" />
         <stop offset="100%" stopColor="#FF4C25" stopOpacity="0" />
       </radialGradient>
     </defs>
@@ -27,13 +27,13 @@ export const CrackedQuestionMark: React.FC<{ className?: string }> = ({ classNam
       fontFamily="Inter, system-ui, sans-serif"
       fontWeight="800"
       fontSize="180"
-      fill="#E5E7EB"
+      fill="#FFFFFF"
     >
       ?
     </text>
     {/* cracks */}
-    <path d="M95 60 L110 95 L100 130" stroke="#FF4C25" strokeWidth="3" fill="none" strokeLinecap="round" />
-    <path d="M140 70 L125 105 L135 140" stroke="#FF4C25" strokeWidth="3" fill="none" strokeLinecap="round" />
-    <path d="M105 150 L120 170" stroke="#FF4C25" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+    <path d="M95 60 L110 95 L100 130" stroke="#FF4C25" strokeWidth="4" fill="none" strokeLinecap="round" />
+    <path d="M140 70 L125 105 L135 140" stroke="#FF4C25" strokeWidth="4" fill="none" strokeLinecap="round" />
+    <path d="M105 150 L120 170" stroke="#FF4C25" strokeWidth="3" fill="none" strokeLinecap="round" />
   </svg>
 );

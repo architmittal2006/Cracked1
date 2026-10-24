@@ -13,9 +13,9 @@ interface CaseCardProps {
 export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
   const getDifficultyClass = () => {
     switch (caseData.difficulty) {
-      case 'High': return 'bg-[#FF4C25]/10 text-[#FF8F72] border border-[#FF4C25]/20';
+      case 'High': return 'bg-amber-500/10 text-amber-300 border border-amber-500/20';
       case 'Chaos': return 'bg-rose-500/10 text-rose-300 border border-rose-500/20';
-      default: return 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20';
+      default: return 'bg-orange-500/10 text-orange-300 border border-orange-500/20';
     }
   };
 
@@ -24,7 +24,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
   const chaosAccent = caseData.is_chaos ? 'border-l-4 border-l-rose-500' : '';
 
   return (
-    <div className={`group rounded-2xl border border-white/8 bg-[#0d0d12] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-all duration-200 hover:border-[#FF4C25]/30 hover:shadow-[0_18px_40px_rgba(255,76,37,0.12)] ${featuredClass} ${chaosAccent}`}>
+    <div className={`group rounded-2xl border border-white/8 bg-[#0d0d12] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-all duration-200 hover:border-orange-500/30 hover:shadow-[0_18px_40px_rgba(255,76,37,0.12)] ${featuredClass} ${chaosAccent}`}>
       <div className='flex items-start justify-between gap-3'>
         <ProblemTypeBadge type={caseData.type} linked />
         <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${getDifficultyClass()}`}>
@@ -63,7 +63,7 @@ export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
             <FileText className='h-3.5 w-3.5' />
             {caseData.submissionCount}
           </span>
-          <span className='font-mono font-semibold text-[#FF4C25]'>{caseData.pts} pts</span>
+          <span className='font-mono font-semibold text-orange-400'>{caseData.pts} pts</span>
         </div>
         <span className='inline-flex items-center gap-1.5 text-xs text-slate-400'>
           <Clock className='h-3.5 w-3.5' />

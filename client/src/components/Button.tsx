@@ -21,14 +21,14 @@ const sizeStyles: Record<ButtonSize, string> = {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[#C75B39] text-white font-medium hover:bg-[#D66A48] ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C75B39]/50 focus-visible:ring-offset-2',
+    'bg-[#10B981] text-white font-medium hover:bg-[#059669] ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/50 focus-visible:ring-offset-2',
   secondary:
-    'bg-transparent border border-white/20 text-white font-medium hover:bg-white/5 hover:border-white/30 ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2',
+    'bg-transparent border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/50 focus-visible:ring-offset-2',
   ghost:
-    'bg-transparent text-slate-400 font-medium hover:text-white hover:bg-white/5 ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2',
+    'bg-transparent text-gray-500 font-medium hover:text-gray-900 hover:bg-gray-100 ' +
+    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/50 focus-visible:ring-offset-2',
 };
 
 export const Button: React.FC<ButtonProps> = ({
