@@ -32,6 +32,9 @@
   --leading-normal: 1.5;
   --leading-relaxed: 1.75;
 
+  /* Used by Button.tsx via `rounded-button`; was previously undefined (square buttons) */
+  --radius-button: 8px;
+
   --color-eureka-blue: #FF4C25;
   --color-eureka-dark: #0A0A0A;
   --color-eureka-card: rgba(20, 20, 20, 0.8);
@@ -94,11 +97,10 @@
   --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
+/* NOTE: the old unlayered `* { margin: 0; padding: 0 }` reset was removed.
+   Tailwind's preflight already resets these, and because unlayered CSS beats
+   every Tailwind utility (which live in @layer utilities), the old reset was
+   silently disabling all p-*, px-*, py-*, m-*, mt-* classes across the app. */
 
 html {
   scroll-behavior: smooth;
@@ -144,10 +146,13 @@ textarea:focus-visible {
 }
 
 /* ─── Typography overrides ─── */
-h1, h2, h3, .font-display {
-  font-family: 'Inter', sans-serif;
-  letter-spacing: -0.01em;
-  font-weight: 600;
+/* Layered so utilities like font-bold / tracking-tight on headings still win. */
+@layer base {
+  h1, h2, h3, .font-display {
+    font-family: 'Inter', sans-serif;
+    letter-spacing: -0.01em;
+    font-weight: 600;
+  }
 }
 
 /* ─── Minimalist Cards (Road to Offer style) ─── */
