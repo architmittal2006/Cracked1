@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { BrandLogo } from './BrandLogo';
 
 export const Footer: React.FC = () => {
   return (
@@ -8,8 +9,7 @@ export const Footer: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div className="col-span-1">
             <div className="flex items-center gap-3 mb-4">
-              <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-10 w-auto" />
-              <span className="font-bold text-white text-base">Cracked?</span>
+              <BrandLogo className="h-6 w-auto" />
             </div>
             <p className="text-slate-400 text-sm max-w-xs leading-relaxed mb-4">
               Proof of work beats promise.
