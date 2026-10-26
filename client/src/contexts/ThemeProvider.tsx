@@ -27,7 +27,7 @@ export const ThemeProvider: React.FC<React.PropsWithChildren> = ({ children }) =
       document.documentElement.dataset.theme = resolvedTheme;
       document.documentElement.dataset.themePreference = theme;
       const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-      if (themeColor) themeColor.content = resolvedTheme === 'light' ? '#F7F8FA' : '#101114';
+      if (themeColor) themeColor.content = resolvedTheme === 'light' ? '#F7F8FA' : '#000000';
     };
 
     applyTheme();

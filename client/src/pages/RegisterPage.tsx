@@ -4,6 +4,7 @@ import { Eye, EyeOff } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { GitHubLoginButton } from '../components/GitHubOAuth';
 import { GoogleLoginButton } from '../components/GoogleOAuth';
+import { BrandLogo } from '../components/BrandLogo';
 
 export const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
@@ -51,8 +52,7 @@ export const RegisterPage: React.FC = () => {
       <section className="login-clean-shell">
         <div className="login-clean-copy">
           <Link to="/" className="login-brand-link">
-            <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-8 w-auto" />
-            <span>Cracked?</span>
+            <BrandLogo className="h-7 w-auto" />
           </Link>
           
           <h1>Create your account</h1>
