@@ -4,6 +4,7 @@ import { Button } from '../components/Button';
 import { PageWrapper } from '../components/PageWrapper';
 import { SEO } from '../components/SEO';
 import { PROBLEM_TYPES } from '../data/mockData';
+import { useAuth } from '../contexts/AuthContext';
 import { getCasebooks } from '../services/api';
 import type { Casebook, CasebookFilters, CasebookSourceKind } from '../services/api';
 
@@ -18,6 +19,7 @@ const inputClass = 'input-field mt-1.5 w-full';
 const labelClass = 'block text-sm font-medium text-[var(--text-primary)]';
 
 export const CasebooksPage: React.FC = () => {
+  const { isAuthenticated, user } = useAuth();
   const [casebooks, setCasebooks] = useState<Casebook[]>([]);
   const [filters, setFilters] = useState<CasebookFilters>({});
   const [draft, setDraft] = useState<CasebookFilters>({});
@@ -76,10 +78,29 @@ export const CasebooksPage: React.FC = () => {
       />
       <PageWrapper className="max-w-5xl">
         <header className="mb-7 border-b border-[var(--border-subtle)] pb-6">
-          <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Casebooks</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-            Read case summaries and source information. Casebooks are for reading, not scored practice.
-          </p>
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Casebooks</h1>
+              <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
+                Read case summaries and source information. Casebooks are for reading, not scored practice.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {isAuthenticated && (
+                <Button size="sm" variant="secondary" as="a" href="/contribute/casebooks/mine">
+                  My casebooks
+                </Button>
+              )}
+              {user?.role === 'Moderator' && (
+                <Button size="sm" variant="secondary" as="a" href="/moderation/casebooks">
+                  Review casebooks
+                </Button>
+              )}
+              <Button size="sm" variant="primary" as="a" href="/contribute/casebooks">
+                Contribute a casebook
+              </Button>
+            </div>
+          </div>
         </header>
 
         <form onSubmit={applyFilters} className="mb-6 grid gap-4 border-b border-[var(--border-subtle)] pb-6 sm:grid-cols-2 lg:grid-cols-4">
