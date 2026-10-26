@@ -135,6 +135,7 @@ export interface CaseProposalInput {
   deliverables: string[];
   reviewerGuide: string;
   solutionOutline: string;
+  referenceRange?: { value: number; unit: string; low: number; high: number };
   originalityConfirmed: boolean;
   confidentialityConfirmed: boolean;
 }
@@ -371,6 +372,7 @@ export interface SubmissionResponse {
   success: true;
   submissionId: string;
   status: string;
+  referenceRange?: { value: number; unit: string; low: number; high: number } | null;
 }
 
 export interface CaseSolution {
@@ -412,13 +414,9 @@ export async function updateSubmission(
 
 // ─── Reviews ───
 
-export interface ReviewRequest {
-  problem_framing: number;
-  framework_fit: number;
-  data_integrity: number;
-  insight_depth: number;
-  feasibility: number;
-}
+export type ReviewRequest =
+  | { problem_framing: number; framework_fit: number; data_integrity: number; insight_depth: number; feasibility: number }
+  | { structure: number; assumption_quality: number; math_accuracy: number; sanity_check: number; clarity: number };
 
 export interface ReviewResponse {
   success: true;
@@ -459,6 +457,7 @@ export interface ReviewQueueResponse {
   submissionId: string;
   caseId: string;
   content: Record<string, string>;
+  referenceRangeHint?: boolean;
 }
 
 export async function getNextReviewSubmission(caseId: string): Promise<ReviewQueueResponse | null> {

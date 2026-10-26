@@ -31,6 +31,13 @@ describe('casebook rights validation', () => {
     expect(casebookInputSchema.safeParse(validCasebook).success).toBe(true);
   });
 
+  it('accepts Guesstimate as a case type', () => {
+    expect(casebookInputSchema.safeParse({
+      ...validCasebook,
+      cases: [{ ...validCasebook.cases[0], caseType: 'Guesstimate' }],
+    }).success).toBe(true);
+  });
+
   it('requires a source URL and rejects hosted text for link-only entries', () => {
     const result = casebookInputSchema.safeParse({
       ...validCasebook,

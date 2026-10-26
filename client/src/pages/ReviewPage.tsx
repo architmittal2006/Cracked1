@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Shield, CheckCircle, Clock, AlertCircle, TrendingUp } from 'lucide-react';
-import { RUBRIC_DIMENSIONS } from '../data/mockData';
+import { formatSubmissionSection, RUBRIC_DIMENSIONS, RUBRIC_DIMENSIONS_BY_TYPE } from '../data/mockData';
 import type { Case } from '../data/mockData';
 import { RubricSlider } from '../components/RubricSlider';
 import { RadarChart } from '../components/RadarChart';
@@ -14,12 +14,17 @@ export const ReviewPage: React.FC = () => {
   const [caseData, setCaseData] = useState<Case | null>(null);
   const [reviewSubmission, setReviewSubmission] = useState<ReviewQueueResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [rubricScores, setRubricScores] = useState({
+  const [rubricScores, setRubricScores] = useState<Record<string, number>>({
     problem_framing: 3,
     framework_fit: 3,
     data_integrity: 3,
     insight_depth: 3,
     feasibility: 3,
+    structure: 3,
+    assumption_quality: 3,
+    math_accuracy: 3,
+    sanity_check: 3,
+    clarity: 3,
   });
   const [feedback, setFeedback] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -48,13 +53,10 @@ export const ReviewPage: React.FC = () => {
   const feedbackLength = feedback.trim().length;
   const feedbackProgress = Math.min((feedbackLength / 80) * 100, 100);
 
-  const weightedScore = (
-    rubricScores.problem_framing * 0.25 +
-    rubricScores.framework_fit * 0.20 +
-    rubricScores.data_integrity * 0.20 +
-    rubricScores.insight_depth * 0.25 +
-    rubricScores.feasibility * 0.10
-  ).toFixed(2);
+  const rubricDimensions = caseData ? RUBRIC_DIMENSIONS_BY_TYPE[caseData.type] : RUBRIC_DIMENSIONS;
+  const weightedScore = rubricDimensions
+    .reduce((total, dimension) => total + (rubricScores[dimension.key] ?? 3) * dimension.weight, 0)
+    .toFixed(2);
 
   const scoreLevel = parseFloat(weightedScore) >= 4 ? 'excellent' : parseFloat(weightedScore) >= 3 ? 'good' : 'needs-improvement';
 
@@ -65,7 +67,22 @@ export const ReviewPage: React.FC = () => {
     setError(null);
 
     try {
-      await createReview(reviewSubmission.submissionId, rubricScores, caseData.id, feedback.trim());
+      const scores = caseData.type === 'Guesstimate'
+        ? {
+            structure: rubricScores.structure ?? 3,
+            assumption_quality: rubricScores.assumption_quality ?? 3,
+            math_accuracy: rubricScores.math_accuracy ?? 3,
+            sanity_check: rubricScores.sanity_check ?? 3,
+            clarity: rubricScores.clarity ?? 3,
+          }
+        : {
+            problem_framing: rubricScores.problem_framing ?? 3,
+            framework_fit: rubricScores.framework_fit ?? 3,
+            data_integrity: rubricScores.data_integrity ?? 3,
+            insight_depth: rubricScores.insight_depth ?? 3,
+            feasibility: rubricScores.feasibility ?? 3,
+          };
+      await createReview(reviewSubmission.submissionId, scores, caseData.id, feedback.trim());
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Review submission failed');
@@ -145,10 +162,15 @@ export const ReviewPage: React.FC = () => {
                 {Object.entries(reviewSubmission?.content ?? {}).map(([key, value]) => (
                   <div key={key}>
                     <h3 className="text-sm font-medium text-[var(--text-primary)]">{key.replaceAll('_', ' ')}</h3>
-                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{value}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{formatSubmissionSection(key, value)}</p>
                   </div>
                 ))}
               </div>
+              {reviewSubmission?.referenceRangeHint && (
+                <p className="mt-4 rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-[var(--text-primary)]">
+                  Reviewer hint: the estimate is more than 2× outside the author’s reference range. Use this as a prompt to inspect the reasoning, not as an automatic score.
+                </p>
+              )}
             </div>
 
             <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
@@ -157,7 +179,7 @@ export const ReviewPage: React.FC = () => {
                 Rubric Scoring
               </h2>
               <div className="space-y-2">
-                {RUBRIC_DIMENSIONS.map((dim, index) => (
+                {rubricDimensions.map((dim, index) => (
                   <div
                     key={dim.key}
                     className="transition-colors duration-200"
@@ -165,7 +187,7 @@ export const ReviewPage: React.FC = () => {
                   >
                     <RubricSlider
                       dimension={dim}
-                      value={rubricScores[dim.key]}
+                      value={rubricScores[dim.key] ?? 3}
                       onChange={(val) => setRubricScores(prev => ({ ...prev, [dim.key]: val }))}
                     />
                   </div>
@@ -214,9 +236,17 @@ export const ReviewPage: React.FC = () => {
                 <TrendingUp className="w-4 h-4 text-emerald-400" />
                 Score Preview
               </h3>
-              <div className="flex justify-center mb-4 relative">
-                <RadarChart scores={rubricScores} size={200} />
-              </div>
+              {caseData.type !== 'Guesstimate' && (
+                <div className="flex justify-center mb-4 relative">
+                  <RadarChart scores={{
+                    problem_framing: rubricScores.problem_framing ?? 3,
+                    framework_fit: rubricScores.framework_fit ?? 3,
+                    data_integrity: rubricScores.data_integrity ?? 3,
+                    insight_depth: rubricScores.insight_depth ?? 3,
+                    feasibility: rubricScores.feasibility ?? 3,
+                  }} size={200} />
+                </div>
+              )}
               <div className="text-center mb-6">
                 <div className="text-xs text-slate-400 mb-1">Weighted score</div>
                 <div className="text-3xl font-semibold tabular-nums text-[var(--text-primary)] mb-2">
@@ -234,14 +264,14 @@ export const ReviewPage: React.FC = () => {
 
               {/* Score breakdown */}
               <div className="space-y-2 mb-6">
-                {RUBRIC_DIMENSIONS.map((dim, index) => (
+                {rubricDimensions.map((dim, index) => (
                   <div
                     key={dim.key}
                     className="flex items-center justify-between text-xs"
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <span className="text-slate-400">{dim.label}</span>
-                    <span className="tabular-nums text-[var(--text-primary)]">{rubricScores[dim.key]}/5</span>
+                    <span className="tabular-nums text-[var(--text-primary)]">{rubricScores[dim.key] ?? 3}/5</span>
                   </div>
                 ))}
               </div>

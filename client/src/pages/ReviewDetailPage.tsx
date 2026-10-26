@@ -1,6 +1,6 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MOCK_REVIEWS, RUBRIC_DIMENSIONS } from '../data/mockData';
+import { MOCK_CASES, MOCK_REVIEWS, MOCK_SUBMISSIONS, RUBRIC_DIMENSIONS, RUBRIC_DIMENSIONS_BY_TYPE } from '../data/mockData';
 import { RadarChart } from '../components/RadarChart';
 import { PageWrapper } from '../components/PageWrapper';
 import { Button } from '../components/Button';
@@ -21,13 +21,15 @@ export const ReviewDetailPage: React.FC = () => {
     );
   }
 
-  const weightedScore = (
-    review.scores.problem_framing * 0.25 +
-    review.scores.framework_fit * 0.20 +
-    review.scores.data_integrity * 0.20 +
-    review.scores.insight_depth * 0.25 +
-    review.scores.feasibility * 0.10
-  ).toFixed(2);
+  const caseId = MOCK_SUBMISSIONS.find((submission) => submission.id === review.submissionId)?.caseId;
+  const caseType = MOCK_CASES.find((caseData) => caseData.id === caseId)?.type;
+  const rubricDimensions = caseType ? RUBRIC_DIMENSIONS_BY_TYPE[caseType] : RUBRIC_DIMENSIONS;
+  const scoreFor = (key: string) => key in review.scores
+    ? (review.scores as Record<string, number>)[key]!
+    : 0;
+  const weightedScore = rubricDimensions
+    .reduce((total, dimension) => total + scoreFor(dimension.key) * dimension.weight, 0)
+    .toFixed(2);
 
   return (
     <PageWrapper>
@@ -43,7 +45,7 @@ export const ReviewDetailPage: React.FC = () => {
         <div className="lg:col-span-2 glass-card p-6">
           <h2 className="text-xl font-bold text-white mb-6">Rubric Dimensions</h2>
           <div className="space-y-4">
-            {RUBRIC_DIMENSIONS.map(dim => (
+            {rubricDimensions.map(dim => (
               <div key={dim.key} className="flex items-center justify-between border-b border-slate-800 pb-3">
                 <div>
                   <div className="font-bold text-white text-sm">{dim.label}</div>
@@ -51,9 +53,11 @@ export const ReviewDetailPage: React.FC = () => {
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-32 progress-bar">
-                    <div className="progress-bar-fill" style={{ width: `${(review.scores[dim.key] / 5) * 100}%` }} />
+                    <div className="progress-bar-fill" style={{ width: `${(scoreFor(dim.key) / 5) * 100}%` }} />
                   </div>
-                  <span className="font-mono font-bold text-emerald-400 w-8 text-right">{review.scores[dim.key]}</span>
+                  <span className="font-mono font-bold text-emerald-400 w-8 text-right">
+                    {scoreFor(dim.key)}
+                  </span>
                 </div>
               </div>
             ))}
@@ -69,7 +73,7 @@ export const ReviewDetailPage: React.FC = () => {
           <div className="glass-card p-6 text-center">
             <div className="text-xs text-slate-400 uppercase tracking-widest mb-2">Weighted Score</div>
             <div className="text-4xl font-black text-emerald-400 font-mono mb-4">{weightedScore}</div>
-            <RadarChart scores={review.scores} size={180} />
+            {'structure' in review.scores ? null : <RadarChart scores={review.scores} size={180} />}
           </div>
         </div>
       </div>

@@ -2,13 +2,78 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Save, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react';
 import { SUBMISSION_TEMPLATES } from '../data/mockData';
-import type { Case } from '../data/mockData';
+import type { Case, SubmissionTemplateSection } from '../data/mockData';
 import { PageWrapper } from '../components/PageWrapper';
 import { Button } from '../components/Button';
 import { createSubmission, getCaseById } from '../services/api';
+import type { SubmissionResponse } from '../services/api';
+
+interface GuesstimateAssumption {
+  name: string;
+  value: string;
+  unit: string;
+  rationale: string;
+}
+
+interface GuesstimateEstimate {
+  value: string;
+  unit: string;
+  low: string;
+  high: string;
+}
+
+function parseSegments(value: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed.filter((segment): segment is string => typeof segment === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+const blankAssumption = (): GuesstimateAssumption => ({ name: '', value: '', unit: '', rationale: '' });
+
+function parseAssumptions(value: string): GuesstimateAssumption[] {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed as GuesstimateAssumption[] : [];
+  } catch {
+    return [];
+  }
+}
+
+function parseEstimate(value: string): GuesstimateEstimate {
+  try {
+    const parsed: unknown = JSON.parse(value);
+    if (parsed && typeof parsed === 'object') return parsed as GuesstimateEstimate;
+  } catch {
+    // Incomplete form data is shown as blank inputs and rejected before submission.
+  }
+  return { value: '', unit: '', low: '', high: '' };
+}
+
+function isNumeric(value: string): boolean {
+  return value.trim() !== '' && Number.isFinite(Number(value));
+}
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(w => w.length > 0).length;
+}
+
+function countSectionWords(section: SubmissionTemplateSection, value: string): number {
+  if (section.inputKind === 'segments') {
+    return countWords(parseSegments(value).join(' '));
+  }
+  if (section.inputKind === 'assumptions') {
+    return countWords(parseAssumptions(value)
+      .map(({ name, value: assumptionValue, unit, rationale }) =>
+        `${name} ${assumptionValue} ${unit} ${rationale}`)
+      .join(' '));
+  }
+  if (section.inputKind === 'estimate') {
+    return countWords(Object.values(parseEstimate(value)).join(' '));
+  }
+  return countWords(value);
 }
 
 export const SubmitPage: React.FC = () => {
@@ -22,6 +87,7 @@ export const SubmitPage: React.FC = () => {
   const [content, setContent] = useState<Record<string, string>>({});
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  const [referenceRange, setReferenceRange] = useState<SubmissionResponse['referenceRange']>();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,7 +110,15 @@ export const SubmitPage: React.FC = () => {
   useEffect(() => {
     if (!caseData) return;
     const initial: Record<string, string> = {};
-    SUBMISSION_TEMPLATES[caseData.type].forEach(s => { initial[s.key] = ''; });
+    SUBMISSION_TEMPLATES[caseData.type].forEach((section) => {
+      initial[section.key] = section.inputKind === 'assumptions'
+        ? JSON.stringify([blankAssumption(), blankAssumption(), blankAssumption()])
+        : section.inputKind === 'segments'
+          ? JSON.stringify(['', ''])
+        : section.inputKind === 'estimate'
+          ? JSON.stringify({ value: '', unit: '', low: '', high: '' })
+          : '';
+    });
     setContent(initial);
   }, [caseData]);
 
@@ -56,10 +130,28 @@ export const SubmitPage: React.FC = () => {
 
   const sectionStatus = useMemo(() => {
     return sections.map(section => {
-      const words = countWords(content[section.key] ?? '');
+      const words = countSectionWords(section, content[section.key] ?? '');
       const wordLimit = section.wordLimit;
       const percentage = Math.min((words / wordLimit) * 100, 100);
-      const valid = words > 0 && words <= wordLimit;
+      let structuredValid = true;
+      if (section.inputKind === 'segments') {
+        structuredValid = parseSegments(content[section.key] ?? '').some((segment) => segment.trim() !== '');
+      } else if (section.inputKind === 'assumptions') {
+        const assumptions = parseAssumptions(content[section.key] ?? '');
+        structuredValid = assumptions.length >= 3 && assumptions.every((assumption) =>
+          assumption.name.trim() && isNumeric(assumption.value) && assumption.unit.trim() && assumption.rationale.trim()
+        );
+      } else if (section.inputKind === 'estimate') {
+        const estimate = parseEstimate(content[section.key] ?? '');
+        const value = Number(estimate.value);
+        const low = Number(estimate.low);
+        const high = Number(estimate.high);
+        structuredValid = Boolean(
+          estimate.unit.trim() && isNumeric(estimate.value) && isNumeric(estimate.low) && isNumeric(estimate.high) &&
+          low <= value && value <= high
+        );
+      }
+      const valid = words > 0 && words <= wordLimit && structuredValid;
       const isEmpty = words === 0;
       const isOverLimit = words > wordLimit;
       return { ...section, words, valid, isEmpty, isOverLimit, percentage };
@@ -79,10 +171,12 @@ export const SubmitPage: React.FC = () => {
     setError(null);
 
     try {
-      const totalWords = Object.values(content).reduce((sum, text) => sum + countWords(text), 0);
+      const totalWords = sections.reduce((sum, section) =>
+        sum + countSectionWords(section, content[section.key] ?? ''), 0);
       const citationsCount = 0;
 
-      await createSubmission(caseData.id, content, citationsCount, totalWords);
+      const response = await createSubmission(caseData.id, content, citationsCount, totalWords);
+      setReferenceRange(response.referenceRange);
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Submission failed');
@@ -127,6 +221,11 @@ export const SubmitPage: React.FC = () => {
           </div>
           <h3 className="text-2xl font-bold text-white mb-2">Submission Received</h3>
           <p className="text-slate-400 mb-6">Your solution is submitted. Compare it with other approaches whenever you’re ready.</p>
+          {caseData.type === 'Guesstimate' && referenceRange && (
+            <p className="mb-6 text-sm text-[var(--text-secondary)]">
+              Author reference range: {referenceRange.low}–{referenceRange.high} {referenceRange.unit} (reference estimate {referenceRange.value} {referenceRange.unit})
+            </p>
+          )}
           <Button variant="primary" size="md" onClick={() => navigate(`/cases/${caseData.id}/solutions`)}>Compare solutions</Button>
         </div>
       ) : (
@@ -176,15 +275,131 @@ export const SubmitPage: React.FC = () => {
                   />
                 </div>
 
-                <textarea
-                  className="input-field min-h-[120px] transition-all duration-300"
-                  placeholder={section.placeholder}
-                  value={content[section.key] ?? ''}
-                  onChange={(e) => {
-                    setContent(prev => ({ ...prev, [section.key]: e.target.value }));
-                    setLastSaved(new Date());
-                  }}
-                />
+                {section.inputKind === 'segments' ? (
+                  <div className="space-y-3">
+                    {parseSegments(content[section.key] ?? '').map((segment, segmentIndex) => (
+                      <label key={segmentIndex} className="block text-xs text-[var(--text-secondary)]">
+                        Segment {segmentIndex + 1}
+                        <input
+                          className="input-field mt-1 w-full"
+                          value={segment}
+                          onChange={(event) => {
+                            const segments = parseSegments(content[section.key] ?? '');
+                            segments[segmentIndex] = event.target.value;
+                            setContent((previous) => ({ ...previous, [section.key]: JSON.stringify(segments) }));
+                            setLastSaved(new Date());
+                          }}
+                        />
+                      </label>
+                    ))}
+                    <div className="flex gap-2">
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        onClick={() => {
+                          const segments = parseSegments(content[section.key] ?? '');
+                          setContent((previous) => ({ ...previous, [section.key]: JSON.stringify([...segments, '']) }));
+                        }}
+                      >
+                        Add segment
+                      </Button>
+                      {parseSegments(content[section.key] ?? '').length > 1 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const segments = parseSegments(content[section.key] ?? '');
+                            setContent((previous) => ({ ...previous, [section.key]: JSON.stringify(segments.slice(0, -1)) }));
+                          }}
+                        >
+                          Remove last segment
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                ) : section.inputKind === 'assumptions' ? (
+                  <div className="space-y-4">
+                    {parseAssumptions(content[section.key] ?? '').map((assumption, assumptionIndex) => (
+                      <fieldset key={assumptionIndex} className="grid gap-3 rounded-md border border-[var(--border-subtle)] p-4 sm:grid-cols-2">
+                        <legend className="px-1 text-xs font-medium text-[var(--text-secondary)]">Assumption {assumptionIndex + 1}</legend>
+                        {(['name', 'value', 'unit', 'rationale'] as const).map((field) => (
+                          <label key={field} className="text-xs text-[var(--text-secondary)]">
+                            {field === 'name' ? 'Name' : field === 'value' ? 'Numeric value' : field === 'unit' ? 'Unit' : 'Rationale'}
+                            <input
+                              className="input-field mt-1 w-full"
+                              type={field === 'value' ? 'number' : 'text'}
+                              step={field === 'value' ? 'any' : undefined}
+                              value={assumption[field]}
+                              onChange={(event) => {
+                                const rows = parseAssumptions(content[section.key] ?? '');
+                                rows[assumptionIndex] = { ...rows[assumptionIndex]!, [field]: event.target.value };
+                                setContent((previous) => ({ ...previous, [section.key]: JSON.stringify(rows) }));
+                                setLastSaved(new Date());
+                              }}
+                            />
+                          </label>
+                        ))}
+                        {parseAssumptions(content[section.key] ?? '').length > 3 && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                              const rows = parseAssumptions(content[section.key] ?? '').filter((_, index) => index !== assumptionIndex);
+                              setContent((previous) => ({ ...previous, [section.key]: JSON.stringify(rows) }));
+                            }}
+                          >
+                            Remove assumption
+                          </Button>
+                        )}
+                      </fieldset>
+                    ))}
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        const rows = parseAssumptions(content[section.key] ?? '');
+                        setContent((previous) => ({ ...previous, [section.key]: JSON.stringify([...rows, blankAssumption()]) }));
+                      }}
+                    >
+                      Add assumption
+                    </Button>
+                  </div>
+                ) : section.inputKind === 'estimate' ? (
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {(['value', 'unit', 'low', 'high'] as const).map((field) => {
+                      const estimate = parseEstimate(content[section.key] ?? '');
+                      const label = field === 'value' ? 'Estimate' : field === 'unit' ? 'Unit' : `Range ${field}`;
+                      return (
+                        <label key={field} className="text-xs text-[var(--text-secondary)]">
+                          {label}
+                          <input
+                            className="input-field mt-1 w-full"
+                            type={field === 'unit' ? 'text' : 'number'}
+                            step={field === 'unit' ? undefined : 'any'}
+                            value={estimate[field]}
+                            onChange={(event) => {
+                              setContent((previous) => ({
+                                ...previous,
+                                [section.key]: JSON.stringify({ ...estimate, [field]: event.target.value }),
+                              }));
+                              setLastSaved(new Date());
+                            }}
+                          />
+                        </label>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <textarea
+                    className="input-field min-h-[120px] transition-all duration-300"
+                    placeholder={section.placeholder}
+                    value={content[section.key] ?? ''}
+                    onChange={(e) => {
+                      setContent(prev => ({ ...prev, [section.key]: e.target.value }));
+                      setLastSaved(new Date());
+                    }}
+                  />
+                )}
 
                 {/* Status message */}
                 {section.isEmpty && (

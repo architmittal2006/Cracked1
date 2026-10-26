@@ -16,6 +16,7 @@ const TYPE_COLORS: Record<ProblemType, string> = {
   Pricing: 'bg-violet-500/10 text-violet-400 border-violet-500/30',
   'M&A': 'bg-rose-500/10 text-rose-400 border-rose-500/30',
   'Growth & Retention': 'bg-teal-500/10 text-teal-400 border-teal-500/30',
+  Guesstimate: 'bg-orange-500/10 text-orange-400 border-orange-500/30',
 };
 
 export const ProblemTypeBadge: React.FC<ProblemTypeBadgeProps> = ({ type, linked = false }) => {

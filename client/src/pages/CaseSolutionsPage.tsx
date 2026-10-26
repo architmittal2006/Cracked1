@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Case } from '../data/mockData';
+import { formatSubmissionSection } from '../data/mockData';
 import { Button } from '../components/Button';
 import { PageWrapper } from '../components/PageWrapper';
 import { getCaseById, getCaseSolutions } from '../services/api';
@@ -127,7 +128,7 @@ export const CaseSolutionsPage: React.FC = () => {
                 {Object.entries(solution.content).map(([section, content]) => (
                   <section key={section}>
                     <h3 className="text-sm font-medium capitalize text-[var(--text-primary)]">{section.replaceAll('_', ' ')}</h3>
-                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{content}</p>
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{formatSubmissionSection(section, content)}</p>
                   </section>
                 ))}
               </div>

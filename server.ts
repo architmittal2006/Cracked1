@@ -111,8 +111,10 @@ async function ensureTables() {
       tags TEXT[] NOT NULL DEFAULT '{}',
       is_chaos BOOLEAN DEFAULT FALSE,
       timer_deadline TIMESTAMPTZ,
+      reference_range JSONB,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE cases ADD COLUMN IF NOT EXISTS reference_range JSONB;
 
     CREATE TABLE IF NOT EXISTS case_proposals (
       id VARCHAR(255) PRIMARY KEY,
@@ -129,6 +131,7 @@ async function ensureTables() {
       deliverables TEXT[] NOT NULL DEFAULT '{}',
       reviewer_guide TEXT NOT NULL,
       solution_outline TEXT NOT NULL,
+      reference_range JSONB,
       status VARCHAR(50) NOT NULL DEFAULT 'Pending',
       moderator_notes TEXT,
       reviewed_by VARCHAR(255),
@@ -136,6 +139,7 @@ async function ensureTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       reviewed_at TIMESTAMPTZ
     );
+    ALTER TABLE case_proposals ADD COLUMN IF NOT EXISTS reference_range JSONB;
     CREATE INDEX IF NOT EXISTS case_proposals_contributor_created_idx
       ON case_proposals (contributor_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS case_proposals_status_created_idx
@@ -290,7 +294,14 @@ const caseProposalSchema = z.object({
     'Pricing',
     'M&A',
     'Growth & Retention',
+    'Guesstimate',
   ]),
+  referenceRange: z.object({
+    value: z.number().finite().nonnegative(),
+    unit: z.string().trim().min(1).max(80),
+    low: z.number().finite().nonnegative(),
+    high: z.number().finite().nonnegative(),
+  }).optional(),
   sector: z.string().trim().min(2).max(80),
   difficulty: z.enum(['Standard', 'High', 'Chaos']),
   sourceKind: z.enum(['original', 'interview_recollection', 'public_source']),
@@ -306,6 +317,12 @@ const caseProposalSchema = z.object({
 }).refine(
   (proposal) => proposal.sourceKind !== 'public_source' || Boolean(proposal.sourceReference),
   { message: 'Add a link or citation for a public source', path: ['sourceReference'] }
+).refine(
+  (proposal) => proposal.type === 'Guesstimate' || !proposal.referenceRange,
+  { message: 'Reference ranges are only supported for Guesstimate cases', path: ['referenceRange'] }
+).refine(
+  (proposal) => !proposal.referenceRange || proposal.referenceRange.low <= proposal.referenceRange.value && proposal.referenceRange.value <= proposal.referenceRange.high,
+  { message: 'Reference range must satisfy low ≤ value ≤ high', path: ['referenceRange'] }
 );
 
 const caseProposalReviewSchema = z.object({
@@ -323,6 +340,15 @@ const caseReviewSchema = z.object({
   data_integrity: z.number().int().min(1).max(5),
   insight_depth: z.number().int().min(1).max(5),
   feasibility: z.number().int().min(1).max(5),
+  feedback: z.string().trim().min(80).max(3000),
+});
+const guesstimateReviewSchema = z.object({
+  caseId: z.string().min(1),
+  structure: z.number().int().min(1).max(5),
+  assumption_quality: z.number().int().min(1).max(5),
+  math_accuracy: z.number().int().min(1).max(5),
+  sanity_check: z.number().int().min(1).max(5),
+  clarity: z.number().int().min(1).max(5),
   feedback: z.string().trim().min(80).max(3000),
 });
 
@@ -984,8 +1010,14 @@ app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res
     }
 
     // Validate solution structure before publishing it to the case's solution list.
+    const caseType = await DatabaseService.getCaseType(caseId);
+    if (!caseType) {
+      res.status(404).json({ success: false, error: 'Case not found' });
+      return;
+    }
     const layer1Check = await VerificationEngine.validateLayer1Gate({
       contentJson,
+      caseType,
     });
 
     if (layer1Check.compliant === false) {
@@ -1003,7 +1035,10 @@ app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res
       structuralCompliant: true
     });
 
-    res.status(201).json({ success: true, submissionId, status: 'Submitted' });
+    const referenceRange = caseType === 'Guesstimate'
+      ? await DatabaseService.getReferenceRangeAfterSubmission(caseId, currentUser.id)
+      : undefined;
+    res.status(201).json({ success: true, submissionId, status: 'Submitted', referenceRange });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -1058,14 +1093,36 @@ app.post('/api/submissions/:submissionId/reviews', requireAuth, async (req: Requ
     res.status(400).json({ success: false, error: 'Invalid submissionId parameter' });
     return;
   }
-  const parse = caseReviewSchema.safeParse(req.body);
-  if (!parse.success) {
-    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid review' });
-    return;
-  }
   const currentUser = req.session.user!;
 
   try {
+    const caseId = typeof req.body?.caseId === 'string' ? req.body.caseId : '';
+    const caseType = await DatabaseService.getCaseType(caseId);
+    const parse = (caseType === 'Guesstimate' ? guesstimateReviewSchema : caseReviewSchema).safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid review' });
+      return;
+    }
+    if (!caseType) {
+      res.status(404).json({ success: false, error: 'Case not found' });
+      return;
+    }
+
+    const scores = caseType === 'Guesstimate'
+      ? {
+          structure: 'structure' in parse.data ? parse.data.structure : 0,
+          assumption_quality: 'assumption_quality' in parse.data ? parse.data.assumption_quality : 0,
+          math_accuracy: 'math_accuracy' in parse.data ? parse.data.math_accuracy : 0,
+          sanity_check: 'sanity_check' in parse.data ? parse.data.sanity_check : 0,
+          clarity: 'clarity' in parse.data ? parse.data.clarity : 0,
+        }
+      : {
+          problem_framing: 'problem_framing' in parse.data ? parse.data.problem_framing : 0,
+          framework_fit: 'framework_fit' in parse.data ? parse.data.framework_fit : 0,
+          data_integrity: 'data_integrity' in parse.data ? parse.data.data_integrity : 0,
+          insight_depth: 'insight_depth' in parse.data ? parse.data.insight_depth : 0,
+          feasibility: 'feasibility' in parse.data ? parse.data.feasibility : 0,
+        };
     // Insert review score payload
     await DatabaseService.insertReview({
       submissionId,
@@ -1073,13 +1130,7 @@ app.post('/api/submissions/:submissionId/reviews', requireAuth, async (req: Requ
       reviewerTier: currentUser.role,
       caseId: parse.data.caseId,
       feedback: parse.data.feedback,
-      scores: {
-        problem_framing: parse.data.problem_framing,
-        framework_fit: parse.data.framework_fit,
-        data_integrity: parse.data.data_integrity,
-        insight_depth: parse.data.insight_depth,
-        feasibility: parse.data.feasibility,
-      },
+      scores,
     });
 
     // Execute Layer 2 Consensus Algorithm and check for Layer 3 escalation

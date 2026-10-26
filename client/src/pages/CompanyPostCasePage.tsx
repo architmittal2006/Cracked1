@@ -3,12 +3,14 @@ import { Link } from 'react-router-dom';
 import { Building2, Send } from 'lucide-react';
 import { PageWrapper } from '../components/PageWrapper';
 import { Button } from '../components/Button';
+import { PROBLEM_TYPES } from '../data/mockData';
+import type { ProblemType } from '../data/mockData';
 
 export const CompanyPostCasePage: React.FC = () => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    type: 'Profitability' as const,
+    type: 'Profitability' as ProblemType,
     sector: '',
     difficulty: 'Standard' as const,
     confidentiality: 'Public' as const,
@@ -60,16 +62,10 @@ export const CompanyPostCasePage: React.FC = () => {
               <span className="text-sm font-medium text-white mb-2 block">Problem Type</span>
               <select
                 value={formData.type}
-                onChange={(e) => setFormData({ ...formData, type: e.target.value as any })}
+                onChange={(e) => setFormData({ ...formData, type: e.target.value as ProblemType })}
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg p-3 text-white focus:outline-none focus:border-amber-500"
               >
-                <option>Market Sizing</option>
-                <option>Profitability</option>
-                <option>Market Entry</option>
-                <option>Operational</option>
-                <option>Pricing</option>
-                <option>M&A</option>
-                <option>Growth & Retention</option>
+                {PROBLEM_TYPES.map((type) => <option key={type}>{type}</option>)}
               </select>
             </label>
 

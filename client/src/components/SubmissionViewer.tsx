@@ -3,6 +3,7 @@ import { User, Calendar, Eye, CheckCircle2, Award } from 'lucide-react';
 import { ProblemTypeBadge } from './ProblemTypeBadge';
 import { StatusPill } from './StatusPill';
 import { TierBadge } from './TierBadge';
+import { formatSubmissionSection } from '../data/mockData';
 
 interface SubmissionViewerProps {
   submission: {
@@ -76,6 +77,10 @@ export const SubmissionViewer: React.FC<SubmissionViewerProps> = ({
             calculation: 'Calculation Steps',
             estimate: 'Final Estimate',
             sanity: 'Sanity Check',
+            clarify_scope: 'Clarify and scope',
+            structure_segments: 'Structure (segments)',
+            calculation_steps: 'Calculation steps',
+            final_estimate: 'Final estimate',
             framing: 'Problem Framing',
             framework: 'Framework Rationale',
             revenue: 'Revenue Branch',
@@ -116,7 +121,7 @@ export const SubmissionViewer: React.FC<SubmissionViewerProps> = ({
                 </h4>
               </div>
               <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap">
-                {value}
+                {formatSubmissionSection(key, value)}
               </p>
             </div>
           );
