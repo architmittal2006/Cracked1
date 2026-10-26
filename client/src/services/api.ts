@@ -197,6 +197,167 @@ export async function reviewCaseProposal(
   return result.proposal;
 }
 
+export type CasebookStatus = 'Pending' | 'Changes_Requested' | 'Published' | 'Declined' | 'Taken_down';
+export type CasebookSourceKind = 'university' | 'company' | 'club' | 'original';
+export type CasebookLicenseKind = 'original' | 'permission' | 'open_license' | 'link_only';
+
+export interface CasebookCaseInput {
+  title: string;
+  firm?: string | null;
+  sector: string;
+  caseType?: string | null;
+  difficulty: string;
+  summary: string;
+  body?: string;
+  position: number;
+  practiceCaseId?: string | null;
+}
+
+export interface CasebookInput {
+  title: string;
+  sourceOrg: string;
+  sourceKind: CasebookSourceKind;
+  year?: number | null;
+  description: string;
+  licenseKind: CasebookLicenseKind;
+  permissionReference?: string;
+  externalUrl?: string;
+  industries: string[];
+  cases: CasebookCaseInput[];
+  rightsConfirmed: boolean;
+  attributionConfirmed: boolean;
+}
+
+export interface CasebookCase extends Omit<CasebookCaseInput, 'body'> {
+  id: string;
+  slug: string;
+  body?: string | null;
+}
+
+export interface Casebook {
+  id: string;
+  slug: string;
+  title: string;
+  sourceOrg: string;
+  sourceKind: CasebookSourceKind;
+  year: number | null;
+  description: string;
+  licenseKind: CasebookLicenseKind;
+  permissionReference: string | null;
+  externalUrl: string | null;
+  industries: string[];
+  caseCount: number;
+  status: CasebookStatus;
+  moderatorNotes?: string | null;
+  createdAt: string;
+  publishedAt: string | null;
+  cases?: CasebookCase[];
+  uploaderName?: string;
+}
+
+export interface CasebookFilters {
+  search?: string;
+  sourceKind?: CasebookSourceKind;
+  sector?: string;
+  caseType?: string;
+  year?: number;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface CasebookSearchResult {
+  casebooks: Casebook[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export async function getCasebooks(filters: CasebookFilters = {}): Promise<CasebookSearchResult> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value !== undefined && value !== '') params.set(key, String(value));
+  }
+  const query = params.toString();
+  const result = await request<{ success: true } & CasebookSearchResult>(
+    `/api/casebooks${query ? `?${query}` : ''}`
+  );
+  return result;
+}
+
+export async function getCasebookBySlug(slug: string): Promise<Casebook> {
+  const result = await request<{ success: true; casebook: Casebook }>(
+    `/api/casebooks/${encodeURIComponent(slug)}`
+  );
+  return result.casebook;
+}
+
+export async function getCasebookCase(
+  slug: string,
+  caseSlug: string
+): Promise<{ casebook: Casebook; caseItem: CasebookCase }> {
+  return request<{ success: true; casebook: Casebook; caseItem: CasebookCase }>(
+    `/api/casebooks/${encodeURIComponent(slug)}/cases/${encodeURIComponent(caseSlug)}`
+  );
+}
+
+export async function submitTakedownRequest(input: {
+  casebookId: string;
+  requesterEmail: string;
+  reason: string;
+}): Promise<void> {
+  await request<{ success: true; requestId: string }>('/api/takedown', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getMyCasebooks(): Promise<Casebook[]> {
+  const result = await request<{ success: true; casebooks: Casebook[] }>('/api/casebooks/mine');
+  return result.casebooks;
+}
+
+export async function getMyCasebook(id: string): Promise<Casebook> {
+  const result = await request<{ success: true; casebook: Casebook }>(
+    `/api/casebooks/mine/${encodeURIComponent(id)}`
+  );
+  return result.casebook;
+}
+
+export async function submitCasebook(input: CasebookInput): Promise<Casebook> {
+  const result = await request<{ success: true; casebook: Casebook }>('/api/casebooks', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return result.casebook;
+}
+
+export async function updateCasebook(id: string, input: CasebookInput): Promise<Casebook> {
+  const result = await request<{ success: true; casebook: Casebook }>(
+    `/api/casebooks/${encodeURIComponent(id)}`,
+    { method: 'PUT', body: JSON.stringify(input) }
+  );
+  return result.casebook;
+}
+
+export async function getCasebookModerationQueue(status: 'Pending' | 'Published'): Promise<Casebook[]> {
+  const result = await request<{ success: true; casebooks: Casebook[] }>(
+    `/api/moderation/casebooks?status=${status}`
+  );
+  return result.casebooks;
+}
+
+export async function reviewCasebook(
+  id: string,
+  action: 'approve' | 'request_changes' | 'decline' | 'take_down',
+  notes: string
+): Promise<Casebook> {
+  const result = await request<{ success: true; casebook: Casebook }>(
+    `/api/moderation/casebooks/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify({ action, notes }) }
+  );
+  return result.casebook;
+}
+
 // ─── Submissions ───
 
 export interface SubmissionRequest {

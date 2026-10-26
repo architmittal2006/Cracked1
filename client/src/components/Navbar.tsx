@@ -8,6 +8,7 @@ import { Button } from './Button';
 
 const navLinks = [
   { to: '/cases', label: 'Practice' },
+  { to: '/casebooks', label: 'Casebooks' },
   { to: '/questions', label: 'Questions' },
   { to: '/leaderboard', label: 'Leaderboard' },
   { to: '/how-it-works', label: 'How It Works' },
@@ -63,7 +64,7 @@ export const Navbar: React.FC = () => {
           <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-10 md:h-11 w-auto" />
         </Link>
 
-        <div className="hidden lg:flex items-center gap-5">
+        <div className="hidden xl:flex items-center gap-5">
           <div className="flex items-center gap-1">
             {visibleNavLinks.map((link) => (
               <NavLink
@@ -109,7 +110,7 @@ export const Navbar: React.FC = () => {
 
         <button
           type="button"
-          className="lg:hidden text-slate-400 hover:text-white p-2 rounded-md hover:bg-white/5"
+          className="xl:hidden text-slate-400 hover:text-white p-2 rounded-md hover:bg-white/5"
           onClick={() => setIsMobileMenuOpen(true)}
           aria-label="Open menu"
         >

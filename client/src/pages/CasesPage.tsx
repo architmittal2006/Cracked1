@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import type { Case, ProblemType } from '../data/mockData';
+import { PROBLEM_TYPES } from '../data/mockData';
 import { CaseCard } from '../components/CaseCard';
 import { CaseFilterBar } from '../components/CaseFilterBar';
 import { ChaosBanner } from '../components/ChaosBanner';
@@ -10,11 +11,15 @@ import { Button } from '../components/Button';
 import { getCases } from '../services/api';
 
 export const CasesPage: React.FC = () => {
+  const [searchParams] = useSearchParams();
   const [cases, setCases] = useState<Case[]>([]);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<ProblemType | 'All'>('All');
+  const [typeFilter, setTypeFilter] = useState<ProblemType | 'All'>(() => {
+    const type = searchParams.get('type');
+    return type && PROBLEM_TYPES.includes(type as ProblemType) ? type as ProblemType : 'All';
+  });
   const [difficultyFilter, setDifficultyFilter] = useState('All');
-  const [sectorFilter, setSectorFilter] = useState('All');
+  const [sectorFilter, setSectorFilter] = useState(searchParams.get('sector') || 'All');
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 

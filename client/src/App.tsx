@@ -40,6 +40,9 @@ import { CompanyPostCasePage } from './pages/CompanyPostCasePage';
 import { CaseProposalPage } from './pages/CaseProposalPage';
 import { MyCaseProposalsPage } from './pages/MyCaseProposalsPage';
 import { CaseModerationPage } from './pages/CaseModerationPage';
+import { CasebooksPage } from './pages/CasebooksPage';
+import { CasebookDetailPage } from './pages/CasebookDetailPage';
+import { CasebookCasePage } from './pages/CasebookCasePage';
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -70,6 +73,9 @@ const App: React.FC = () => {
                   <Route path="/questions/:id/answer" element={<QuestionsAnswerPage />} />
                   <Route path="/cases" element={<CasesPage />} />
                   <Route path="/cases/type/:type" element={<CasesByTypePage />} />
+                  <Route path="/casebooks" element={<CasebooksPage />} />
+                  <Route path="/casebooks/:slug/:caseSlug" element={<CasebookCasePage />} />
+                  <Route path="/casebooks/:slug" element={<CasebookDetailPage />} />
                   <Route path="/contribute/cases" element={
                     <ProtectedRoute>
                       <CaseProposalPage />
