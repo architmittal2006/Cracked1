@@ -4,6 +4,7 @@ import { Menu, X, LogIn, LogOut, User } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/useTheme';
 import { Avatar } from './Avatar';
+import { BrandLogo } from './BrandLogo';
 import { Button } from './Button';
 
 const navLinks = [
@@ -61,7 +62,7 @@ export const Navbar: React.FC = () => {
     <nav className="fixed top-0 z-50 h-16 w-full border-b border-[var(--border-subtle)] bg-[var(--bg-deep)]" aria-label="Main navigation">
       <div className="h-full max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2 group transition-opacity hover:opacity-90">
-          <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-10 md:h-11 w-auto" />
+          <BrandLogo className="h-7 w-auto md:h-8" />
         </Link>
 
         <div className="hidden xl:flex items-center gap-5">
