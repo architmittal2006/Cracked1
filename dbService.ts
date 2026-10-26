@@ -1,5 +1,6 @@
 // Persistent PostgreSQL data layer using Drizzle ORM
 import argon2 from 'argon2';
+import type { PoolClient } from 'pg';
 import { eq, and, count, sql } from 'drizzle-orm';
 import { db, pool } from './db/index.js';
 import {
@@ -11,6 +12,7 @@ import {
   votes,
   credibilityScores,
 } from './db/schema.js';
+import type { CasebookFilters, CasebookInput } from './casebookValidation.js';
 
 export interface ReviewRubric {
   problem_framing: number;
@@ -73,6 +75,82 @@ export interface CaseProposalRecord extends CaseProposalInput {
   contributorName?: string;
 }
 
+export type CasebookStatus = 'Pending' | 'Changes_Requested' | 'Published' | 'Declined' | 'Taken_down';
+export type CasebookReviewAction = 'approve' | 'request_changes' | 'decline' | 'take_down';
+
+export interface CasebookCaseRecord {
+  id: string;
+  slug: string;
+  title: string;
+  firm: string | null;
+  sector: string;
+  caseType: string | null;
+  difficulty: string;
+  summary: string;
+  body: string | null;
+  position: number;
+  practiceCaseId: string | null;
+}
+
+export interface CasebookRecord {
+  id: string;
+  slug: string;
+  title: string;
+  sourceOrg: string;
+  sourceKind: string;
+  year: number | null;
+  description: string;
+  licenseKind: string;
+  permissionReference: string | null;
+  externalUrl: string | null;
+  industries: string[];
+  caseCount: number;
+  status: CasebookStatus;
+  uploaderId: string;
+  moderatorNotes: string | null;
+  reviewedBy: string | null;
+  createdAt: string;
+  publishedAt: string | null;
+  cases?: CasebookCaseRecord[];
+  uploaderName?: string;
+}
+
+export type PublicCasebookRecord = Omit<
+  CasebookRecord,
+  'uploaderId' | 'moderatorNotes' | 'reviewedBy' | 'uploaderName' | 'cases'
+> & { cases?: Omit<CasebookCaseRecord, 'body'>[] };
+
+interface CasebookDbRow {
+  id: string;
+  slug: string;
+  title: string;
+  sourceOrg: string;
+  sourceKind: string;
+  year: number | null;
+  description: string;
+  licenseKind: string;
+  permissionReference: string | null;
+  externalUrl: string | null;
+  industries: string[] | null;
+  caseCount: number;
+  status: CasebookStatus;
+  uploaderId: string;
+  moderatorNotes: string | null;
+  reviewedBy: string | null;
+  createdAt: Date | string;
+  publishedAt: Date | string | null;
+  uploaderName?: string;
+}
+
+interface CasebookCaseDbRow extends CasebookCaseRecord {}
+
+export interface CasebookSearchResult {
+  casebooks: PublicCasebookRecord[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
 export interface PublishedCaseRecord {
   id: string;
   title: string;
@@ -106,6 +184,415 @@ export async function comparePassword(password: string, hash: string): Promise<b
 // ─── User storage ───
 
 export class DatabaseService {
+  private static slugify(value: string): string {
+    return value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'casebook';
+  }
+
+  private static async insertCasebookCases(
+    client: PoolClient,
+    casebookId: string,
+    input: CasebookInput
+  ): Promise<void> {
+    for (const [index, caseItem] of input.cases.entries()) {
+      const id = `casebook_case_${crypto.randomUUID()}`;
+      const suffix = crypto.randomUUID().slice(0, 8);
+      const slug = `${this.slugify(caseItem.title)}-${suffix}`;
+      await client.query(
+        `INSERT INTO casebook_cases (
+           id, casebook_id, slug, title, firm, sector, case_type, difficulty,
+           summary, body, position, practice_case_id
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+        [
+          id, casebookId, slug, caseItem.title, caseItem.firm || null, caseItem.sector,
+          caseItem.caseType || null, caseItem.difficulty, caseItem.summary,
+          input.licenseKind === 'link_only' ? null : caseItem.body || null,
+          caseItem.position ?? index, caseItem.practiceCaseId || null,
+        ]
+      );
+    }
+  }
+
+  private static casebookFromRow(row: CasebookDbRow): CasebookRecord {
+    return {
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      sourceOrg: row.sourceOrg,
+      sourceKind: row.sourceKind,
+      year: row.year,
+      description: row.description,
+      licenseKind: row.licenseKind,
+      permissionReference: row.permissionReference,
+      externalUrl: row.externalUrl,
+      industries: row.industries ?? [],
+      caseCount: Number(row.caseCount),
+      status: row.status,
+      uploaderId: row.uploaderId,
+      moderatorNotes: row.moderatorNotes,
+      reviewedBy: row.reviewedBy,
+      createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+      publishedAt: row.publishedAt instanceof Date ? row.publishedAt.toISOString() : row.publishedAt,
+      uploaderName: row.uploaderName,
+    };
+  }
+
+  private static caseFromRow(row: CasebookCaseDbRow): CasebookCaseRecord {
+    return {
+      id: row.id,
+      slug: row.slug,
+      title: row.title,
+      firm: row.firm,
+      sector: row.sector,
+      caseType: row.caseType,
+      difficulty: row.difficulty,
+      summary: row.summary,
+      body: row.body,
+      position: row.position,
+      practiceCaseId: row.practiceCaseId,
+    };
+  }
+
+  private static publicCasebook(record: CasebookRecord): PublicCasebookRecord {
+    const { uploaderId: _uploaderId, moderatorNotes: _moderatorNotes, reviewedBy: _reviewedBy, uploaderName: _uploaderName, cases, ...publicRecord } = record;
+    return {
+      ...publicRecord,
+      ...(cases ? { cases: cases.map(({ body: _body, ...caseSummary }) => caseSummary) } : {}),
+    };
+  }
+
+  private static readonly casebookSelect = `
+    id, slug, title, source_org AS "sourceOrg", source_kind AS "sourceKind",
+    year, description, license_kind AS "licenseKind",
+    permission_reference AS "permissionReference", external_url AS "externalUrl",
+    industries, case_count AS "caseCount", status, uploader_id AS "uploaderId",
+    moderator_notes AS "moderatorNotes", reviewed_by AS "reviewedBy",
+    created_at AS "createdAt", published_at AS "publishedAt"`;
+
+  private static readonly casebookCaseSelect = `
+    id, slug, title, firm, sector, case_type AS "caseType", difficulty,
+    summary, body, position, practice_case_id AS "practiceCaseId"`;
+
+  public static async createCasebook(uploaderId: string, input: CasebookInput): Promise<CasebookRecord> {
+    const id = `casebook_${crypto.randomUUID()}`;
+    const slug = `${this.slugify(input.title)}-${crypto.randomUUID().slice(0, 8)}`;
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query<CasebookDbRow>(
+        `INSERT INTO casebooks (
+           id, slug, title, source_org, source_kind, year, description, license_kind,
+           permission_reference, external_url, industries, case_count, uploader_id
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+         RETURNING ${this.casebookSelect}`,
+        [
+          id, slug, input.title, input.sourceOrg, input.sourceKind, input.year ?? null,
+          input.description, input.licenseKind, input.permissionReference || null,
+          input.externalUrl || null, input.industries, input.cases.length, uploaderId,
+        ]
+      );
+      await this.insertCasebookCases(client, id, input);
+      await client.query('COMMIT');
+      return this.casebookFromRow(result.rows[0]);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public static async getMyCasebooks(uploaderId: string): Promise<CasebookRecord[]> {
+    const result = await pool.query<CasebookDbRow>(
+      `SELECT ${this.casebookSelect}
+       FROM casebooks
+       WHERE uploader_id = $1
+       ORDER BY created_at DESC`,
+      [uploaderId]
+    );
+    return result.rows.map((row) => this.casebookFromRow(row));
+  }
+
+  public static async getCasebookForOwner(id: string, uploaderId: string): Promise<CasebookRecord | undefined> {
+    const result = await pool.query<CasebookDbRow>(
+      `SELECT ${this.casebookSelect}
+       FROM casebooks
+       WHERE id = $1 AND uploader_id = $2`,
+      [id, uploaderId]
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    const cases = await pool.query<CasebookCaseDbRow>(
+      `SELECT ${this.casebookCaseSelect}
+       FROM casebook_cases
+       WHERE casebook_id = $1
+       ORDER BY position, id`,
+      [id]
+    );
+    return { ...this.casebookFromRow(row), cases: cases.rows.map((item) => this.caseFromRow(item)) };
+  }
+
+  public static async updateCasebook(
+    id: string,
+    uploaderId: string,
+    input: CasebookInput
+  ): Promise<CasebookRecord | undefined> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query(
+        `UPDATE casebooks SET
+           title = $3, source_org = $4, source_kind = $5, year = $6, description = $7,
+           license_kind = $8, permission_reference = $9, external_url = $10,
+           industries = $11, case_count = $12, status = 'Pending',
+           moderator_notes = NULL, reviewed_by = NULL, published_at = NULL
+         WHERE id = $1 AND uploader_id = $2 AND status = 'Changes_Requested'
+         RETURNING id`,
+        [
+          id, uploaderId, input.title, input.sourceOrg, input.sourceKind, input.year ?? null,
+          input.description, input.licenseKind, input.permissionReference || null,
+          input.externalUrl || null, input.industries, input.cases.length,
+        ]
+      );
+      if (!updated.rows[0]) {
+        await client.query('ROLLBACK');
+        return undefined;
+      }
+      await client.query('DELETE FROM casebook_cases WHERE casebook_id = $1', [id]);
+      await this.insertCasebookCases(client, id, input);
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+    return this.getCasebookForOwner(id, uploaderId);
+  }
+
+  public static async getPublishedCasebooks(filters: CasebookFilters): Promise<CasebookSearchResult> {
+    const queryValues = [
+      filters.search,
+      filters.sourceKind ?? null,
+      filters.sector ?? null,
+      filters.caseType ?? null,
+      filters.year ?? null,
+    ];
+    const filterSql = `
+      status = 'Published'
+      AND ($1 = '' OR title ILIKE '%' || $1 || '%' OR source_org ILIKE '%' || $1 || '%'
+        OR description ILIKE '%' || $1 || '%' OR array_to_string(industries, ' ') ILIKE '%' || $1 || '%')
+      AND ($2::text IS NULL OR source_kind = $2)
+      AND ($5::integer IS NULL OR year = $5)
+      AND (($3::text IS NULL AND $4::text IS NULL) OR EXISTS (
+        SELECT 1 FROM casebook_cases c WHERE c.casebook_id = casebooks.id
+          AND ($3::text IS NULL OR c.sector = $3)
+          AND ($4::text IS NULL OR c.case_type = $4)
+      ))`;
+    const countResult = await pool.query<{ total: string }>(
+      `SELECT COUNT(*)::text AS total FROM casebooks WHERE ${filterSql}`,
+      queryValues
+    );
+    const offset = (filters.page - 1) * filters.pageSize;
+    const result = await pool.query<CasebookDbRow>(
+      `SELECT ${this.casebookSelect}
+       FROM casebooks
+       WHERE ${filterSql}
+       ORDER BY published_at DESC, title ASC
+       LIMIT $6 OFFSET $7`,
+      [...queryValues, filters.pageSize, offset]
+    );
+    return {
+      casebooks: result.rows.map((row) => this.publicCasebook(this.casebookFromRow(row))),
+      total: Number(countResult.rows[0]?.total ?? 0),
+      page: filters.page,
+      pageSize: filters.pageSize,
+    };
+  }
+
+  public static async getPublishedCasebookBySlug(slug: string): Promise<PublicCasebookRecord | undefined> {
+    const result = await pool.query<CasebookDbRow>(
+      `SELECT ${this.casebookSelect}
+       FROM casebooks
+       WHERE slug = $1 AND status = 'Published'`,
+      [slug]
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    const cases = await pool.query<CasebookCaseDbRow>(
+      `SELECT ${this.casebookCaseSelect.replace(', body,', ', NULL::text AS body,')}
+       FROM casebook_cases
+       WHERE casebook_id = $1
+       ORDER BY position, id`,
+      [row.id]
+    );
+    return this.publicCasebook({
+      ...this.casebookFromRow(row),
+      cases: cases.rows.map((item) => this.caseFromRow(item)),
+    });
+  }
+
+  public static async getPublishedCasebookCase(
+    slug: string,
+    caseSlug: string
+  ): Promise<{ casebook: PublicCasebookRecord; caseItem: CasebookCaseRecord } | undefined> {
+    const result = await pool.query<CasebookDbRow & CasebookCaseDbRow & {
+      bookId: string;
+      bookSlug: string;
+      bookTitle: string;
+      sourceOrg: string;
+      sourceKind: string;
+      licenseKind: string;
+      permissionReference: string | null;
+      externalUrl: string | null;
+      caseCount: number;
+      uploaderId: string;
+      moderatorNotes: string | null;
+      reviewedBy: string | null;
+      publishedAt: Date | string | null;
+    }>(
+      `SELECT b.id AS "bookId", b.slug AS "bookSlug", b.title AS "bookTitle",
+          b.source_org AS "sourceOrg", b.source_kind AS "sourceKind", b.year,
+          b.description, b.license_kind AS "licenseKind",
+          b.permission_reference AS "permissionReference", b.external_url AS "externalUrl",
+          b.industries, b.case_count AS "caseCount", b.status,
+          b.uploader_id AS "uploaderId", b.moderator_notes AS "moderatorNotes",
+          b.reviewed_by AS "reviewedBy", b.created_at AS "createdAt",
+          b.published_at AS "publishedAt",
+          c.${this.casebookCaseSelect.trim().replaceAll(', ', ', c.')}
+       FROM casebooks b
+       JOIN casebook_cases c ON c.casebook_id = b.id
+       WHERE b.slug = $1 AND b.status = 'Published' AND c.slug = $2`,
+      [slug, caseSlug]
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    return {
+      casebook: this.publicCasebook(this.casebookFromRow({
+        id: row.bookId,
+        slug: row.bookSlug,
+        title: row.bookTitle,
+        sourceOrg: row.sourceOrg,
+        sourceKind: row.sourceKind,
+        year: row.year,
+        description: row.description,
+        licenseKind: row.licenseKind,
+        permissionReference: row.permissionReference,
+        externalUrl: row.externalUrl,
+        industries: row.industries,
+        caseCount: row.caseCount,
+        status: row.status,
+        uploaderId: row.uploaderId,
+        moderatorNotes: row.moderatorNotes,
+        reviewedBy: row.reviewedBy,
+        createdAt: row.createdAt,
+        publishedAt: row.publishedAt,
+      })),
+      caseItem: this.caseFromRow(row),
+    };
+  }
+
+  public static async getCasebookModerationQueue(status: 'Pending' | 'Published'): Promise<CasebookRecord[]> {
+    const result = await pool.query<CasebookDbRow>(
+      `SELECT b.${this.casebookSelect.trim().replaceAll(', ', ', b.')},
+          COALESCE(u.name, b.uploader_id) AS "uploaderName"
+       FROM casebooks b
+       LEFT JOIN users u ON u.id = b.uploader_id
+       WHERE b.status = $1
+       ORDER BY b.created_at ASC`,
+      [status]
+    );
+    const books = result.rows.map((row) => this.casebookFromRow(row));
+    if (books.length === 0) return books;
+    const cases = await pool.query<CasebookCaseDbRow & { casebookId: string }>(
+      `SELECT ${this.casebookCaseSelect}, casebook_id AS "casebookId"
+       FROM casebook_cases
+       WHERE casebook_id = ANY($1::varchar[])
+       ORDER BY position, id`,
+      [books.map((book) => book.id)]
+    );
+    const grouped = new Map<string, CasebookCaseRecord[]>();
+    for (const row of cases.rows) {
+      const group = grouped.get(row.casebookId) ?? [];
+      group.push(this.caseFromRow(row));
+      grouped.set(row.casebookId, group);
+    }
+    return books.map((book) => ({ ...book, cases: grouped.get(book.id) ?? [] }));
+  }
+
+  public static async getCasebookForModeration(id: string): Promise<CasebookRecord | undefined> {
+    const result = await pool.query<CasebookDbRow>(
+      `SELECT ${this.casebookSelect}
+       FROM casebooks
+       WHERE id = $1 AND status IN ('Pending', 'Published')`,
+      [id]
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    const cases = await pool.query<CasebookCaseDbRow>(
+      `SELECT ${this.casebookCaseSelect}
+       FROM casebook_cases
+       WHERE casebook_id = $1
+       ORDER BY position, id`,
+      [id]
+    );
+    return { ...this.casebookFromRow(row), cases: cases.rows.map((item) => this.caseFromRow(item)) };
+  }
+
+  public static async reviewCasebook(
+    id: string,
+    moderatorId: string,
+    action: CasebookReviewAction,
+    notes: string
+  ): Promise<CasebookRecord | undefined> {
+    const statusByAction: Record<CasebookReviewAction, CasebookStatus> = {
+      approve: 'Published',
+      request_changes: 'Changes_Requested',
+      decline: 'Declined',
+      take_down: 'Taken_down',
+    };
+    const allowedCurrentStatus = action === 'take_down' ? 'Published' : 'Pending';
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const updated = await client.query<CasebookDbRow>(
+        `UPDATE casebooks SET status = $2, moderator_notes = $3, reviewed_by = $4,
+           published_at = CASE WHEN $2 = 'Published' THEN NOW() ELSE published_at END
+         WHERE id = $1 AND status = $5
+         RETURNING ${this.casebookSelect}`,
+        [id, statusByAction[action], notes || null, moderatorId, allowedCurrentStatus]
+      );
+      const row = updated.rows[0];
+      if (!row) {
+        await client.query('ROLLBACK');
+        return undefined;
+      }
+      await client.query('COMMIT');
+      return this.casebookFromRow(row);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public static async createTakedownRequest(input: {
+    casebookId: string;
+    requesterEmail: string;
+    reason: string;
+  }): Promise<string | undefined> {
+    const id = `takedown_${crypto.randomUUID()}`;
+    const result = await pool.query(
+      `INSERT INTO takedown_requests (id, casebook_id, requester_email, reason)
+       SELECT $1, id, $3, $4 FROM casebooks
+       WHERE id = $2 AND status = 'Published'
+       RETURNING id`,
+      [id, input.casebookId, input.requesterEmail, input.reason]
+    );
+    return result.rows[0]?.id;
+  }
+
   public static async getPublishedCases(): Promise<PublishedCaseRecord[]> {
     const result = await pool.query<{
       id: string;
