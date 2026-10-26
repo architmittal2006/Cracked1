@@ -184,10 +184,14 @@ app.use(cookieParser());
 // CORS — allow configured client origin to call the API with credentials
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5174';
 app.use((_req: Request, res: Response, next: NextFunction) => {
-  res.header('Access-Control-Allow-Origin', CLIENT_ORIGIN);
-  res.header('Access-Control-Allow-Credentials', 'true');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  const origin = _req.get('origin');
+  if (origin === CLIENT_ORIGIN) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.vary('Origin');
+  }
   if (_req.method === 'OPTIONS') {
     res.status(204).end();
     return;
@@ -279,6 +283,10 @@ const caseProposalLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
+  throw new Error('SESSION_SECRET must be set in production');
+}
+
 // Session configuration with PostgreSQL-backed store
 app.use(session({
   store: new pgStore({
@@ -286,7 +294,7 @@ app.use(session({
     tableName: 'sessions',
     createTableIfMissing: true,
   }),
-  secret: process.env.SESSION_SECRET || 'change-this-secret-in-production',
+  secret: process.env.SESSION_SECRET || 'development-only-session-secret',
   name: 'connect.sid',
   resave: false,
   saveUninitialized: false,
