@@ -41,6 +41,29 @@ export const cases = pgTable('cases', {
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const caseProposals = pgTable('case_proposals', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  contributorId: varchar('contributor_id', { length: 255 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  type: varchar('type', { length: 100 }).notNull(),
+  sector: varchar('sector', { length: 100 }).notNull(),
+  difficulty: varchar('difficulty', { length: 50 }).notNull(),
+  sourceKind: varchar('source_kind', { length: 50 }).notNull(),
+  sourceReference: text('source_reference'),
+  context: text('context').notNull(),
+  prompt: text('prompt').notNull(),
+  exhibits: text('exhibits'),
+  deliverables: text('deliverables').array().notNull().default([]),
+  reviewerGuide: text('reviewer_guide').notNull(),
+  solutionOutline: text('solution_outline').notNull(),
+  status: varchar('status', { length: 50 }).notNull().default('Pending'),
+  moderatorNotes: text('moderator_notes'),
+  reviewedBy: varchar('reviewed_by', { length: 255 }),
+  publishedCaseId: varchar('published_case_id', { length: 255 }).references(() => cases.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+});
+
 export const submissions = pgTable('submissions', {
   id: varchar('id', { length: 255 }).primaryKey(),
   caseId: varchar('case_id', { length: 255 }).notNull().references(() => cases.id),
@@ -48,7 +71,7 @@ export const submissions = pgTable('submissions', {
   contentJson: jsonb('content_json').notNull(),
   citationsCount: integer('citations_count').notNull().default(0),
   wordCount: integer('word_count').notNull().default(0),
-  status: varchar('status', { length: 50 }).notNull().default('Pending_Review'),
+  status: varchar('status', { length: 50 }).notNull().default('Submitted'),
   structuralCompliant: boolean('structural_compliant').default(false),
   finalWeightedScore: integer('final_weighted_score'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
@@ -61,6 +84,7 @@ export const reviews = pgTable('reviews', {
   caseId: varchar('case_id', { length: 255 }).references(() => cases.id),
   reviewerTier: varchar('reviewer_tier', { length: 50 }).notNull(),
   scores: jsonb('scores').notNull(),
+  feedback: text('feedback').notNull().default(''),
   isVoided: boolean('is_voided').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });

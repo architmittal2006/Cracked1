@@ -6,14 +6,14 @@ const tiers = [
     name: 'Analyst',
     description: 'Entry-level contributors',
     score: '0-1,000 pts',
-    features: ['Solve up to 5 cases', 'Earn peer reviews', 'Basic profile visibility'],
+    features: ['Solve up to 5 cases', 'Compare other solutions', 'Basic profile visibility'],
     popular: false,
   },
   {
     name: 'Consultant',
     description: 'Proven case solvers',
     score: '1,000-5,000 pts',
-    features: ['Unlimited submissions', 'Advanced rubric access', 'Priority review queue', 'Featured profiles'],
+    features: ['Unlimited submissions', 'Solution history', 'Featured profiles'],
     popular: true,
   },
   {
@@ -29,7 +29,7 @@ export const TiersSection: React.FC = () => (
   <section className="py-12 px-6">
     <div className="max-w-6xl mx-auto">
       <h2 className="text-3xl font-bold text-white mb-3 text-center">Credibility tiers</h2>
-      <p className="text-slate-400 text-center mb-8 max-w-2xl mx-auto">Progress through tiers as you solve cases and earn peer consensus scores.</p>
+      <p className="text-slate-400 text-center mb-8 max-w-2xl mx-auto">Explore the platform’s current credibility tiers. They are not yet an independently validated hiring measure.</p>
       <div className="grid md:grid-cols-3 gap-6">
         {tiers.map((t) => (
           <div key={t.name} className={`glass-card p-6 relative ${t.popular ? 'border-orange-500/50' : ''}`}>

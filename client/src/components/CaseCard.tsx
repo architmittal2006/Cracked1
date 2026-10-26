@@ -1,85 +1,61 @@
-﻿import React from 'react';
-import { Clock, FileText, Zap } from 'lucide-react';
+import React from 'react';
+import { ArrowUpRight, FileText } from 'lucide-react';
 import type { Case } from '../data/mockData';
-import { GATE_STATE } from '../data/mockData';
-import { ProblemTypeBadge } from './ProblemTypeBadge';
-import { GateIndicator } from './GateIndicator';
-import { Button } from './Button';
 
 interface CaseCardProps {
   caseData: Case;
+  track?: 'open_arena' | 'community_question' | 'curated_case';
 }
 
-export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
-  const getDifficultyClass = () => {
-    switch (caseData.difficulty) {
-      case 'High': return 'bg-amber-500/10 text-amber-300 border border-amber-500/20';
-      case 'Chaos': return 'bg-rose-500/10 text-rose-300 border border-rose-500/20';
-      default: return 'bg-orange-500/10 text-orange-300 border border-orange-500/20';
-    }
-  };
+const difficultyClasses: Record<string, string> = {
+  Standard: 'border border-[var(--border-subtle)] bg-[var(--bg-card-hover)] text-[var(--text-secondary)]',
+  High: 'border border-[var(--border-subtle)] bg-[var(--bg-card-hover)] text-[var(--text-secondary)]',
+  Chaos: 'border border-[var(--border-subtle)] bg-[var(--bg-card-hover)] text-[var(--text-secondary)]',
+};
 
-  const gateReviews = GATE_STATE[caseData.id] ?? 0;
-  const featuredClass = caseData.isFeatured ? 'md:col-span-2 lg:col-span-3' : '';
-  const chaosAccent = caseData.is_chaos ? 'border-l-4 border-l-rose-500' : '';
+export const CaseCard: React.FC<CaseCardProps> = ({ caseData }) => {
+  const difficultyClass = difficultyClasses[caseData.difficulty] ?? difficultyClasses.Standard;
 
   return (
-    <div className={`group rounded-2xl border border-white/8 bg-[#0d0d12] p-5 shadow-[0_20px_50px_rgba(0,0,0,0.12)] transition-all duration-200 hover:border-orange-500/30 hover:shadow-[0_18px_40px_rgba(255,76,37,0.12)] ${featuredClass} ${chaosAccent}`}>
-      <div className='flex items-start justify-between gap-3'>
-        <ProblemTypeBadge type={caseData.type} linked />
-        <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] ${getDifficultyClass()}`}>
-          {caseData.difficulty}
-        </span>
-      </div>
-
-      {caseData.is_chaos && (
-        <div className='mt-4 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.2em] text-rose-300'>
-          <Zap className='h-3 w-3' /> Chaos case
+    <article className="border-b border-[var(--border-subtle)] py-5 first:border-t">
+      <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
+        <div className="min-w-0">
+          <div className="mb-2 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-medium text-[var(--accent-primary)]">{caseData.type}</span>
+            <span className={`rounded px-2 py-0.5 text-xs font-medium ${difficultyClass}`}>
+              {caseData.difficulty}
+            </span>
+          </div>
+          <h2 className="text-base font-semibold leading-6 text-[var(--text-primary)]">
+            <a className="rounded-sm outline-none hover:underline focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]" href={`/cases/${caseData.id}`}>
+              {caseData.title}
+            </a>
+          </h2>
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
+            {caseData.sector}{caseData.companyType ? ` · ${caseData.companyType}` : ''}
+          </p>
+          <p className="mt-2 line-clamp-2 max-w-3xl text-sm leading-6 text-[var(--text-secondary)]">
+            {caseData.description}
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-[var(--text-muted)]">
+            <span className="inline-flex items-center gap-1.5">
+              <FileText aria-hidden="true" className="h-3.5 w-3.5" />
+              {caseData.submissionCount} {caseData.submissionCount === 1 ? 'submission' : 'submissions'}
+            </span>
+            <span>Submit a solution and compare approaches</span>
+            {caseData.tags.slice(0, 2).map((tag) => <span key={tag}>{tag}</span>)}
+          </div>
         </div>
-      )}
 
-      <h3 className='mt-4 text-xl font-semibold tracking-[-0.03em] text-white'>{caseData.title}</h3>
-      <p className='mt-1 text-sm text-slate-400'>{caseData.sector} · {caseData.companyType}</p>
-
-      <p className='mt-3 text-sm leading-relaxed text-slate-300 line-clamp-3'>
-        {caseData.description}
-      </p>
-
-      <div className='mt-4 flex flex-wrap gap-2'>
-        {caseData.tags.slice(0, 3).map((tag) => (
-          <span key={tag} className='rounded-full border border-white/8 bg-white/[0.02] px-2 py-1 text-[10px] font-medium text-slate-300'>
-            {tag}
-          </span>
-        ))}
+        <a
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[var(--border-medium)] px-4 text-sm font-medium text-[var(--text-primary)] transition-colors hover:bg-[var(--bg-card-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] sm:min-w-[120px]"
+          href={`/cases/${caseData.id}`}
+          aria-label={`Open case: ${caseData.title}`}
+        >
+          Open case
+          <ArrowUpRight aria-hidden="true" className="h-4 w-4" />
+        </a>
       </div>
-
-      <div className='mt-5'>
-        <GateIndicator reviewsCompleted={gateReviews} compact />
-      </div>
-
-      <div className='mt-5 flex items-center justify-between border-t border-white/8 pt-4'>
-        <div className='flex items-center gap-4 text-xs text-slate-400'>
-          <span className='inline-flex items-center gap-1.5'>
-            <FileText className='h-3.5 w-3.5' />
-            {caseData.submissionCount}
-          </span>
-          <span className='font-mono font-semibold text-orange-400'>{caseData.pts} pts</span>
-        </div>
-        <span className='inline-flex items-center gap-1.5 text-xs text-slate-400'>
-          <Clock className='h-3.5 w-3.5' />
-          {new Date(caseData.deadline).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
-        </span>
-      </div>
-
-      <Button
-        variant='primary'
-        size='md'
-        as='a'
-        href={`/cases/${caseData.id}`}
-        className='mt-5 w-full'
-      >
-        View Case
-      </Button>
-    </div>
+    </article>
   );
 };

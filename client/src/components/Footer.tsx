@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 export const Footer: React.FC = () => {
   return (
-    <footer className="bg-[#0A1628] pt-12 pb-8 relative mt-16 border-t border-white/10" aria-label="Site footer">
+    <footer className="bg-[var(--bg-surface)] pt-12 pb-8 relative mt-16 border-t border-[var(--border-subtle)]" aria-label="Site footer">
       <div className="page-container">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-12 mb-12">
           <div className="col-span-1">
@@ -16,18 +16,18 @@ export const Footer: React.FC = () => {
             </p>
             <div className="space-y-2">
               <p className="text-slate-400 text-sm">
-                <span className="text-slate-500">Contact:</span>{' '}
+                <span className="text-[var(--text-secondary)]">Contact:</span>{' '}
                 <a href="mailto:hello@cracked.com" className="text-slate-300 hover:text-[#C75B39] transition-colors">hello@cracked.com</a>
               </p>
               <p className="text-slate-400 text-sm">
-                <span className="text-slate-500">Twitter:</span>{' '}
+                <span className="text-[var(--text-secondary)]">Twitter:</span>{' '}
                 <a href="https://twitter.com/cracked_platform" target="_blank" rel="noreferrer" className="text-slate-300 hover:text-[#C75B39] transition-colors">@cracked_platform</a>
               </p>
             </div>
           </div>
 
           <div>
-            <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-xs">Practice</h4>
+            <h4 className="text-[var(--text-primary)] font-semibold mb-4 text-sm">Practice</h4>
             <ul className="space-y-3">
               <li><Link to="/cases" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Case Library</Link></li>
               <li><Link to="/arena" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Open Arena</Link></li>
@@ -36,7 +36,7 @@ export const Footer: React.FC = () => {
           </div>
 
           <div>
-            <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-xs">Questions</h4>
+            <h4 className="text-[var(--text-primary)] font-semibold mb-4 text-sm">Questions</h4>
             <ul className="space-y-3">
               <li><Link to="/questions" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Community Questions</Link></li>
               <li><Link to="/register" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Create Account</Link></li>
@@ -44,7 +44,7 @@ export const Footer: React.FC = () => {
           </div>
 
           <div>
-            <h4 className="text-white font-bold mb-4 uppercase tracking-wider text-xs">Legal</h4>
+            <h4 className="text-[var(--text-primary)] font-semibold mb-4 text-sm">Legal</h4>
             <ul className="space-y-3">
               <li><Link to="/privacy" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Privacy Policy</Link></li>
             </ul>
@@ -52,8 +52,8 @@ export const Footer: React.FC = () => {
         </div>
 
         <div className="border-t border-slate-800/60 pt-6 flex flex-col md:flex-row justify-between items-center gap-4">
-          <p className="text-slate-400 text-xs">© 2025 Cracked? — Peer-reviewed case solving.</p>
-          <p className="text-slate-400 text-[11px] font-mono tracking-wider">Proof of work beats promise</p>
+          <p className="text-slate-400 text-xs">© 2025 Cracked? — Structured case practice.</p>
+          <p className="text-slate-400 text-xs">Proof of work beats promise</p>
         </div>
       </div>
     </footer>

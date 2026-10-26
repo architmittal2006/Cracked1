@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Trophy, ArrowRight } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Trophy, ArrowRight, FileText, Clock } from 'lucide-react';
 import { getTierProgress } from '../data/mockData';
 import { ScoreRing } from '../components/ScoreRing';
 import { TierBadge } from '../components/TierBadge';
@@ -100,17 +100,31 @@ export const DashboardPage: React.FC = () => {
             <Button variant="ghost" size="sm" onClick={() => navigate('/cases')}>Browse cases</Button>
           </div>
           <div className="space-y-4">
-            <p className="text-slate-400 text-sm">No active submissions. <Link to="/cases" className="text-orange-400 hover:text-orange-300 transition-colors">Pick a case</Link></p>
+            <div className="flex flex-col items-center py-6 text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/50 mb-3">
+                <FileText className="w-6 h-6 text-slate-500" />
+              </div>
+              <p className="text-slate-400 text-sm mb-3">No active submissions yet.</p>
+              <Button variant="primary" size="sm" onClick={() => navigate('/cases')}>
+                Browse Cases
+              </Button>
+            </div>
           </div>
         </Card>
 
         <Card>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-white">Review Queue</h2>
-            <span className="text-xs text-slate-500">Unlock gates by reviewing</span>
+            <h2 className="text-xl font-semibold text-white">Solution Library</h2>
+            <span className="text-xs text-slate-500">Compare approaches after solving</span>
           </div>
           <div className="space-y-4">
-            <p className="text-slate-400 text-sm">No reviews available yet.</p>
+            <div className="flex flex-col items-center py-6 text-center">
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/50 mb-3">
+                <Clock className="w-6 h-6 text-slate-500" />
+              </div>
+              <p className="text-slate-400 text-sm mb-3">No solutions to compare yet.</p>
+              <p className="text-slate-500 text-sm">Submit a case solution to explore other approaches.</p>
+            </div>
           </div>
         </Card>
       </div>

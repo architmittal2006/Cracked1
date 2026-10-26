@@ -1,31 +1,51 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { MOCK_CASES, SLUG_TO_PROBLEM_TYPE } from '../data/mockData';
+import { PROBLEM_TYPE_SLUGS, SLUG_TO_PROBLEM_TYPE } from '../data/mockData';
+import type { Case } from '../data/mockData';
 import { CaseCard } from '../components/CaseCard';
 import { CaseFilterBar } from '../components/CaseFilterBar';
 import { ChaosBanner } from '../components/ChaosBanner';
 import { PageWrapper } from '../components/PageWrapper';
 import { Button } from '../components/Button';
+import { getCases } from '../services/api';
 
 export const CasesByTypePage: React.FC = () => {
   const { type } = useParams();
   const navigate = useNavigate();
   const problemType = type ? SLUG_TO_PROBLEM_TYPE[type] : undefined;
 
+  const [cases, setCases] = useState<Case[]>([]);
   const [search, setSearch] = useState('');
   const [difficultyFilter, setDifficultyFilter] = useState('All');
   const [sectorFilter, setSectorFilter] = useState('All');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const sectors = useMemo(() => [...new Set(MOCK_CASES.map(c => c.sector))].sort(), []);
+  useEffect(() => {
+    let isCurrent = true;
+    getCases()
+      .then((loadedCases) => {
+        if (isCurrent) setCases(loadedCases);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) setLoadError(error instanceof Error ? error.message : 'Could not load cases');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoading(false);
+      });
+    return () => { isCurrent = false; };
+  }, []);
 
-  const filteredCases = MOCK_CASES.filter(c => {
-    if (problemType && c.type !== problemType) return false;
+  const sectors = useMemo(() => [...new Set(cases.map((caseData) => caseData.sector))].sort(), [cases]);
+
+  const filteredCases = cases.filter((caseData) => {
+    if (problemType && caseData.type !== problemType) return false;
     const searchLower = search.toLowerCase();
-    const searchMatch = !search || c.title.toLowerCase().includes(searchLower) ||
-      c.sector.toLowerCase().includes(searchLower) ||
-      c.tags.some(t => t.toLowerCase().includes(searchLower));
-    const diffMatch = difficultyFilter === 'All' || c.difficulty === difficultyFilter;
-    const sectorMatch = sectorFilter === 'All' || c.sector === sectorFilter;
+    const searchMatch = !search || caseData.title.toLowerCase().includes(searchLower) ||
+      caseData.sector.toLowerCase().includes(searchLower) ||
+      caseData.tags.some((tag) => tag.toLowerCase().includes(searchLower));
+    const diffMatch = difficultyFilter === 'All' || caseData.difficulty === difficultyFilter;
+    const sectorMatch = sectorFilter === 'All' || caseData.sector === sectorFilter;
     return searchMatch && diffMatch && sectorMatch;
   });
 
@@ -43,10 +63,9 @@ export const CasesByTypePage: React.FC = () => {
   return (
     <PageWrapper>
       <div className="page-header">
-        <div className="section-label mb-2">{problemType.toUpperCase()}</div>
-        <h1 className="section-title mb-4">{problemType} Cases</h1>
+          <h1 className="section-title mb-4">{problemType} cases</h1>
         <p className="section-subtitle">
-          Specialized briefs for {problemType.toLowerCase()} problems. Complete 2 peer reviews to unlock submission.
+          Specialized briefs for {problemType.toLowerCase()} problems. Submit your solution, then compare different approaches.
         </p>
       </div>
 
@@ -56,7 +75,7 @@ export const CasesByTypePage: React.FC = () => {
         search={search}
         onSearchChange={setSearch}
         typeFilter={problemType}
-        onTypeChange={() => {}}
+        onTypeChange={(selectedType) => navigate(selectedType === 'All' ? '/cases' : `/cases/type/${PROBLEM_TYPE_SLUGS[selectedType]}`)}
         difficultyFilter={difficultyFilter}
         onDifficultyChange={setDifficultyFilter}
         sectorFilter={sectorFilter}
@@ -64,13 +83,19 @@ export const CasesByTypePage: React.FC = () => {
         sectors={sectors}
       />
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-children">
-        {filteredCases.length > 0 ? (
-          filteredCases.map(caseData => <CaseCard key={caseData.id} caseData={caseData} />)
-        ) : (
-          <div className="col-span-full py-20 text-center text-slate-400">No cases match your filters.</div>
-        )}
-      </div>
+      {loadError ? (
+        <p className="border-y border-[var(--border-subtle)] py-8 text-sm text-[var(--text-secondary)]" role="alert">
+          Cases could not be loaded: {loadError}
+        </p>
+      ) : isLoading ? (
+        <p className="border-y border-[var(--border-subtle)] py-8 text-sm text-[var(--text-secondary)]" aria-live="polite">Loading cases…</p>
+      ) : filteredCases.length ? (
+        <div>{filteredCases.map((caseData) => <CaseCard key={caseData.id} caseData={caseData} />)}</div>
+      ) : (
+        <p className="border-y border-[var(--border-subtle)] py-8 text-sm text-[var(--text-secondary)]">
+          No {problemType.toLowerCase()} cases match your filters yet. <a href="/contribute/cases" className="underline underline-offset-4">Propose a case</a>.
+        </p>
+      )}
     </PageWrapper>
   );
 };

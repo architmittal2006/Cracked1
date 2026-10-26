@@ -1,155 +1,132 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Clock, FileText, Users, Zap, PenLine, Eye, ArrowLeft } from 'lucide-react';
-import { MOCK_CASES, GATE_STATE } from '../data/mockData';
+import { ArrowLeft, Clock, Eye, FileText, PenLine } from 'lucide-react';
+import type { Case } from '../data/mockData';
 import { StatusPill } from '../components/StatusPill';
 import { ProblemTypeBadge } from '../components/ProblemTypeBadge';
 import { DeliverablesList } from '../components/DeliverablesList';
-import { GateIndicator } from '../components/GateIndicator';
 import { PageWrapper } from '../components/PageWrapper';
 import { Button } from '../components/Button';
+import { getCaseById } from '../services/api';
 
 export const CaseDetailPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const caseData = MOCK_CASES.find((c) => c.id === id);
+  const [caseData, setCaseData] = useState<Case | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  if (!caseData) {
+  useEffect(() => {
+    if (!id) return;
+    let isCurrent = true;
+    getCaseById(id)
+      .then((loadedCase) => {
+        if (!isCurrent) return;
+        setCaseData(loadedCase);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) setLoadError(error instanceof Error ? error.message : 'Could not load this case');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoading(false);
+      });
+    return () => { isCurrent = false; };
+  }, [id]);
+
+  if (isLoading) {
+    return <PageWrapper><p className="py-10 text-sm text-[var(--text-secondary)]" aria-live="polite">Loading case…</p></PageWrapper>;
+  }
+
+  if (loadError || !caseData) {
     return (
       <PageWrapper>
-        <div className='py-20 text-center'>
-          <h2 className='mb-4 text-2xl font-bold text-white'>Case Not Found</h2>
-          <Button variant='primary' size='md' onClick={() => navigate('/cases')}>Back to Cases</Button>
+        <div className="py-10" role={loadError ? 'alert' : undefined}>
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]">
+            {loadError ? 'Case could not be loaded' : 'Case not found'}
+          </h1>
+          {loadError && <p className="mt-2 text-sm text-[var(--text-secondary)]">{loadError}</p>}
+          <Button variant="secondary" size="sm" onClick={() => navigate('/cases')} className="mt-5">Back to cases</Button>
         </div>
       </PageWrapper>
     );
   }
 
-  const gateReviews = GATE_STATE[caseData.id] ?? 0;
-  const gateCleared = gateReviews >= 2;
-
-  const getDifficultyClass = () => {
-    switch (caseData.difficulty) {
-      case 'High': return 'bg-[#FF4C25]/10 text-[#FF8F72] border border-[#FF4C25]/20';
-      case 'Chaos': return 'bg-rose-500/10 text-rose-300 border border-rose-500/20';
-      default: return 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/20';
-    }
-  };
+  const difficultyClass = caseData.difficulty === 'Chaos'
+    ? 'border border-rose-500/30 bg-rose-500/10 text-rose-300'
+    : caseData.difficulty === 'High'
+      ? 'border border-amber-500/30 bg-amber-500/10 text-amber-300'
+      : 'border border-[var(--border-subtle)] bg-[var(--bg-card-hover)] text-[var(--text-secondary)]';
 
   return (
-    <PageWrapper className='py-8'>
-      <Button variant='ghost' size='sm' onClick={() => navigate('/cases')} className='mb-6 inline-flex gap-2'>
-        <ArrowLeft className='h-4 w-4' /> Back to Cases
+    <PageWrapper className="py-8">
+      <Button variant="ghost" size="sm" onClick={() => navigate('/cases')} className="mb-5 inline-flex gap-2">
+        <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Back to cases
       </Button>
 
-      <div className={`mb-8 rounded-2xl border border-white/8 bg-[#0d0d12] p-6 shadow-[0_18px_40px_rgba(0,0,0,0.12)] ${caseData.is_chaos ? 'border-l-4 border-l-rose-500' : ''}`}>
-        <div className='mb-4 flex flex-wrap items-center gap-3'>
+      <header className="mb-8 border-b border-[var(--border-subtle)] pb-7">
+        <div className="mb-3 flex flex-wrap items-center gap-2">
           <ProblemTypeBadge type={caseData.type} linked />
-          <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${getDifficultyClass()}`}>
-            {caseData.difficulty}
-          </span>
+          <span className={`rounded px-2.5 py-1 text-xs font-medium ${difficultyClass}`}>{caseData.difficulty}</span>
           <StatusPill status={caseData.status} />
-          {caseData.is_chaos && (
-            <span className='inline-flex items-center gap-1 rounded-full border border-rose-500/30 bg-rose-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-rose-300'>
-              <Zap className='h-3 w-3' /> Live Timer
+          {caseData.is_chaos && <span className="text-xs text-[var(--text-secondary)]">Chaos case</span>}
+        </div>
+        <h1 className="max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">{caseData.title}</h1>
+        <p className="mt-2 text-sm text-[var(--text-secondary)]">
+          {caseData.sector}{caseData.companyType ? ` · ${caseData.companyType}` : ''}
+        </p>
+        <p className="mt-5 max-w-3xl whitespace-pre-wrap text-sm leading-6 text-[var(--text-primary)]">{caseData.description}</p>
+
+        {caseData.tags.length > 0 && (
+          <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--text-secondary)]" aria-label="Case tags">
+            {caseData.tags.map((tag) => <li key={tag}>{tag}</li>)}
+          </ul>
+        )}
+
+        <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3 border-t border-[var(--border-subtle)] pt-4 text-sm text-[var(--text-secondary)]">
+          <span className="inline-flex items-center gap-2"><FileText aria-hidden="true" className="h-4 w-4" />{caseData.submissionCount} submissions</span>
+          {caseData.deadline && (
+            <span className="inline-flex items-center gap-2">
+              <Clock aria-hidden="true" className="h-4 w-4" /> Deadline: {new Date(caseData.deadline).toLocaleDateString()}
             </span>
           )}
+          {caseData.pts > 0 && <span className="tabular-nums">{caseData.pts} points</span>}
         </div>
+      </header>
 
-        <h1 className='mb-2 text-3xl font-bold tracking-[-0.04em] text-white md:text-5xl'>{caseData.title}</h1>
-        <p className='mb-5 text-slate-400'>{caseData.sector} · {caseData.companyType}</p>
-        <p className='mb-6 max-w-3xl text-base leading-relaxed text-slate-300 md:text-lg'>
-          {caseData.description}
-        </p>
+      <div className="grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(260px,0.8fr)]">
+        <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
+          <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Expected deliverables</h2>
+          <DeliverablesList deliverables={caseData.deliverables} />
+        </section>
 
-        <div className='mb-6 flex flex-wrap gap-2'>
-          {caseData.tags.map((tag) => (
-            <span key={tag} className='rounded-full border border-white/8 bg-white/[0.02] px-3 py-1.5 text-[10px] font-medium uppercase tracking-[0.12em] text-slate-300'>
-              {tag}
-            </span>
-          ))}
-        </div>
-
-        <div className='mb-6 flex flex-wrap gap-5 text-sm text-slate-400'>
-          <div className='inline-flex items-center gap-2'><FileText className='h-4 w-4' /> {caseData.submissionCount} submissions</div>
-          <div className='inline-flex items-center gap-2'><Users className='h-4 w-4' /> {caseData.reviewCount} reviews</div>
-          <div className='inline-flex items-center gap-2'><Clock className='h-4 w-4 text-amber-300' /> Deadline: {caseData.deadline}</div>
-          <div className='font-mono font-bold text-emerald-300'>{caseData.pts} points</div>
-        </div>
-
-        <GateIndicator reviewsCompleted={gateReviews} />
-      </div>
-
-      <div className='grid gap-8 lg:grid-cols-[1.7fr_0.9fr]'>
-        <div className='space-y-8'>
-          <div className='rounded-2xl border border-white/8 bg-[#0d0d12] p-6 shadow-[0_18px_40px_rgba(0,0,0,0.12)]'>
-            <h2 className='mb-4 text-xl font-bold text-white'>Required deliverables</h2>
-            <DeliverablesList deliverables={caseData.deliverables} />
-          </div>
-
-          <div className='rounded-2xl border border-white/8 bg-[#0d0d12] p-6 shadow-[0_18px_40px_rgba(0,0,0,0.12)]'>
-            <h2 className='mb-2 text-xl font-bold text-white'>Proof-of-review gate</h2>
-            <p className='mb-5 text-sm leading-relaxed text-slate-400'>
-              Complete 2 peer reviews on submissions for this case before you can submit your own solution.
+        <aside className="space-y-5">
+          <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">Solve and compare</h2>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+              Submit your own approach first. Then compare it with other learners’ solutions.
             </p>
-            <GateIndicator reviewsCompleted={gateReviews} />
-            {!gateCleared && (
-              <Button variant='secondary' size='md' onClick={() => navigate(`/cases/${caseData.id}/review`)} className='mt-6 inline-flex gap-2'>
-                <Eye className='h-4 w-4' /> Start Reviewing
-              </Button>
-            )}
-          </div>
-        </div>
-
-        <div className='space-y-6'>
-          <div className='rounded-2xl border border-white/8 bg-[#0d0d12] p-6 shadow-[0_18px_40px_rgba(0,0,0,0.12)]'>
-            <h3 className='mb-4 text-lg font-bold text-white'>Actions</h3>
-            <div className='space-y-3'>
+            <div className="mt-5 space-y-2">
               <Button
-                variant='secondary'
-                size='md'
-                onClick={() => navigate(`/cases/${caseData.id}/review`)}
-                className='w-full justify-center gap-2'
+                variant="primary"
+                size="sm"
+                onClick={() => navigate(`/cases/${caseData.id}/submit`)}
+                className="w-full"
               >
-                <Eye className='h-4 w-4' /> Review a Submission
+                <PenLine aria-hidden="true" className="h-4 w-4" />
+                Submit your solution
               </Button>
-
-              {gateCleared ? (
-                <Button
-                  variant='primary'
-                  size='md'
-                  onClick={() => navigate(`/cases/${caseData.id}/submit`)}
-                  className='w-full justify-center gap-2'
-                >
-                  <PenLine className='h-4 w-4' /> Submit Solution
-                </Button>
-              ) : (
-                <Button
-                  variant='primary'
-                  size='md'
-                  disabled
-                  className='w-full justify-center gap-2 opacity-50 cursor-not-allowed'
-                >
-                  <PenLine className='h-4 w-4' /> Submit Solution
-                </Button>
-              )}
-
-              {!gateCleared && (
-                <p className='text-center text-xs text-slate-500'>Complete {2 - gateReviews} more review(s) to unlock</p>
-              )}
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => navigate(`/cases/${caseData.id}/solutions`)}
+                className="w-full"
+              >
+                <Eye aria-hidden="true" className="h-4 w-4" />
+                Compare solutions
+              </Button>
             </div>
-          </div>
-
-          <div className='rounded-2xl border border-white/8 bg-[#0d0d12] p-6 shadow-[0_18px_40px_rgba(0,0,0,0.12)]'>
-            <h3 className='mb-4 text-lg font-bold text-white'>Case stats</h3>
-            <div className='space-y-4 text-sm'>
-              <div className='flex items-center justify-between'><span className='text-slate-400'>Submissions</span><span className='font-mono font-bold text-white'>{caseData.submissionCount}</span></div>
-              <div className='flex items-center justify-between'><span className='text-slate-400'>Reviews</span><span className='font-mono font-bold text-white'>{caseData.reviewCount}</span></div>
-              <div className='flex items-center justify-between'><span className='text-slate-400'>Avg Score</span><span className='font-mono font-bold text-emerald-300'>421 pts</span></div>
-              <div className='flex items-center justify-between'><span className='text-slate-400'>Points</span><span className='font-mono font-bold text-emerald-300'>{caseData.pts}</span></div>
-            </div>
-          </div>
-        </div>
+          </section>
+        </aside>
       </div>
     </PageWrapper>
   );

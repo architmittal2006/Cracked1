@@ -30,13 +30,13 @@ const tracks = [
   {
     title: 'Curated Cases',
     slug: '/cases',
-    desc: 'Rigorous corporate briefs. Complete 2 peer reviews to unlock submissions, get scored across 5 rubric dimensions, and earn merge bonuses.',
+    desc: 'Work through structured business briefs, submit your approach, and compare it with other learners’ solutions.',
     icon: Zap,
     color: '#F59E0B',
     bgBadge: 'rgba(245, 158, 11, 0.15)',
     borderBadge: 'rgba(245, 158, 11, 0.3)',
-    weight: '1.0× full weight',
-    gate: '2-review gate',
+    weight: 'Solve at your pace',
+    gate: 'Compare after submitting',
     cta: 'Solve Cases',
   },
 ];

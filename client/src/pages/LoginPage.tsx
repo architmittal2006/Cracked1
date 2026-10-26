@@ -29,7 +29,7 @@ const roleContent = {
     cta: 'Enter the Arena',
     bullets: [
       { icon: GitPullRequest, text: 'Submit typed case solutions across 7 problem types' },
-      { icon: BadgeCheck, text: 'Complete 2 peer reviews to unlock each submission gate' },
+      { icon: BadgeCheck, text: 'Compare your solution with other learners’ approaches' },
       { icon: ShieldCheck, text: 'Grow a live credibility score from Analyst to Partner' },
     ],
   },

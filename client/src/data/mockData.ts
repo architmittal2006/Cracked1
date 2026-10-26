@@ -21,7 +21,7 @@ export type CredibilityTier =
 
 export type ReviewerTier = 'General' | 'Verified' | 'Arbiter';
 export type UserStatus = 'Active' | 'Dormant';
-export type SubmissionStatus = 'Draft' | 'Pending_Review' | 'In_Dispute' | 'Completed' | 'Merged';
+export type SubmissionStatus = 'Draft' | 'Submitted' | 'Pending_Review' | 'In_Dispute' | 'Completed' | 'Merged';
 export type CaseDifficulty = 'Standard' | 'High' | 'Chaos';
 export type CaseStatus = 'Open' | 'In_Review' | 'Completed' | 'Accepted' | 'Archived';
 export type TrackType = 'open_arena' | 'community_question' | 'curated_case';

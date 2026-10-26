@@ -15,6 +15,9 @@ interface CaseFilterBarProps {
   sectors: string[];
 }
 
+const selectClassName =
+  'input-field h-10 min-w-0 px-3 text-sm sm:w-auto sm:min-w-[150px]';
+
 export const CaseFilterBar: React.FC<CaseFilterBarProps> = ({
   search,
   onSearchChange,
@@ -26,77 +29,44 @@ export const CaseFilterBar: React.FC<CaseFilterBarProps> = ({
   onSectorChange,
   sectors,
 }) => (
-  <div className="space-y-4 mb-8">
-    <div className="relative">
-      <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
+  <div className="mb-6 grid gap-3 md:grid-cols-[minmax(220px,1fr)_repeat(3,minmax(140px,190px))]">
+    <label className="relative block min-w-0">
+      <span className="sr-only">Search cases</span>
+      <Search aria-hidden="true" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
       <input
-        type="text"
-        placeholder="Search cases by title, sector, or tags..."
-        className="input-field pl-10"
+        type="search"
+        placeholder="Search cases"
+        className="input-field h-10 pl-10"
         value={search}
-        onChange={(e) => onSearchChange(e.target.value)}
+        onChange={(event) => onSearchChange(event.target.value)}
       />
-    </div>
+    </label>
 
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-slate-500 uppercase font-bold mr-1">Type</span>
-      <button
-        type="button"
-        onClick={() => onTypeChange('All')}
-        className={`px-3 py-1.5 text-xs rounded-md border transition-all duration-200 ${
-          typeFilter === 'All'
-            ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
-            : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
-        }`}
-      >
-        All Types
-      </button>
-      {PROBLEM_TYPES.map(type => (
-        <button
-          key={type}
-          type="button"
-          onClick={() => onTypeChange(type)}
-          className={`px-3 py-1.5 text-xs rounded-md border transition-all duration-200 ${
-            typeFilter === type
-              ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
-              : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
-          }`}
-        >
-          {type}
-        </button>
-      ))}
-    </div>
+    <label className="min-w-0">
+      <span className="sr-only">Filter by problem type</span>
+      <select className={selectClassName} value={typeFilter} onChange={(event) => onTypeChange(event.target.value as ProblemType | 'All')}>
+        <option value="All">All problem types</option>
+        {PROBLEM_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}
+      </select>
+    </label>
 
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="text-xs text-slate-500 uppercase font-bold mr-1">Difficulty</span>
-      {['All', 'Standard', 'High', 'Chaos'].map(diff => (
-        <button
-          key={diff}
-          type="button"
-          onClick={() => onDifficultyChange(diff)}
-          className={`px-3 py-1.5 text-xs rounded-md border transition-all duration-200 ${
-            difficultyFilter === diff
-              ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
-              : 'bg-slate-900/50 border-slate-800 text-slate-400 hover:border-slate-700 hover:text-slate-300'
-          }`}
-        >
-          {diff === 'All' ? 'All' : diff}
-        </button>
-      ))}
-
-      <div className="w-px h-6 bg-slate-800 mx-2 self-center hidden sm:block" />
-
-      <span className="text-xs text-slate-500 uppercase font-bold mr-1">Sector</span>
-      <select
-        className="input-field w-auto py-1.5 text-xs min-w-[140px]"
-        value={sectorFilter}
-        onChange={(e) => onSectorChange(e.target.value)}
-      >
-        <option value="All">All Sectors</option>
-        {sectors.map(sector => (
-          <option key={sector} value={sector}>{sector}</option>
+    <label className="min-w-0">
+      <span className="sr-only">Filter by difficulty</span>
+      <select className={selectClassName} value={difficultyFilter} onChange={(event) => onDifficultyChange(event.target.value)}>
+        {['All', 'Standard', 'High', 'Chaos'].map((difficulty) => (
+          <option key={difficulty} value={difficulty}>
+            {difficulty === 'All' ? 'All difficulties' : difficulty}
+          </option>
         ))}
       </select>
-    </div>
+    </label>
+
+    <label className="min-w-0">
+      <span className="sr-only">Filter by sector</span>
+      <select className={selectClassName} value={sectorFilter} onChange={(event) => onSectorChange(event.target.value)}>
+        <option value="All">All sectors</option>
+        {sectors.map((sector) => <option key={sector} value={sector}>{sector}</option>)}
+      </select>
+    </label>
   </div>
 );

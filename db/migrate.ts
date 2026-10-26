@@ -88,7 +88,7 @@ async function main() {
       content_json JSONB NOT NULL,
       citations_count INTEGER NOT NULL DEFAULT 0,
       word_count INTEGER NOT NULL DEFAULT 0,
-      status VARCHAR(50) NOT NULL DEFAULT 'Pending_Review',
+      status VARCHAR(50) NOT NULL DEFAULT 'Submitted',
       structural_compliant BOOLEAN DEFAULT FALSE,
       final_weighted_score INTEGER,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()

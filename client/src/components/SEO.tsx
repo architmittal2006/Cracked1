@@ -12,8 +12,8 @@ const BASE_URL = 'https://cracked1-afy4.onrender.com';
 const DEFAULT_IMAGE = `${BASE_URL}/og.png`;
 
 export const SEO: React.FC<SEOProps> = ({
-  title = 'Cracked? — Peer-Reviewed Case Competitions & Consulting Credibility',
-  description = 'Peer-reviewed case competitions for consulting credibility. Solve real business problems, get reviewed by peers, earn credibility tiers, and share your certificate with recruiters.',
+  title = 'Cracked? — Structured Case Practice',
+  description = 'Practice structured business cases, submit your solution, and compare your approach with other learners.',
   ogImage = DEFAULT_IMAGE,
   ogUrl = BASE_URL,
   noindex = false,

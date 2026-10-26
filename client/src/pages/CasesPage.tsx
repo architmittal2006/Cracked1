@@ -1,93 +1,142 @@
-import React, { useMemo, useState } from 'react';
-import { MOCK_CASES } from '../data/mockData';
-import type { ProblemType } from '../data/mockData';
+import React, { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
+import type { Case, ProblemType } from '../data/mockData';
 import { CaseCard } from '../components/CaseCard';
 import { CaseFilterBar } from '../components/CaseFilterBar';
 import { ChaosBanner } from '../components/ChaosBanner';
 import { PageWrapper } from '../components/PageWrapper';
 import { SEO } from '../components/SEO';
 import { Button } from '../components/Button';
+import { getCases } from '../services/api';
 
 export const CasesPage: React.FC = () => {
+  const [cases, setCases] = useState<Case[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<ProblemType | 'All'>('All');
   const [difficultyFilter, setDifficultyFilter] = useState('All');
   const [sectorFilter, setSectorFilter] = useState('All');
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const sectors = useMemo(() => [...new Set(MOCK_CASES.map(c => c.sector))].sort(), []);
+  useEffect(() => {
+    let isCurrent = true;
+    getCases()
+      .then((loadedCases) => {
+        if (isCurrent) setCases(loadedCases);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) setLoadError(error instanceof Error ? error.message : 'Could not load cases');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoading(false);
+      });
 
-  const filteredCases = MOCK_CASES.filter(c => {
-    const searchLower = search.toLowerCase();
-    const searchMatch = !search || c.title.toLowerCase().includes(searchLower) ||
-      c.sector.toLowerCase().includes(searchLower) ||
-      c.tags.some(t => t.toLowerCase().includes(searchLower));
-    const typeMatch = typeFilter === 'All' || c.type === typeFilter;
-    const diffMatch = difficultyFilter === 'All' || c.difficulty === difficultyFilter;
-    const sectorMatch = sectorFilter === 'All' || c.sector === sectorFilter;
-    return searchMatch && typeMatch && diffMatch && sectorMatch;
+    return () => { isCurrent = false; };
+  }, []);
+
+  const sectors = useMemo(() => [...new Set(cases.map((caseData) => caseData.sector))].sort(), [cases]);
+  const filteredCases = cases.filter((caseData) => {
+    const searchLower = search.trim().toLowerCase();
+    const searchMatch = !searchLower ||
+      caseData.title.toLowerCase().includes(searchLower) ||
+      caseData.sector.toLowerCase().includes(searchLower) ||
+      caseData.tags.some((tag) => tag.toLowerCase().includes(searchLower));
+    return searchMatch &&
+      (typeFilter === 'All' || caseData.type === typeFilter) &&
+      (difficultyFilter === 'All' || caseData.difficulty === difficultyFilter) &&
+      (sectorFilter === 'All' || caseData.sector === sectorFilter);
   });
 
-  const featuredCase = filteredCases.find(c => c.isFeatured);
+  const clearFilters = () => {
+    setSearch('');
+    setTypeFilter('All');
+    setDifficultyFilter('All');
+    setSectorFilter('All');
+  };
 
   return (
     <>
       <SEO
         title="Case Library"
-        description="Browse consulting cases graded by peer review on five dimensions. Filter by industry, type, difficulty, or track. Complete 2 peer reviews to unlock submissions."
+        description="Explore community-submitted case studies. Every proposal is reviewed before it appears in the library."
         ogUrl="/cases"
       />
       <PageWrapper>
-        <div className="page-header">
-          <h1 className="text-3xl md:text-4xl font-semibold text-white mb-2">Case Library</h1>
-          <p className="section-subtitle">
-            {filteredCases.length} case{filteredCases.length !== 1 ? 's' : ''} available • Filter by type, difficulty, or sector
-          </p>
+        <header className="mb-8 flex flex-col gap-5 border-b border-[var(--border-subtle)] pb-7 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Case library</h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
+              Work through structured case studies. Community proposals are reviewed before publication.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" as="a" href="/contribute/cases/mine">My proposals</Button>
+            <Button variant="primary" size="sm" as="a" href="/contribute/cases">Propose a case</Button>
+          </div>
+        </header>
+
+        <ChaosBanner cases={cases} />
+
+        <CaseFilterBar
+          search={search}
+          onSearchChange={setSearch}
+          typeFilter={typeFilter}
+          onTypeChange={setTypeFilter}
+          difficultyFilter={difficultyFilter}
+          onDifficultyChange={setDifficultyFilter}
+          sectorFilter={sectorFilter}
+          onSectorChange={setSectorFilter}
+          sectors={sectors}
+        />
+
+        <div className="mb-2 flex items-center justify-between text-sm text-[var(--text-secondary)]" aria-live="polite">
+          <p>{filteredCases.length} {filteredCases.length === 1 ? 'case' : 'cases'}</p>
+          {(search || typeFilter !== 'All' || difficultyFilter !== 'All' || sectorFilter !== 'All') && (
+            <button type="button" onClick={clearFilters} className="rounded-sm text-[var(--text-primary)] underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]">
+              Clear filters
+            </button>
+          )}
         </div>
 
-      <ChaosBanner cases={MOCK_CASES} />
-
-      <CaseFilterBar
-        search={search}
-        onSearchChange={setSearch}
-        typeFilter={typeFilter}
-        onTypeChange={setTypeFilter}
-        difficultyFilter={difficultyFilter}
-        onDifficultyChange={setDifficultyFilter}
-        sectorFilter={sectorFilter}
-        onSectorChange={setSectorFilter}
-        sectors={sectors}
-      />
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 stagger-children">
-        {featuredCase && typeFilter === 'All' && difficultyFilter === 'All' && sectorFilter === 'All' && !search && (
-          <CaseCard key={`featured-${featuredCase.id}`} caseData={featuredCase} />
-        )}
-
-        {filteredCases
-          .filter(c => !c.isFeatured || typeFilter !== 'All' || difficultyFilter !== 'All' || sectorFilter !== 'All' || search)
-          .map(caseData => (
-            <CaseCard key={caseData.id} caseData={caseData} />
-          ))}
-
-        {filteredCases.length === 0 && (
-          <div className="col-span-full py-20 text-center">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/5 mb-4">
-              <span className="text-3xl">🔍</span>
+        {loadError ? (
+          <div className="border-y border-[var(--border-subtle)] py-8" role="alert">
+            <p className="font-medium text-[var(--text-primary)]">Cases could not be loaded.</p>
+            <p className="mt-1 text-sm text-[var(--text-secondary)]">{loadError}</p>
+            <button type="button" className="mt-3 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4" onClick={() => window.location.reload()}>
+              Try again
+            </button>
+          </div>
+        ) : isLoading ? (
+          <div className="border-y border-[var(--border-subtle)] py-8 text-sm text-[var(--text-secondary)]" aria-live="polite">
+            Loading cases…
+          </div>
+        ) : filteredCases.length > 0 ? (
+          <div>
+            {filteredCases.map((caseData) => <CaseCard key={caseData.id} caseData={caseData} />)}
+          </div>
+        ) : (
+          <div className="border-y border-[var(--border-subtle)] py-9">
+            <h2 className="text-base font-semibold text-[var(--text-primary)]">
+              {cases.length ? 'No cases match those filters' : 'No published cases yet'}
+            </h2>
+            <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
+              {cases.length
+                ? 'Try a different search or clear your filters.'
+                : 'Help build the library by proposing an original, well-structured case. A moderator reviews every proposal before it is published.'}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              {cases.length ? (
+                <Button variant="secondary" size="sm" onClick={clearFilters}>Clear filters</Button>
+              ) : (
+                <Button variant="primary" size="sm" as="a" href="/contribute/cases">Propose the first case</Button>
+              )}
+              <Link className="inline-flex h-9 items-center px-3 text-sm text-[var(--text-secondary)] underline underline-offset-4" to="/how-it-works">
+                How case review works
+              </Link>
             </div>
-            <h3 className="text-xl font-bold text-white mb-2">No cases found</h3>
-            <p className="text-slate-400 mb-6">Try adjusting your filters or search terms</p>
-              <Button variant="primary" size="sm" onClick={() => {
-                setSearch('');
-                setTypeFilter('All');
-                setDifficultyFilter('All');
-                setSectorFilter('All');
-              }}>
-                Clear all filters
-              </Button>
           </div>
         )}
-      </div>
-    </PageWrapper>
+      </PageWrapper>
     </>
   );
 };

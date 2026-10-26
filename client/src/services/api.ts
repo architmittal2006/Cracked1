@@ -3,6 +3,8 @@
 // Connects frontend to backend
 // ═══════════════════════════════════════════════════
 
+import type { Case as CaseRecord } from '../data/mockData';
+
 const API_BASE = import.meta.env.VITE_API_URL || window.location.origin;
 
 export interface ApiError {
@@ -107,34 +109,92 @@ export async function getArenaSolutions(_caseId: string): Promise<ArenaSubmissio
 
 // ─── Cases ───
 
-export interface Case {
-  id: string;
-  title: string;
-  type: string;
-  sector: string;
-  difficulty: string;
-  status: string;
-  description: string;
-  deliverables: string[];
-  pts: number;
-  submissionCount: number;
-  reviewCount: number;
-  deadline: string;
-  tags: string[];
-  is_chaos?: boolean;
-  timer_deadline?: string;
-}
+export type Case = CaseRecord;
 
 export async function getCases(): Promise<Case[]> {
-  // For now, return mock data since backend doesn't have this endpoint yet
-  // This will be replaced when backend implements case listing
-  const { MOCK_CASES } = await import('../data/mockData');
-  return MOCK_CASES;
+  return request<Case[]>('/api/cases');
 }
 
 export async function getCaseById(id: string): Promise<Case | null> {
   const cases = await getCases();
-  return cases.find(c => c.id === id) || null;
+  return cases.find((caseData) => caseData.id === id) ?? null;
+}
+
+export type CaseProposalStatus = 'Pending' | 'Changes_Requested' | 'Approved' | 'Declined';
+
+export interface CaseProposalInput {
+  title: string;
+  type: string;
+  sector: string;
+  difficulty: string;
+  sourceKind: 'original' | 'interview_recollection' | 'public_source';
+  sourceReference: string;
+  context: string;
+  prompt: string;
+  exhibits: string;
+  deliverables: string[];
+  reviewerGuide: string;
+  solutionOutline: string;
+  originalityConfirmed: boolean;
+  confidentialityConfirmed: boolean;
+}
+
+export type CaseProposal = Omit<CaseProposalInput, 'originalityConfirmed' | 'confidentialityConfirmed' | 'sourceReference' | 'exhibits'> & {
+  id: string;
+  contributorId: string;
+  sourceReference: string | null;
+  exhibits: string | null;
+  status: CaseProposalStatus;
+  moderatorNotes: string | null;
+  publishedCaseId: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  contributorName?: string;
+};
+
+export async function submitCaseProposal(input: CaseProposalInput): Promise<CaseProposal> {
+  const result = await request<{ success: true; proposal: CaseProposal }>('/api/case-proposals', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+  return result.proposal;
+}
+
+export async function getMyCaseProposals(): Promise<CaseProposal[]> {
+  const result = await request<{ success: true; proposals: CaseProposal[] }>('/api/case-proposals/mine');
+  return result.proposals;
+}
+
+export async function getCaseProposal(id: string): Promise<CaseProposal> {
+  const result = await request<{ success: true; proposal: CaseProposal }>(
+    `/api/case-proposals/${encodeURIComponent(id)}`
+  );
+  return result.proposal;
+}
+
+export async function updateCaseProposal(id: string, input: CaseProposalInput): Promise<CaseProposal> {
+  const result = await request<{ success: true; proposal: CaseProposal }>(
+    `/api/case-proposals/${encodeURIComponent(id)}`,
+    { method: 'PUT', body: JSON.stringify(input) }
+  );
+  return result.proposal;
+}
+
+export async function getCaseProposalQueue(): Promise<CaseProposal[]> {
+  const result = await request<{ success: true; proposals: CaseProposal[] }>('/api/moderation/case-proposals');
+  return result.proposals;
+}
+
+export async function reviewCaseProposal(
+  id: string,
+  action: 'approve' | 'request_changes' | 'decline',
+  notes: string
+): Promise<CaseProposal> {
+  const result = await request<{ success: true; proposal: CaseProposal }>(
+    `/api/moderation/case-proposals/${encodeURIComponent(id)}`,
+    { method: 'PATCH', body: JSON.stringify({ action, notes }) }
+  );
+  return result.proposal;
 }
 
 // ─── Submissions ───
@@ -150,6 +210,19 @@ export interface SubmissionResponse {
   success: true;
   submissionId: string;
   status: string;
+}
+
+export interface CaseSolution {
+  id: string;
+  content: Record<string, string>;
+  createdAt: string;
+}
+
+export async function getCaseSolutions(caseId: string): Promise<CaseSolution[]> {
+  const result = await request<{ success: true; solutions: CaseSolution[] }>(
+    `/api/cases/${encodeURIComponent(caseId)}/solutions`
+  );
+  return result.solutions;
 }
 
 export async function createSubmission(
@@ -193,11 +266,13 @@ export interface ReviewResponse {
 
 export async function createReview(
   submissionId: string,
-  scores: ReviewRequest
+  scores: ReviewRequest,
+  caseId: string,
+  feedback: string
 ): Promise<ReviewResponse> {
   return request<ReviewResponse>(`/api/submissions/${submissionId}/reviews`, {
     method: 'POST',
-    body: JSON.stringify(scores),
+    body: JSON.stringify({ ...scores, caseId, feedback }),
   });
 }
 
@@ -214,13 +289,7 @@ export interface GateStatus {
 }
 
 export async function getGateStatus(caseId: string): Promise<GateStatus> {
-  // Backend doesn't have this endpoint yet, use mock data
-  const { GATE_STATE } = await import('../data/mockData');
-  const reviewsCompleted = GATE_STATE[caseId] || 0;
-  return {
-    reviews_completed: reviewsCompleted,
-    can_submit: reviewsCompleted >= 2,
-  };
+  return request<GateStatus>(`/api/cases/${encodeURIComponent(caseId)}/gate-status`);
 }
 
 // ─── Review Queue ───
@@ -228,15 +297,20 @@ export async function getGateStatus(caseId: string): Promise<GateStatus> {
 export interface ReviewQueueResponse {
   submissionId: string;
   caseId: string;
+  content: Record<string, string>;
 }
 
-export async function getNextReviewSubmission(caseId: string): Promise<ReviewQueueResponse> {
-  // Backend doesn't have this endpoint yet, return mock data
-  // In production, this would call GET /api/review-queue/:caseId
-  return {
-    submissionId: 'sub001',
-    caseId,
-  };
+export async function getNextReviewSubmission(caseId: string): Promise<ReviewQueueResponse | null> {
+  try {
+    return await request<ReviewQueueResponse>(
+      `/api/cases/${encodeURIComponent(caseId)}/review-queue`
+    );
+  } catch (error) {
+    if (error instanceof Error && error.message === 'No unreviewed submission is available for this case') {
+      return null;
+    }
+    throw error;
+  }
 }
 
 // ─── User & Profile ───

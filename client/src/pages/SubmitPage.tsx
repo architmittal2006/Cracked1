@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Lock, Save, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react';
-import { MOCK_CASES, SUBMISSION_TEMPLATES } from '../data/mockData';
-import { GateIndicator } from '../components/GateIndicator';
+import { Save, CheckCircle, AlertCircle, Clock, FileText } from 'lucide-react';
+import { SUBMISSION_TEMPLATES } from '../data/mockData';
+import type { Case } from '../data/mockData';
 import { PageWrapper } from '../components/PageWrapper';
 import { Button } from '../components/Button';
-import { createSubmission, getGateStatus } from '../services/api';
+import { createSubmission, getCaseById } from '../services/api';
 
 function countWords(text: string): number {
   return text.trim().split(/\s+/).filter(w => w.length > 0).length;
@@ -14,13 +14,9 @@ function countWords(text: string): number {
 export const SubmitPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const caseData = MOCK_CASES.find(c => c.id === id);
-
-  // Mock authentication check - in production, use actual auth state
-  const isAuthenticated = true;
-
-  const [gateReviews, setGateReviews] = useState(0);
-  const gateCleared = gateReviews >= 2;
+  const [caseData, setCaseData] = useState<Case | null>(null);
+  const [isLoadingCase, setIsLoadingCase] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const sections = useMemo(() => (caseData ? SUBMISSION_TEMPLATES[caseData.type] : []), [caseData]);
   const [content, setContent] = useState<Record<string, string>>({});
@@ -30,23 +26,26 @@ export const SubmitPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
+    if (!id) return;
+    let isCurrent = true;
+    getCaseById(id)
+      .then((loadedCase) => {
+        if (isCurrent) setCaseData(loadedCase);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) setLoadError(error instanceof Error ? error.message : 'Could not load this case');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoadingCase(false);
+      });
+    return () => { isCurrent = false; };
+  }, [id]);
 
   useEffect(() => {
     if (!caseData) return;
     const initial: Record<string, string> = {};
     SUBMISSION_TEMPLATES[caseData.type].forEach(s => { initial[s.key] = ''; });
     setContent(initial);
-
-    // Fetch gate status from API
-    getGateStatus(caseData.id).then(status => {
-      setGateReviews(status.reviews_completed);
-    }).catch(() => {
-      // Keep default gateReviews = 0 on error
-    });
   }, [caseData]);
 
   useEffect(() => {
@@ -70,7 +69,7 @@ export const SubmitPage: React.FC = () => {
   const allSectionsValid = sectionStatus.every(s => s.valid);
   const completedSections = sectionStatus.filter(s => s.valid).length;
   const totalSections = sections.length;
-  const overallProgress = (completedSections / totalSections) * 100;
+  const overallProgress = totalSections ? (completedSections / totalSections) * 100 : 0;
   const minutesSinceSave = lastSaved ? Math.floor((Date.now() - lastSaved.getTime()) / 60000) : null;
 
   const handleSubmit = async () => {
@@ -81,7 +80,7 @@ export const SubmitPage: React.FC = () => {
 
     try {
       const totalWords = Object.values(content).reduce((sum, text) => sum + countWords(text), 0);
-      const citationsCount = 1; // Temporary fix - will be replaced with actual citations input
+      const citationsCount = 0;
 
       await createSubmission(caseData.id, content, citationsCount, totalWords);
       setSubmitted(true);
@@ -92,8 +91,12 @@ export const SubmitPage: React.FC = () => {
     }
   };
 
-  if (!isAuthenticated) {
-    return null;
+  if (isLoadingCase) {
+    return <PageWrapper><p className="py-10 text-sm text-slate-400" aria-live="polite">Loading case…</p></PageWrapper>;
+  }
+
+  if (loadError) {
+    return <PageWrapper><p className="py-10 text-sm text-rose-400" role="alert">Case could not be loaded: {loadError}</p></PageWrapper>;
   }
 
   if (!caseData) {
@@ -102,25 +105,6 @@ export const SubmitPage: React.FC = () => {
         <div className="text-center py-20">
           <h2 className="text-2xl font-bold mb-4">Case Not Found</h2>
           <Button variant="primary" size="md" onClick={() => navigate('/cases')}>Back to Cases</Button>
-        </div>
-      </PageWrapper>
-    );
-  }
-
-  if (!gateCleared) {
-    return (
-      <PageWrapper>
-        <div className="glass-card p-8 text-center max-w-lg mx-auto animate-scale-in">
-          <div className="w-20 h-20 rounded-full bg-rose-500/10 border-2 border-rose-500/30 flex items-center justify-center mx-auto mb-4">
-            <Lock className="w-10 h-10 text-rose-400" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2 text-white">Gate Locked</h2>
-          <p className="text-slate-400 mb-6">Complete 2 peer reviews for this case before submitting.</p>
-          <GateIndicator reviewsCompleted={gateReviews} />
-          <div className="flex gap-3 justify-center mt-6">
-            <Button variant="secondary" size="md" onClick={() => navigate(`/cases/${caseData.id}/review`)}>Review Submissions</Button>
-            <Button variant="ghost" size="md" onClick={() => navigate(`/cases/${caseData.id}`)}>Back to Case</Button>
-          </div>
         </div>
       </PageWrapper>
     );
@@ -142,8 +126,8 @@ export const SubmitPage: React.FC = () => {
             <CheckCircle className="w-10 h-10 text-emerald-400" />
           </div>
           <h3 className="text-2xl font-bold text-white mb-2">Submission Received</h3>
-          <p className="text-slate-400 mb-6">Structural validation passed. Your solution enters the review queue.</p>
-          <Button variant="primary" size="md" onClick={() => navigate('/dashboard')}>Go to Dashboard</Button>
+          <p className="text-slate-400 mb-6">Your solution is submitted. Compare it with other approaches whenever you’re ready.</p>
+          <Button variant="primary" size="md" onClick={() => navigate(`/cases/${caseData.id}/solutions`)}>Compare solutions</Button>
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -285,7 +269,7 @@ export const SubmitPage: React.FC = () => {
                     Submitting...
                   </span>
                 ) : (
-                  'Submit for Review'
+                  'Submit solution'
                 )}
               </Button>
               {error && (

@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { SmoothScroll } from './components/SmoothScroll';
@@ -7,6 +7,7 @@ import { Navbar } from './components/Navbar';
 import { Footer } from './components/Footer';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { AuthProvider } from './contexts/AuthContext';
+import { ThemeProvider } from './contexts/ThemeProvider';
 import { GitHubOAuthCallback } from './components/GitHubOAuth';
 import { GoogleOAuthCallback } from './components/GoogleOAuth';
 import { LandingPage } from './pages/LandingPage';
@@ -21,7 +22,7 @@ import { CasesPage } from './pages/CasesPage';
 import { CasesByTypePage } from './pages/CasesByTypePage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
 import { SubmitPage } from './pages/SubmitPage';
-import { ReviewPage } from './pages/ReviewPage';
+import { CaseSolutionsPage } from './pages/CaseSolutionsPage';
 import { ReviewDetailPage } from './pages/ReviewDetailPage';
 import { FollowUpPage } from './pages/FollowUpPage';
 import { DashboardPage } from './pages/DashboardPage';
@@ -36,6 +37,9 @@ import { RegisterPage } from './pages/RegisterPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { CompanyDashboardPage } from './pages/CompanyDashboardPage';
 import { CompanyPostCasePage } from './pages/CompanyPostCasePage';
+import { CaseProposalPage } from './pages/CaseProposalPage';
+import { MyCaseProposalsPage } from './pages/MyCaseProposalsPage';
+import { CaseModerationPage } from './pages/CaseModerationPage';
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
@@ -45,13 +49,14 @@ const ScrollToTop = () => {
 
 const App: React.FC = () => {
   return (
-    <ErrorBoundary>
-      <HelmetProvider>
-        <AuthProvider>
-          <Router>
-            <ScrollToTop />
-            <SmoothScroll>
-            <div className="min-h-screen text-slate-100 flex flex-col font-sans selection:bg-[#2D87FF]/30">
+    <ThemeProvider>
+      <ErrorBoundary>
+        <HelmetProvider>
+          <AuthProvider>
+            <Router>
+              <ScrollToTop />
+              <SmoothScroll>
+              <div className="min-h-screen flex flex-col font-sans">
               <Navbar />
               <main className="flex-grow pt-16 relative z-10" aria-label="Main content">
                 <Routes>
@@ -65,9 +70,34 @@ const App: React.FC = () => {
                   <Route path="/questions/:id/answer" element={<QuestionsAnswerPage />} />
                   <Route path="/cases" element={<CasesPage />} />
                   <Route path="/cases/type/:type" element={<CasesByTypePage />} />
+                  <Route path="/contribute/cases" element={
+                    <ProtectedRoute>
+                      <CaseProposalPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/contribute/cases/mine" element={
+                    <ProtectedRoute>
+                      <MyCaseProposalsPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/contribute/cases/:proposalId/edit" element={
+                    <ProtectedRoute>
+                      <CaseProposalPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/moderation/cases" element={
+                    <ProtectedRoute>
+                      <CaseModerationPage />
+                    </ProtectedRoute>
+                  } />
                   <Route path="/cases/:id/submit" element={
                     <ProtectedRoute>
                       <SubmitPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/cases/:id/solutions" element={
+                    <ProtectedRoute>
+                      <CaseSolutionsPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/cases/:id/followup" element={
@@ -76,9 +106,7 @@ const App: React.FC = () => {
                     </ProtectedRoute>
                   } />
                   <Route path="/cases/:id/review" element={
-                    <ProtectedRoute>
-                      <ReviewPage />
-                    </ProtectedRoute>
+                    <Navigate to="/cases" replace />
                   } />
                   <Route path="/cases/:id" element={
                     <ProtectedRoute>
@@ -126,12 +154,13 @@ const App: React.FC = () => {
               <div className="relative z-10">
                 <Footer />
               </div>
-            </div>
-            </SmoothScroll>
-          </Router>
-        </AuthProvider>
-      </HelmetProvider>
-    </ErrorBoundary>
+              </div>
+              </SmoothScroll>
+            </Router>
+          </AuthProvider>
+        </HelmetProvider>
+      </ErrorBoundary>
+    </ThemeProvider>
   );
 };
 

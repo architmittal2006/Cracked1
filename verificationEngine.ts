@@ -11,23 +11,33 @@ interface ReviewRecord {
 
 class VerificationEngine {
   public static async validateLayer1Gate(submission: {
-    contentJson: Record<string, any>;
-    citationsCount: number;
-    wordCount: number;
-    requiredFields: string[];
-  }): Promise<{ compliant: boolean; error?: string }> {
-    for (const field of submission.requiredFields) {
-      if (!submission.contentJson[field] || submission.contentJson[field].toString().trim() === '') {
-        return { compliant: false, error: `Layer 1 Failure: Template missing target segment "${field}"` };
+    contentJson: unknown;
+  }): Promise<
+    | { compliant: true; contentJson: Record<string, string>; wordCount: number }
+    | { compliant: false; error: string }
+  > {
+    if (!submission.contentJson || typeof submission.contentJson !== 'object' || Array.isArray(submission.contentJson)) {
+      return { compliant: false, error: 'Solution must contain structured text sections.' };
+    }
+
+    const contentJson: Record<string, string> = Object.fromEntries([]);
+    let wordCount = 0;
+    for (const [field, value] of Object.entries(submission.contentJson)) {
+      if (!field.trim() || typeof value !== 'string' || !value.trim()) {
+        return { compliant: false, error: 'Every solution section must contain text.' };
       }
+      contentJson[field] = value;
+      wordCount += value.trim().split(/\s+/).filter(Boolean).length;
     }
-    if (submission.citationsCount < 1) {
-      return { compliant: false, error: "Layer 1 Failure: Minimum of 1 structured data source citation required." };
+
+    if (wordCount === 0) {
+      return { compliant: false, error: 'Write your solution before submitting.' };
     }
-    if (submission.wordCount < 500 || submission.wordCount > 4000) {
-      return { compliant: false, error: `Layer 1 Failure: Payload word volume [${submission.wordCount}] out of allowable parameters.` };
+    if (wordCount > 4000) {
+      return { compliant: false, error: 'Solution must be 4,000 words or fewer.' };
     }
-    return { compliant: true };
+
+    return { compliant: true, contentJson, wordCount };
   }
 
   public static calculateIndividualWeightedScore(rubric: ReviewRubric): number {

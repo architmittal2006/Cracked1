@@ -32,7 +32,7 @@ export const PrivacyPolicyPage: React.FC = () => {
             <li>Provide and improve our case competition platform</li>
             <li>Process and display your submissions and reviews</li>
             <li>Calculate and display your credibility scores and tiers</li>
-            <li>Enable peer review and quality control processes</li>
+            <li>Let learners compare submitted solutions and improve case practice</li>
             <li>Communicate with you about platform updates and relevant opportunities</li>
           </ul>
         </div>
@@ -43,7 +43,7 @@ export const PrivacyPolicyPage: React.FC = () => {
             We do not sell your personal information. We may share your information in the following circumstances:
           </p>
           <ul className="text-slate-300 leading-relaxed list-disc list-inside space-y-2">
-            <li>With other users for peer review purposes (submission content and reviewer scores are visible within the platform)</li>
+            <li>With other users who have submitted a solution to the same case, or who contributed that published case (anonymized solution content is visible within the platform)</li>
             <li>With companies when you opt to share your profile or certificate (only information you choose to make public)</li>
             <li>With service providers who perform services on our behalf (e.g., hosting, authentication providers)</li>
             <li>When required by law or to protect our rights and safety</li>

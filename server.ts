@@ -10,7 +10,13 @@ import pgStoreFactory from 'connect-pg-simple';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { Pool } from 'pg';
-import { DatabaseService, hashPassword, comparePassword } from './dbService.js';
+import {
+  DatabaseService,
+  hashPassword,
+  comparePassword,
+  InvalidCaseReviewError,
+  type CaseProposalInput,
+} from './dbService.js';
 import { VerificationEngine } from './verificationEngine.js';
 
 // Load environment variables
@@ -101,6 +107,33 @@ async function ensureTables() {
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 
+    CREATE TABLE IF NOT EXISTS case_proposals (
+      id VARCHAR(255) PRIMARY KEY,
+      contributor_id VARCHAR(255) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      type VARCHAR(100) NOT NULL,
+      sector VARCHAR(100) NOT NULL,
+      difficulty VARCHAR(50) NOT NULL,
+      source_kind VARCHAR(50) NOT NULL,
+      source_reference TEXT,
+      context TEXT NOT NULL,
+      prompt TEXT NOT NULL,
+      exhibits TEXT,
+      deliverables TEXT[] NOT NULL DEFAULT '{}',
+      reviewer_guide TEXT NOT NULL,
+      solution_outline TEXT NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+      moderator_notes TEXT,
+      reviewed_by VARCHAR(255),
+      published_case_id VARCHAR(255) REFERENCES cases(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      reviewed_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS case_proposals_contributor_created_idx
+      ON case_proposals (contributor_id, created_at DESC);
+    CREATE INDEX IF NOT EXISTS case_proposals_status_created_idx
+      ON case_proposals (status, created_at ASC);
+
     CREATE TABLE IF NOT EXISTS submissions (
       id VARCHAR(255) PRIMARY KEY,
       case_id VARCHAR(255) NOT NULL REFERENCES cases(id),
@@ -108,7 +141,7 @@ async function ensureTables() {
       content_json JSONB NOT NULL,
       citations_count INTEGER NOT NULL DEFAULT 0,
       word_count INTEGER NOT NULL DEFAULT 0,
-      status VARCHAR(50) NOT NULL DEFAULT 'Pending_Review',
+      status VARCHAR(50) NOT NULL DEFAULT 'Submitted',
       structural_compliant BOOLEAN DEFAULT FALSE,
       final_weighted_score INTEGER,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -121,9 +154,11 @@ async function ensureTables() {
       case_id VARCHAR(255) REFERENCES cases(id),
       reviewer_tier VARCHAR(50) NOT NULL,
       scores JSONB NOT NULL,
+      feedback TEXT NOT NULL DEFAULT '',
       is_voided BOOLEAN DEFAULT FALSE NOT NULL,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
+    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS feedback TEXT NOT NULL DEFAULT '';
 
     CREATE TABLE IF NOT EXISTS votes (
       id VARCHAR(255) PRIMARY KEY,
@@ -182,6 +217,68 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
+const caseProposalSchema = z.object({
+  title: z.string().trim().min(8).max(120),
+  type: z.enum([
+    'Market Sizing',
+    'Profitability',
+    'Market Entry',
+    'Operational',
+    'Pricing',
+    'M&A',
+    'Growth & Retention',
+  ]),
+  sector: z.string().trim().min(2).max(80),
+  difficulty: z.enum(['Standard', 'High', 'Chaos']),
+  sourceKind: z.enum(['original', 'interview_recollection', 'public_source']),
+  sourceReference: z.string().trim().max(500).optional(),
+  context: z.string().trim().min(50).max(5000),
+  prompt: z.string().trim().min(40).max(5000),
+  exhibits: z.string().trim().max(5000).optional(),
+  deliverables: z.array(z.string().trim().min(2).max(160)).min(1).max(8),
+  reviewerGuide: z.string().trim().min(50).max(3000),
+  solutionOutline: z.string().trim().min(50).max(5000),
+  originalityConfirmed: z.literal(true),
+  confidentialityConfirmed: z.literal(true),
+}).refine(
+  (proposal) => proposal.sourceKind !== 'public_source' || Boolean(proposal.sourceReference),
+  { message: 'Add a link or citation for a public source', path: ['sourceReference'] }
+);
+
+const caseProposalReviewSchema = z.object({
+  action: z.enum(['approve', 'request_changes', 'decline']),
+  notes: z.string().trim().max(3000).optional().default(''),
+}).refine(
+  (review) => review.action === 'approve' || review.notes.length >= 10,
+  { message: 'Add at least 10 characters of feedback for this decision', path: ['notes'] }
+);
+
+const caseReviewSchema = z.object({
+  caseId: z.string().min(1),
+  problem_framing: z.number().int().min(1).max(5),
+  framework_fit: z.number().int().min(1).max(5),
+  data_integrity: z.number().int().min(1).max(5),
+  insight_depth: z.number().int().min(1).max(5),
+  feasibility: z.number().int().min(1).max(5),
+  feedback: z.string().trim().min(80).max(3000),
+});
+
+const isCaseModeratorEmail = (email: string): boolean => {
+  const moderatorEmails = (process.env.CASE_MODERATOR_EMAILS || '')
+    .split(',')
+    .map((value) => value.trim().toLowerCase())
+    .filter(Boolean);
+  return moderatorEmails.includes(email.trim().toLowerCase());
+};
+
+const caseProposalLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'You have reached the hourly proposal limit. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 // Session configuration with PostgreSQL-backed store
 app.use(session({
   store: new pgStore({
@@ -201,20 +298,18 @@ app.use(session({
   },
 }));
 
-// Contextual Middleware simulating authenticated session user
-const mockAuthUser = (req: Request, res: Response, next: NextFunction) => {
-  req.body.currentUser = {
-    id: "u1111111-1111-1111-1111-111111111111",
-    role: "Verified",
-    name: "Alex Operator"
-  };
-  next();
-};
-
 // Authentication middleware
 const requireAuth = (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.user) {
     res.status(401).json({ success: false, error: 'Unauthorized' });
+    return;
+  }
+  next();
+};
+
+const requireCaseModerator = (req: Request, res: Response, next: NextFunction) => {
+  if (!req.session.user || !isCaseModeratorEmail(req.session.user.email)) {
+    res.status(403).json({ success: false, error: 'Moderator access is required' });
     return;
   }
   next();
@@ -277,7 +372,7 @@ app.post('/api/auth/github/callback', async (req: Request, res: Response) => {
       reviewScore: 0,
       casesSolved: 0,
       mergeBonusCount: 0,
-      role: 'General',
+      role: isCaseModeratorEmail(userData.email || `${userData.login}@github.com`) ? 'Moderator' : 'General',
     };
 
     res.json({ success: true, user: req.session.user });
@@ -344,7 +439,7 @@ app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
       reviewScore: 0,
       casesSolved: 0,
       mergeBonusCount: 0,
-      role: 'General',
+      role: isCaseModeratorEmail(userData.email) ? 'Moderator' : 'General',
     };
 
     res.json({ success: true, user: req.session.user });
@@ -382,7 +477,7 @@ app.post('/api/auth/register', authLimiter, async (req: Request, res: Response):
       reviewScore: newUser.reviewScore,
       casesSolved: newUser.casesSolved,
       mergeBonusCount: newUser.mergeBonusCount,
-      role: newUser.role,
+      role: isCaseModeratorEmail(newUser.email) ? 'Moderator' : newUser.role,
     };
     res.status(201).json({ success: true, user: req.session.user });
   } catch (error: any) {
@@ -421,7 +516,7 @@ app.post('/api/auth/login', authLimiter, async (req: Request, res: Response): Pr
       reviewScore: user.reviewScore,
       casesSolved: user.casesSolved,
       mergeBonusCount: user.mergeBonusCount,
-      role: user.role,
+      role: isCaseModeratorEmail(user.email) ? 'Moderator' : user.role,
     };
     res.json({ success: true, user: req.session.user });
   } catch (error: any) {
@@ -446,12 +541,172 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
   });
 });
 
-/**
- * CORE LOGIC GATEWAY: SUBMISSION PAYWALL & LAYER 1 CHECK
- */
-app.post('/api/cases/:caseId/submissions', mockAuthUser, async (req: Request, res: Response): Promise<void> => {
+app.get('/api/cases', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const cases = await DatabaseService.getPublishedCases();
+    res.json(cases.map((caseData) => ({
+      ...caseData,
+      companyType: 'Community case',
+      industry: caseData.sector,
+      track: 'curated_case',
+      isFeatured: false,
+    })));
+  } catch (error) {
+    console.error('Published cases error:', error);
+    res.status(500).json({ success: false, error: 'Could not load published cases' });
+  }
+});
+
+app.get('/api/cases/:caseId/gate-status', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const caseId = req.params.caseId;
-  const { contentJson, citationsCount, wordCount, currentUser } = req.body;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+  try {
+    const reviewsCompleted = await DatabaseService.getCompletedReviewCountForCase(
+      req.session.user!.id,
+      caseId
+    );
+    res.json({ reviews_completed: reviewsCompleted, can_submit: true });
+  } catch (error) {
+    console.error('Case gate status error:', error);
+    res.status(500).json({ success: false, error: 'Could not load your review gate status' });
+  }
+});
+
+app.post('/api/case-proposals', requireAuth, caseProposalLimiter, async (req: Request, res: Response): Promise<void> => {
+  const parse = caseProposalSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid case proposal' });
+    return;
+  }
+
+  const input: CaseProposalInput = parse.data;
+  try {
+    const proposal = await DatabaseService.createCaseProposal(
+      req.session.user!.id,
+      input
+    );
+    res.status(201).json({ success: true, proposal });
+  } catch (error) {
+    console.error('Case proposal submission error:', error);
+    res.status(500).json({ success: false, error: 'Could not submit your case proposal' });
+  }
+});
+
+app.get('/api/case-proposals/mine', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const proposals = await DatabaseService.getCaseProposalsForContributor(req.session.user!.id);
+    res.json({ success: true, proposals });
+  } catch (error) {
+    console.error('Contributor case proposals error:', error);
+    res.status(500).json({ success: false, error: 'Could not load your proposals' });
+  }
+});
+
+app.get('/api/case-proposals/:proposalId', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const proposalId = req.params.proposalId;
+  if (typeof proposalId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid proposalId parameter' });
+    return;
+  }
+  try {
+    const proposal = await DatabaseService.getCaseProposalForContributor(
+      proposalId,
+      req.session.user!.id
+    );
+    if (!proposal) {
+      res.status(404).json({ success: false, error: 'Proposal not found' });
+      return;
+    }
+    res.json({ success: true, proposal });
+  } catch (error) {
+    console.error('Case proposal lookup error:', error);
+    res.status(500).json({ success: false, error: 'Could not load this proposal' });
+  }
+});
+
+app.put('/api/case-proposals/:proposalId', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const proposalId = req.params.proposalId;
+  if (typeof proposalId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid proposalId parameter' });
+    return;
+  }
+  const parse = caseProposalSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid case proposal' });
+    return;
+  }
+
+  const input: CaseProposalInput = parse.data;
+  try {
+    const proposal = await DatabaseService.updateCaseProposal(
+      proposalId,
+      req.session.user!.id,
+      input
+    );
+    if (!proposal) {
+      res.status(409).json({ success: false, error: 'Only proposals requesting changes can be edited and resubmitted' });
+      return;
+    }
+    res.json({ success: true, proposal });
+  } catch (error) {
+    console.error('Case proposal update error:', error);
+    res.status(500).json({ success: false, error: 'Could not update your case proposal' });
+  }
+});
+
+app.get('/api/moderation/case-proposals', requireAuth, requireCaseModerator, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const proposals = await DatabaseService.getPendingCaseProposals();
+    res.json({ success: true, proposals });
+  } catch (error) {
+    console.error('Moderation queue error:', error);
+    res.status(500).json({ success: false, error: 'Could not load the moderation queue' });
+  }
+});
+
+app.patch('/api/moderation/case-proposals/:proposalId', requireAuth, requireCaseModerator, async (req: Request, res: Response): Promise<void> => {
+  const proposalId = req.params.proposalId;
+  if (typeof proposalId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid proposalId parameter' });
+    return;
+  }
+  const parse = caseProposalReviewSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid review decision' });
+    return;
+  }
+
+  const statusByAction = {
+    approve: 'Approved',
+    request_changes: 'Changes_Requested',
+    decline: 'Declined',
+  } as const;
+
+  try {
+    const proposal = await DatabaseService.reviewCaseProposal(
+      proposalId,
+      req.session.user!.id,
+      statusByAction[parse.data.action],
+      parse.data.notes
+    );
+    if (!proposal) {
+      res.status(409).json({ success: false, error: 'This proposal has already been reviewed' });
+      return;
+    }
+    res.json({ success: true, proposal });
+  } catch (error) {
+    console.error('Case proposal review error:', error);
+    res.status(500).json({ success: false, error: 'Could not apply the review decision' });
+  }
+});
+
+app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  const { contentJson, citationsCount = 0 } = req.body ?? {};
+  const currentUser = req.session.user!;
 
   try {
     if (typeof caseId !== 'string') {
@@ -459,64 +714,108 @@ app.post('/api/cases/:caseId/submissions', mockAuthUser, async (req: Request, re
       return;
     }
 
-    // 1. Enforce Hard Submission Paywall
-    const reviewCount = await DatabaseService.getCompletedReviewCountForCase(currentUser.id, caseId);
-    if (reviewCount < 2) {
-       res.status(403).json({
-        success: false,
-        error: `Submission Blocked: You must complete at least 2 peer reviews for this case first. Completed: [${reviewCount}/2]`
-      });
-       return;
+    if (!Number.isSafeInteger(citationsCount) || citationsCount < 0) {
+      res.status(400).json({ success: false, error: 'Invalid citationsCount parameter.' });
+      return;
     }
 
-    // 2. Layer 1 Automated Syntax & Integrity Gate
+    // Validate solution structure before publishing it to the case's solution list.
     const layer1Check = await VerificationEngine.validateLayer1Gate({
       contentJson,
-      citationsCount,
-      wordCount,
-      requiredFields: ['problem_framing_statement', 'framework_selection', 'implementation_roadmap']
     });
 
-    if (!layer1Check.compliant) {
-       res.status(400).json({ success: false, error: layer1Check.error });
-       return;
+    if (layer1Check.compliant === false) {
+      res.status(400).json({ success: false, error: layer1Check.error });
+      return;
     }
 
     // 3. Commit Submission to Ledger
     const submissionId = await DatabaseService.createSubmission({
       caseId,
       userId: currentUser.id,
-      contentJson,
+      contentJson: layer1Check.contentJson,
       citationsCount,
-      wordCount,
+      wordCount: layer1Check.wordCount,
       structuralCompliant: true
     });
 
-    res.status(201).json({ success: true, submissionId, status: 'Pending_Review' });
+    res.status(201).json({ success: true, submissionId, status: 'Submitted' });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+app.get('/api/cases/:caseId/solutions', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+
+  try {
+    const solutions = await DatabaseService.getCaseSolutionsForUser(caseId, req.session.user!.id);
+    if (!solutions) {
+      res.status(403).json({ success: false, error: 'Submit a solution to compare other approaches' });
+      return;
+    }
+    res.json({ success: true, solutions });
+  } catch (error) {
+    console.error('Case solutions error:', error);
+    res.status(500).json({ success: false, error: 'Could not load case solutions' });
+  }
+});
+
+app.get('/api/cases/:caseId/review-queue', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+
+  try {
+    const submission = await DatabaseService.getNextReviewSubmission(caseId, req.session.user!.id);
+    if (!submission) {
+      res.status(404).json({ success: false, error: 'No unreviewed submission is available for this case' });
+      return;
+    }
+    res.json(submission);
+  } catch (error) {
+    console.error('Case review queue error:', error);
+    res.status(500).json({ success: false, error: 'Could not load a submission to review' });
   }
 });
 
 /**
  * CORE LOGIC GATEWAY: RUBRIC EVALUATION & LAYER 2/3 ROUTING
  */
-app.post('/api/submissions/:submissionId/reviews', mockAuthUser, async (req: Request, res: Response): Promise<void> => {
+app.post('/api/submissions/:submissionId/reviews', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const submissionId = req.params.submissionId;
-  const { problem_framing, framework_fit, data_integrity, insight_depth, feasibility, currentUser } = req.body;
+  if (typeof submissionId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid submissionId parameter' });
+    return;
+  }
+  const parse = caseReviewSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid review' });
+    return;
+  }
+  const currentUser = req.session.user!;
 
   try {
-    if (typeof submissionId !== 'string') {
-      res.status(400).json({ success: false, error: 'Invalid submissionId parameter.' });
-      return;
-    }
-
     // Insert review score payload
     await DatabaseService.insertReview({
       submissionId,
       reviewerId: currentUser.id,
       reviewerTier: currentUser.role,
-      scores: { problem_framing, framework_fit, data_integrity, insight_depth, feasibility }
+      caseId: parse.data.caseId,
+      feedback: parse.data.feedback,
+      scores: {
+        problem_framing: parse.data.problem_framing,
+        framework_fit: parse.data.framework_fit,
+        data_integrity: parse.data.data_integrity,
+        insight_depth: parse.data.insight_depth,
+        feasibility: parse.data.feasibility,
+      },
     });
 
     // Execute Layer 2 Consensus Algorithm and check for Layer 3 escalation
@@ -524,6 +823,11 @@ app.post('/api/submissions/:submissionId/reviews', mockAuthUser, async (req: Req
 
     res.status(200).json({ success: true, engineAction: actionTaken });
   } catch (error: any) {
+    if (error instanceof InvalidCaseReviewError) {
+      res.status(400).json({ success: false, error: error.message });
+      return;
+    }
+    console.error('Case review submission error:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });

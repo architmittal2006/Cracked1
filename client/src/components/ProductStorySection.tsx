@@ -1,16 +1,30 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence, useScroll, useMotionValueEvent, useReducedMotion } from 'framer-motion';
-import { ReviewScreen } from './mockups/ReviewScreen';
+import { SolutionsScreen } from './mockups/SolutionsScreen';
 import { SubmitScreen } from './mockups/SubmitScreen';
-import { ScoreScreen, ProfileScreen } from './mockups/ScoreScreen';
+import { ProfileScreen } from './mockups/ScoreScreen';
+import { PROBLEM_TYPES } from '../data/mockData';
 
 const STEPS = [
-  { n: 1, title: 'Review cases', desc: 'Complete peer reviews to unlock submission.' },
-  { n: 2, title: 'Submit solutions', desc: 'Write structured solutions with citations.' },
-  { n: 3, title: 'Earn credibility', desc: 'Scored on a 5-dimension rubric.' },
-  { n: 4, title: 'Get noticed', desc: 'Shareable profile and certificates for recruiters.' },
+  { n: 1, title: 'Choose a case', desc: 'Pick a structured business problem to work through.' },
+  { n: 2, title: 'Submit your solution', desc: 'Explain your approach in a clear, structured response.' },
+  { n: 3, title: 'Compare approaches', desc: 'Read other solutions after you have submitted yours.' },
+  { n: 4, title: 'Build a record', desc: 'Keep your work together on a shareable profile.' },
 ];
-const SCREENS = [ReviewScreen, SubmitScreen, ScoreScreen, ProfileScreen];
+
+const CasePickerScreen: React.FC = () => (
+  <div className="space-y-3 p-4 text-sm">
+    <div className="font-semibold text-white">Case library</div>
+    {PROBLEM_TYPES.slice(0, 3).map((type) => (
+      <div key={type} className="glass-card flex items-center justify-between p-3">
+        <span className="text-slate-300">{type}</span>
+        <span className="text-xs text-slate-500">Open case</span>
+      </div>
+    ))}
+  </div>
+);
+
+const SCREENS = [CasePickerScreen, SubmitScreen, SolutionsScreen, ProfileScreen];
 
 export const ProductStorySection: React.FC = () => {
   const reduce = useReducedMotion();

@@ -4,11 +4,12 @@ interface CardProps {
   children: React.ReactNode;
   className?: string;
   padding?: 'p-5' | 'p-6' | 'p-8';
+  bordered?: boolean;
 }
 
-export const Card: React.FC<CardProps> = ({ children, className = '', padding = 'p-6' }) => {
+export const Card: React.FC<CardProps> = ({ children, className = '', padding = 'p-6', bordered = true }) => {
   return (
-    <div className={`rounded-lg border border-white/8 bg-[#141414] shadow-sm ${padding} ${className}`}>
+    <div className={`rounded-xl ${bordered ? 'border border-[var(--border-subtle)]' : ''} bg-[var(--bg-card)] shadow-[var(--shadow-card)] ${padding} ${className}`}>
       {children}
     </div>
   );

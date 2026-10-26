@@ -58,12 +58,12 @@ export const ProofStrip: React.FC = () => {
         </div>
       ) : (
         <div className="max-w-5xl mx-auto px-6">
-          <h3 className="text-lg font-semibold text-white mb-4 text-center">How scoring works</h3>
+          <h3 className="text-lg font-semibold text-white mb-4 text-center">How case practice works</h3>
           <div className="grid md:grid-cols-3 gap-4">
             {[
-              { t: '2-review gate', d: 'Every submission needs two peer reviews before it scores.' },
-              { t: '5-dimension rubric', d: 'Structure, analysis, creativity, feasibility, communication.' },
-              { t: 'Tier ladder', d: 'Analyst → Consultant → Partner → Principal as scores rise.' },
+              { t: 'Solve first', d: 'Work through the case and write your own approach.' },
+              { t: 'Submit your solution', d: 'Complete the structured response before sending it.' },
+              { t: 'Compare approaches', d: 'Read other solutions after you have submitted yours.' },
             ].map((c) => (
               <div key={c.t} className="glass-card p-5">
                 <div className="font-semibold text-white mb-1">{c.t}</div>

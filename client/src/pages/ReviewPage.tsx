@@ -1,31 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useParams, useNavigate } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 import { Shield, CheckCircle, Clock, AlertCircle, TrendingUp } from 'lucide-react';
-import { MOCK_CASES, RUBRIC_DIMENSIONS } from '../data/mockData';
+import { RUBRIC_DIMENSIONS } from '../data/mockData';
+import type { Case } from '../data/mockData';
 import { RubricSlider } from '../components/RubricSlider';
 import { RadarChart } from '../components/RadarChart';
 import { PageWrapper } from '../components/PageWrapper';
-import { FlagButton } from '../components/FlagButton';
-import { createReview, getNextReviewSubmission } from '../services/api';
-
-const ANONYMOUS_SUBMISSION = `The D2C brand's margin erosion stems from three compounding factors: CAC inflation on paid social (+180% YoY), discount-driven revenue mix shift (promo sales now 42% of GMV vs 18%), and fulfillment cost deleverage at current order volumes.
-
-Revenue branch: Growth is real but low-quality — repeat purchase rate dropped from 34% to 19%. The brand is buying new customers at unsustainable CAC while failing to retain them.
-
-Cost branch: COGS is stable at 32%, but variable marketing spend per order exceeds contribution margin on first purchase. Wholesale would improve unit economics but at 15-20% brand dilution risk based on comparable D2C pivots.
-
-Root cause: The growth strategy optimized for top-line at the expense of unit economics. Meta algorithm changes exposed this structural weakness.
-
-Recommendations: (1) Pause broad Meta prospecting, shift to retention-led CRM campaigns. (2) Introduce a subscription tier to improve LTV/CAC. (3) Pilot selective wholesale with premium retail partners only.`;
+import { createReview, getCaseById, getNextReviewSubmission } from '../services/api';
+import type { ReviewQueueResponse } from '../services/api';
 
 export const ReviewPage: React.FC = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
-  const caseData = MOCK_CASES.find(c => c.id === id);
-
-  // Mock authentication check - in production, use actual auth state
-  const isAuthenticated = true; // Change to false to test redirect
-
+  const [caseData, setCaseData] = useState<Case | null>(null);
+  const [reviewSubmission, setReviewSubmission] = useState<ReviewQueueResponse | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
   const [rubricScores, setRubricScores] = useState({
     problem_framing: 3,
     framework_fit: 3,
@@ -37,23 +25,24 @@ export const ReviewPage: React.FC = () => {
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [submissionId, setSubmissionId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login');
-    }
-  }, [isAuthenticated, navigate]);
-
-  useEffect(() => {
-    if (!caseData) return;
-    getNextReviewSubmission(caseData.id)
-      .then(response => setSubmissionId(response.submissionId))
-      .catch(() => {
-        // Fallback to mock ID if API fails
-        setSubmissionId('sub001');
+    if (!id) return;
+    let isCurrent = true;
+    Promise.all([getCaseById(id), getNextReviewSubmission(id)])
+      .then(([loadedCase, queuedSubmission]) => {
+        if (!isCurrent) return;
+        setCaseData(loadedCase);
+        setReviewSubmission(queuedSubmission);
+      })
+      .catch((loadError: unknown) => {
+        if (isCurrent) setError(loadError instanceof Error ? loadError.message : 'Could not load a submission to review');
+      })
+      .finally(() => {
+        if (isCurrent) setIsLoading(false);
       });
-  }, [caseData]);
+    return () => { isCurrent = false; };
+  }, [id]);
 
   const feedbackValid = feedback.trim().length >= 80;
   const feedbackLength = feedback.trim().length;
@@ -70,13 +59,13 @@ export const ReviewPage: React.FC = () => {
   const scoreLevel = parseFloat(weightedScore) >= 4 ? 'excellent' : parseFloat(weightedScore) >= 3 ? 'good' : 'needs-improvement';
 
   const handleSubmit = async () => {
-    if (!caseData || !feedbackValid || !submissionId) return;
+    if (!caseData || !feedbackValid || !reviewSubmission) return;
 
     setSubmitting(true);
     setError(null);
 
     try {
-      await createReview(submissionId, rubricScores);
+      await createReview(reviewSubmission.submissionId, rubricScores, caseData.id, feedback.trim());
       setSubmitted(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Review submission failed');
@@ -85,16 +74,31 @@ export const ReviewPage: React.FC = () => {
     }
   };
 
-  if (!isAuthenticated) {
-    return null;
+  if (isLoading) {
+    return <PageWrapper><p className="py-10 text-sm text-slate-400" aria-live="polite">Loading submission…</p></PageWrapper>;
   }
 
-  if (!caseData) {
+  if (!caseData || error && !reviewSubmission && !submitted) {
     return (
       <PageWrapper>
         <div className="text-center py-20">
-          <h2 className="text-2xl font-bold mb-4">Case Not Found</h2>
-          <Link to="/cases" className="btn-primary">Back to Cases</Link>
+          <h2 className="text-xl font-semibold text-white mb-3">{caseData ? 'Could not load a submission' : 'Case not found'}</h2>
+          {error && <p className="mb-5 text-sm text-slate-400" role="alert">{error}</p>}
+          <Link to={caseData ? `/cases/${caseData.id}` : '/cases'} className="btn-primary">Back to case</Link>
+        </div>
+      </PageWrapper>
+    );
+  }
+
+  if (!reviewSubmission && !submitted) {
+    return (
+      <PageWrapper>
+        <div className="mx-auto max-w-2xl border-y border-[var(--border-subtle)] py-8">
+          <h1 className="text-xl font-semibold text-[var(--text-primary)]">No submission ready for review</h1>
+          <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
+            There are no other pending solutions for this case right now. Check back when someone has submitted a solution.
+          </p>
+          <Link to={`/cases/${caseData.id}`} className="mt-5 inline-flex text-sm text-[var(--text-primary)] underline underline-offset-4">Back to case</Link>
         </div>
       </PageWrapper>
     );
@@ -105,8 +109,7 @@ export const ReviewPage: React.FC = () => {
       <Link to={`/cases/${caseData.id}`} className="btn-ghost mb-6 text-sm inline-flex">← Back to Case</Link>
 
       <div className="page-header pb-6">
-        <div className="section-label mb-2">PEER REVIEW</div>
-        <h1 className="section-title text-3xl mb-2">Review Submission</h1>
+        <h1 className="section-title text-3xl mb-2">Review submission</h1>
         <p className="section-subtitle">{caseData.title} — submission is anonymized</p>
       </div>
 
@@ -117,7 +120,7 @@ export const ReviewPage: React.FC = () => {
           </div>
           <h3 className="text-2xl font-bold text-white mb-2">Review Submitted</h3>
           <div className="mb-4">
-            <p className="text-slate-400 mb-1">Weighted score: <span className="text-emerald-400 font-mono text-xl font-bold">{weightedScore}</span></p>
+            <p className="text-slate-400 mb-1">Weighted score: <span className="text-emerald-400 tabular-nums text-xl font-semibold">{weightedScore}</span></p>
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30">
               <TrendingUp className="w-4 h-4 text-emerald-400" />
               <span className="text-emerald-400 text-xs font-bold uppercase">
@@ -131,19 +134,24 @@ export const ReviewPage: React.FC = () => {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
-            <div className="glass-card p-6">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs font-mono uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                <span className="text-sm font-medium text-[var(--text-secondary)] flex items-center gap-2">
                   <Shield className="w-3 h-3" />
                   Anonymous Submission
                 </span>
               </div>
-              <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed whitespace-pre-wrap bg-slate-900/50 p-4 rounded-lg border border-slate-800">
-                {ANONYMOUS_SUBMISSION}
+              <div className="space-y-4 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card-hover)] p-4">
+                {Object.entries(reviewSubmission?.content ?? {}).map(([key, value]) => (
+                  <div key={key}>
+                    <h3 className="text-sm font-medium text-[var(--text-primary)]">{key.replaceAll('_', ' ')}</h3>
+                    <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{value}</p>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="glass-card p-6">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
               <h2 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
                 <TrendingUp className="w-5 h-5 text-emerald-400" />
                 Rubric Scoring
@@ -152,7 +160,7 @@ export const ReviewPage: React.FC = () => {
                 {RUBRIC_DIMENSIONS.map((dim, index) => (
                   <div
                     key={dim.key}
-                    className="transition-all duration-300"
+                    className="transition-colors duration-200"
                     style={{ animationDelay: `${index * 100}ms` }}
                   >
                     <RubricSlider
@@ -165,13 +173,13 @@ export const ReviewPage: React.FC = () => {
               </div>
             </div>
 
-            <div className="glass-card p-6">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
               <label className="block text-sm font-bold text-white mb-2 flex items-center justify-between">
                 <span>Written Feedback</span>
                 <span className="text-slate-500 font-normal text-xs">(min 80 characters)</span>
               </label>
               <textarea
-                className="input-field min-h-[140px] transition-all duration-300"
+                className="input-field min-h-[140px] transition-colors duration-200"
                 placeholder="Provide specific, actionable feedback on framing, data use, and recommendations..."
                 value={feedback}
                 onChange={(e) => setFeedback(e.target.value)}
@@ -190,7 +198,7 @@ export const ReviewPage: React.FC = () => {
                 </div>
                 <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
                   <div
-                    className={`h-full transition-all duration-300 ease-out ${
+                    className={`h-full transition-[width] duration-300 ease-out ${
                       feedbackValid ? 'bg-emerald-500' : 'bg-amber-500'
                     }`}
                     style={{ width: `${feedbackProgress}%` }}
@@ -201,18 +209,17 @@ export const ReviewPage: React.FC = () => {
           </div>
 
           <div className="space-y-6">
-            <div className="glass-card p-6 sticky top-24">
+            <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6 lg:sticky lg:top-24">
               <h3 className="font-bold text-white mb-4 flex items-center gap-2">
                 <TrendingUp className="w-4 h-4 text-emerald-400" />
                 Score Preview
               </h3>
               <div className="flex justify-center mb-4 relative">
-                <div className="absolute inset-0 bg-emerald-500/5 rounded-full blur-3xl" />
                 <RadarChart scores={rubricScores} size={200} />
               </div>
               <div className="text-center mb-6">
-                <div className="text-xs text-slate-400 uppercase tracking-widest mb-1">Weighted Score</div>
-                <div className="text-4xl font-black text-emerald-400 font-mono mb-2 transition-all duration-300">
+                <div className="text-xs text-slate-400 mb-1">Weighted score</div>
+                <div className="text-3xl font-semibold tabular-nums text-[var(--text-primary)] mb-2">
                   {weightedScore}
                 </div>
                 <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-slate-800 border border-slate-700">
@@ -234,17 +241,15 @@ export const ReviewPage: React.FC = () => {
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <span className="text-slate-400">{dim.label}</span>
-                    <span className="font-mono text-emerald-400 font-bold">{rubricScores[dim.key]}/5</span>
+                    <span className="tabular-nums text-[var(--text-primary)]">{rubricScores[dim.key]}/5</span>
                   </div>
                 ))}
               </div>
 
               <button
                 type="button"
-                className={`btn-primary w-full mb-3 transition-all duration-300 ${
-                  feedbackValid
-                    ? 'shadow-[0_0_20px_rgba(255,76,37,0.4)]'
-                    : 'opacity-50 cursor-not-allowed'
+                className={`btn-primary w-full mb-3 transition-colors duration-200 ${
+                  feedbackValid ? '' : 'opacity-50 cursor-not-allowed'
                 }`}
                 disabled={!feedbackValid || submitting}
                 onClick={handleSubmit}
@@ -264,7 +269,6 @@ export const ReviewPage: React.FC = () => {
                   {error}
                 </div>
               )}
-              <FlagButton reviewId="rev001" />
             </div>
           </div>
         </div>

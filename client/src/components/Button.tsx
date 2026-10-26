@@ -21,14 +21,14 @@ const sizeStyles: Record<ButtonSize, string> = {
 
 const variantStyles: Record<ButtonVariant, string> = {
   primary:
-    'bg-[#10B981] text-white font-medium hover:bg-[#059669] ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#10B981]/50 focus-visible:ring-offset-2',
+    'border border-transparent bg-[#FF4C25] text-[#101114] font-medium hover:bg-[#E64324] ' +
+    'focus-visible:ring-2 focus-visible:ring-[#FF4C25]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-deep)]',
   secondary:
-    'bg-transparent border border-gray-300 text-gray-700 font-medium hover:bg-gray-50 hover:border-gray-400 ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/50 focus-visible:ring-offset-2',
+    'border border-[var(--border-medium)] bg-[var(--bg-card)] text-slate-200 font-medium hover:bg-white/[0.06] hover:border-white/25 ' +
+    'focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-deep)]',
   ghost:
-    'bg-transparent text-gray-500 font-medium hover:text-gray-900 hover:bg-gray-100 ' +
-    'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-gray-400/50 focus-visible:ring-offset-2',
+    'border border-transparent bg-transparent text-slate-300 font-medium hover:text-white hover:bg-white/[0.05] ' +
+    'focus-visible:ring-2 focus-visible:ring-white/30 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-deep)]',
 };
 
 export const Button: React.FC<ButtonProps> = ({
@@ -45,7 +45,8 @@ export const Button: React.FC<ButtonProps> = ({
   const isLink = as === 'a' && !!href;
 
   const classes = [
-    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-button border-0 outline-none transition-all duration-200',
+    'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg outline-none transition-colors duration-150',
+    `cracked-button-${variant}`,
     sizeStyles[size],
     variantStyles[variant],
     disabled ? 'opacity-50 cursor-not-allowed pointer-events-none' : '',

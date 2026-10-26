@@ -7,7 +7,7 @@ export const ManifestoSection: React.FC = () => (
       <p className="text-2xl md:text-4xl font-bold text-white leading-tight">
         We believe proof of work beats <span className="italic font-serif text-orange-400">promise</span>.
       </p>
-      <p className="text-slate-400 mt-4 text-lg">Cracked? exists so consultants earn credibility by solving real cases and being reviewed by peers — not by claiming it.</p>
+      <p className="text-slate-400 mt-4 text-lg">Cracked? gives learners a place to solve real cases, explain their reasoning, and compare different approaches.</p>
     </div>
   </section>
 );
