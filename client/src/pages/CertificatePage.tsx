@@ -6,6 +6,7 @@ import { TierBadge } from '../components/TierBadge';
 import { ScoreRing } from '../components/ScoreRing';
 import { PageWrapper } from '../components/PageWrapper';
 import { Button } from '../components/Button';
+import { BrandLogo } from '../components/BrandLogo';
 
 function generateVerificationHash(username: string, score: number): string {
   let hash = 0;
@@ -46,7 +47,7 @@ export const CertificatePage: React.FC = () => {
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-400 via-emerald-400 to-cyan-400" />
 
           <div className="section-label mb-4 flex items-center justify-center gap-2">
-            <img src="/logo-with--cracked-----one-should-get-an-idea-that.png" alt="Cracked?" className="h-10 w-auto" />
+            <BrandLogo className="h-8 w-auto" />
             <span>CERTIFICATE</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">{user.name}</h1>
