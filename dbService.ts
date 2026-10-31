@@ -386,7 +386,7 @@ export class DatabaseService {
       AND ($5::integer IS NULL OR year = $5)
       AND (($3::text IS NULL AND $4::text IS NULL) OR EXISTS (
         SELECT 1 FROM casebook_cases c WHERE c.casebook_id = casebooks.id
-          AND ($3::text IS NULL OR c.sector = $3)
+          AND ($3::text IS NULL OR LOWER(c.sector) = LOWER($3))
           AND ($4::text IS NULL OR c.case_type = $4)
       ))`;
     const countResult = await pool.query<{ total: string }>(

@@ -43,6 +43,16 @@ export const HowItWorksPage: React.FC = () => {
         ))}
       </section>
 
+      <section className="border-b border-[var(--border-subtle)] py-8">
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Read, then practice</h2>
+        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
+          Casebooks are reading material, separate from scored cases. Read an attributed summary, then use a similar practice case to work through your own approach.
+        </p>
+        <Link to="/casebooks" className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">
+          Browse casebooks <ArrowRight aria-hidden="true" className="h-4 w-4" />
+        </Link>
+      </section>
+
       <section className="py-12">
         <div className="mb-5">
           <h2 className="text-xl font-semibold text-[var(--text-primary)]">Choose a problem type</h2>
