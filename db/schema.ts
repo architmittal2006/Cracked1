@@ -1,4 +1,4 @@
-import { pgTable, varchar, text, integer, boolean, timestamp, jsonb } from 'drizzle-orm/pg-core';
+import { pgTable, varchar, text, integer, boolean, timestamp, jsonb, uniqueIndex, index } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: varchar('id', { length: 255 }).primaryKey(),
@@ -62,6 +62,58 @@ export const caseProposals = pgTable('case_proposals', {
   publishedCaseId: varchar('published_case_id', { length: 255 }).references(() => cases.id),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   reviewedAt: timestamp('reviewed_at', { withTimezone: true }),
+});
+
+export const casebooks = pgTable('casebooks', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  slug: varchar('slug', { length: 255 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  sourceOrg: varchar('source_org', { length: 255 }).notNull(),
+  sourceKind: varchar('source_kind', { length: 50 }).notNull(),
+  year: integer('year'),
+  description: text('description').notNull(),
+  licenseKind: varchar('license_kind', { length: 50 }).notNull(),
+  permissionReference: text('permission_reference'),
+  externalUrl: text('external_url'),
+  industries: text('industries').array().notNull().default([]),
+  caseCount: integer('case_count').notNull().default(0),
+  status: varchar('status', { length: 50 }).notNull().default('Pending'),
+  uploaderId: varchar('uploader_id', { length: 255 }).notNull().references(() => users.id),
+  moderatorNotes: text('moderator_notes'),
+  reviewedBy: varchar('reviewed_by', { length: 255 }).references(() => users.id),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('casebooks_slug_unique').on(table.slug),
+  index('casebooks_status_created_idx').on(table.status, table.createdAt),
+  index('casebooks_uploader_created_idx').on(table.uploaderId, table.createdAt),
+]);
+
+export const casebookCases = pgTable('casebook_cases', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  casebookId: varchar('casebook_id', { length: 255 }).notNull().references(() => casebooks.id, { onDelete: 'cascade' }),
+  slug: varchar('slug', { length: 255 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  firm: varchar('firm', { length: 255 }),
+  sector: varchar('sector', { length: 100 }).notNull(),
+  caseType: varchar('case_type', { length: 100 }),
+  difficulty: varchar('difficulty', { length: 50 }).notNull(),
+  summary: text('summary').notNull(),
+  body: text('body'),
+  position: integer('position').notNull().default(0),
+  practiceCaseId: varchar('practice_case_id', { length: 255 }).references(() => cases.id, { onDelete: 'set null' }),
+}, (table) => [
+  uniqueIndex('casebook_cases_book_slug_unique').on(table.casebookId, table.slug),
+  index('casebook_cases_book_position_idx').on(table.casebookId, table.position),
+]);
+
+export const takedownRequests = pgTable('takedown_requests', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  casebookId: varchar('casebook_id', { length: 255 }).notNull().references(() => casebooks.id, { onDelete: 'cascade' }),
+  requesterEmail: varchar('requester_email', { length: 255 }).notNull(),
+  reason: text('reason').notNull(),
+  status: varchar('status', { length: 50 }).notNull().default('Pending'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const submissions = pgTable('submissions', {

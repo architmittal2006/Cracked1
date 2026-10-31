@@ -16,8 +16,15 @@ import {
   comparePassword,
   InvalidCaseReviewError,
   type CaseProposalInput,
+  type CasebookReviewAction,
 } from './dbService.js';
 import { VerificationEngine } from './verificationEngine.js';
+import {
+  casebookFiltersSchema,
+  casebookInputSchema,
+  casebookReviewSchema,
+  takedownRequestSchema,
+} from './casebookValidation.js';
 
 // Load environment variables
 dotenv.config();
@@ -133,6 +140,58 @@ async function ensureTables() {
       ON case_proposals (contributor_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS case_proposals_status_created_idx
       ON case_proposals (status, created_at ASC);
+
+    CREATE TABLE IF NOT EXISTS casebooks (
+      id VARCHAR(255) PRIMARY KEY,
+      slug VARCHAR(255) NOT NULL UNIQUE,
+      title VARCHAR(255) NOT NULL,
+      source_org VARCHAR(255) NOT NULL,
+      source_kind VARCHAR(50) NOT NULL,
+      year INTEGER,
+      description TEXT NOT NULL,
+      license_kind VARCHAR(50) NOT NULL,
+      permission_reference TEXT,
+      external_url TEXT,
+      industries TEXT[] NOT NULL DEFAULT '{}',
+      case_count INTEGER NOT NULL DEFAULT 0,
+      status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+      uploader_id VARCHAR(255) NOT NULL REFERENCES users(id),
+      moderator_notes TEXT,
+      reviewed_by VARCHAR(255) REFERENCES users(id),
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      published_at TIMESTAMPTZ
+    );
+    CREATE INDEX IF NOT EXISTS casebooks_status_created_idx
+      ON casebooks (status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS casebooks_uploader_created_idx
+      ON casebooks (uploader_id, created_at DESC);
+
+    CREATE TABLE IF NOT EXISTS casebook_cases (
+      id VARCHAR(255) PRIMARY KEY,
+      casebook_id VARCHAR(255) NOT NULL REFERENCES casebooks(id) ON DELETE CASCADE,
+      slug VARCHAR(255) NOT NULL,
+      title VARCHAR(255) NOT NULL,
+      firm VARCHAR(255),
+      sector VARCHAR(100) NOT NULL,
+      case_type VARCHAR(100),
+      difficulty VARCHAR(50) NOT NULL,
+      summary TEXT NOT NULL,
+      body TEXT,
+      position INTEGER NOT NULL DEFAULT 0,
+      practice_case_id VARCHAR(255) REFERENCES cases(id) ON DELETE SET NULL,
+      UNIQUE (casebook_id, slug)
+    );
+    CREATE INDEX IF NOT EXISTS casebook_cases_book_position_idx
+      ON casebook_cases (casebook_id, position);
+
+    CREATE TABLE IF NOT EXISTS takedown_requests (
+      id VARCHAR(255) PRIMARY KEY,
+      casebook_id VARCHAR(255) NOT NULL REFERENCES casebooks(id) ON DELETE CASCADE,
+      requester_email VARCHAR(255) NOT NULL,
+      reason TEXT NOT NULL,
+      status VARCHAR(50) NOT NULL DEFAULT 'Pending',
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
 
     CREATE TABLE IF NOT EXISTS submissions (
       id VARCHAR(255) PRIMARY KEY,
@@ -279,6 +338,22 @@ const caseProposalLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   message: { success: false, error: 'You have reached the hourly proposal limit. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const casebookProposalLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'You have reached the hourly casebook limit. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const takedownLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'You have reached the hourly report limit. Try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -711,6 +786,187 @@ app.patch('/api/moderation/case-proposals/:proposalId', requireAuth, requireCase
   }
 });
 
+app.get('/api/casebooks', async (req: Request, res: Response): Promise<void> => {
+  const parse = casebookFiltersSchema.safeParse(req.query);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid casebook filters' });
+    return;
+  }
+  try {
+    const result = await DatabaseService.getPublishedCasebooks(parse.data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Published casebooks error:', error);
+    res.status(500).json({ success: false, error: 'Could not load casebooks' });
+  }
+});
+
+app.get('/api/casebooks/mine', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const casebooks = await DatabaseService.getMyCasebooks(req.session.user!.id);
+    res.json({ success: true, casebooks });
+  } catch (error) {
+    console.error('Contributor casebooks error:', error);
+    res.status(500).json({ success: false, error: 'Could not load your casebooks' });
+  }
+});
+
+app.get('/api/casebooks/mine/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id;
+  if (typeof id !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid casebook ID' });
+    return;
+  }
+  try {
+    const casebook = await DatabaseService.getCasebookForOwner(id, req.session.user!.id);
+    if (!casebook) {
+      res.status(404).json({ success: false, error: 'Casebook not found' });
+      return;
+    }
+    res.json({ success: true, casebook });
+  } catch (error) {
+    console.error('Contributor casebook lookup error:', error);
+    res.status(500).json({ success: false, error: 'Could not load this casebook' });
+  }
+});
+
+app.post('/api/casebooks', requireAuth, casebookProposalLimiter, async (req: Request, res: Response): Promise<void> => {
+  const parse = casebookInputSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid casebook' });
+    return;
+  }
+  try {
+    const casebook = await DatabaseService.createCasebook(req.session.user!.id, parse.data);
+    res.status(201).json({ success: true, casebook });
+  } catch (error) {
+    console.error('Casebook submission error:', error);
+    res.status(500).json({ success: false, error: 'Could not submit this casebook' });
+  }
+});
+
+app.put('/api/casebooks/:id', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id;
+  if (typeof id !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid casebook ID' });
+    return;
+  }
+  const parse = casebookInputSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid casebook' });
+    return;
+  }
+  try {
+    const casebook = await DatabaseService.updateCasebook(id, req.session.user!.id, parse.data);
+    if (!casebook) {
+      res.status(409).json({ success: false, error: 'Only your casebooks requesting changes can be edited and resubmitted' });
+      return;
+    }
+    res.json({ success: true, casebook });
+  } catch (error) {
+    console.error('Casebook update error:', error);
+    res.status(500).json({ success: false, error: 'Could not update this casebook' });
+  }
+});
+
+app.get('/api/casebooks/:slug/cases/:caseSlug', async (req: Request, res: Response): Promise<void> => {
+  const { slug, caseSlug } = req.params;
+  if (typeof slug !== 'string' || typeof caseSlug !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid casebook or case slug' });
+    return;
+  }
+  try {
+    const result = await DatabaseService.getPublishedCasebookCase(slug, caseSlug);
+    if (!result) {
+      res.status(404).json({ success: false, error: 'Case not found' });
+      return;
+    }
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Published casebook case error:', error);
+    res.status(500).json({ success: false, error: 'Could not load this case' });
+  }
+});
+
+app.get('/api/casebooks/:slug', async (req: Request, res: Response): Promise<void> => {
+  const slug = req.params.slug;
+  if (typeof slug !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid casebook slug' });
+    return;
+  }
+  try {
+    const casebook = await DatabaseService.getPublishedCasebookBySlug(slug);
+    if (!casebook) {
+      res.status(404).json({ success: false, error: 'Casebook not found' });
+      return;
+    }
+    res.json({ success: true, casebook });
+  } catch (error) {
+    console.error('Published casebook error:', error);
+    res.status(500).json({ success: false, error: 'Could not load this casebook' });
+  }
+});
+
+app.get('/api/moderation/casebooks', requireAuth, requireCaseModerator, async (req: Request, res: Response): Promise<void> => {
+  const status = req.query.status === undefined ? 'Pending' : req.query.status;
+  if (status !== 'Pending' && status !== 'Published') {
+    res.status(400).json({ success: false, error: 'Status must be Pending or Published' });
+    return;
+  }
+  try {
+    const casebooks = await DatabaseService.getCasebookModerationQueue(status);
+    res.json({ success: true, casebooks });
+  } catch (error) {
+    console.error('Casebook moderation queue error:', error);
+    res.status(500).json({ success: false, error: 'Could not load the casebook review queue' });
+  }
+});
+
+app.patch('/api/moderation/casebooks/:id', requireAuth, requireCaseModerator, async (req: Request, res: Response): Promise<void> => {
+  const id = req.params.id;
+  if (typeof id !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid casebook ID' });
+    return;
+  }
+  const parse = casebookReviewSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid review decision' });
+    return;
+  }
+  try {
+    const casebook = await DatabaseService.reviewCasebook(
+      id, req.session.user!.id, parse.data.action as CasebookReviewAction, parse.data.notes
+    );
+    if (!casebook) {
+      res.status(409).json({ success: false, error: 'This casebook is no longer in the selected review state' });
+      return;
+    }
+    res.json({ success: true, casebook });
+  } catch (error) {
+    console.error('Casebook moderation error:', error);
+    res.status(500).json({ success: false, error: 'Could not apply the casebook decision' });
+  }
+});
+
+app.post('/api/takedown', takedownLimiter, async (req: Request, res: Response): Promise<void> => {
+  const parse = takedownRequestSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid takedown request' });
+    return;
+  }
+  try {
+    const requestId = await DatabaseService.createTakedownRequest(parse.data);
+    if (!requestId) {
+      res.status(404).json({ success: false, error: 'Published casebook not found' });
+      return;
+    }
+    res.status(201).json({ success: true, requestId });
+  } catch (error) {
+    console.error('Casebook takedown request error:', error);
+    res.status(500).json({ success: false, error: 'Could not submit this report' });
+  }
+});
+
 app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const caseId = req.params.caseId;
   const { contentJson, citationsCount = 0 } = req.body ?? {};
@@ -908,4 +1164,4 @@ if (process.env.NODE_ENV !== 'test') {
   });
 }
 
-export { app };
+export { app, ensureTables };
