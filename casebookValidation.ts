@@ -8,6 +8,7 @@ const caseTypes = [
   'Pricing',
   'M&A',
   'Growth & Retention',
+  'Guesstimate',
 ] as const;
 
 const casebookCaseSchema = z.object({

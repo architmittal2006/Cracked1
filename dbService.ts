@@ -3,6 +3,8 @@ import argon2 from 'argon2';
 import type { PoolClient } from 'pg';
 import { eq, and, count, sql } from 'drizzle-orm';
 import { db, pool } from './db/index.js';
+import { isEstimateFarOutsideReferenceRange, parseGuesstimateEstimateValue } from './guesstimate.js';
+import type { GuesstimateReferenceRange } from './guesstimate.js';
 import {
   users,
   sessions,
@@ -14,13 +16,21 @@ import {
 } from './db/schema.js';
 import type { CasebookFilters, CasebookInput } from './casebookValidation.js';
 
-export interface ReviewRubric {
-  problem_framing: number;
-  framework_fit: number;
-  data_integrity: number;
-  insight_depth: number;
-  feasibility: number;
-}
+export type ReviewRubric =
+  | {
+      problem_framing: number;
+      framework_fit: number;
+      data_integrity: number;
+      insight_depth: number;
+      feasibility: number;
+    }
+  | {
+      structure: number;
+      assumption_quality: number;
+      math_accuracy: number;
+      sanity_check: number;
+      clarity: number;
+    };
 
 export interface ReviewRecord {
   id: string;
@@ -62,6 +72,7 @@ export interface CaseProposalInput {
   deliverables: string[];
   reviewerGuide: string;
   solutionOutline: string;
+  referenceRange?: GuesstimateReferenceRange;
 }
 
 export interface CaseProposalRecord extends CaseProposalInput {
@@ -167,6 +178,10 @@ export interface PublishedCaseRecord {
   tags: string[];
   is_chaos: boolean;
   timer_deadline: string;
+}
+
+export interface CaseReferenceRangeAccess {
+  referenceRange: GuesstimateReferenceRange | null;
 }
 
 export class InvalidCaseReviewError extends Error {}
@@ -640,14 +655,17 @@ export class DatabaseService {
   public static async getNextReviewSubmission(
     caseId: string,
     reviewerId: string
-  ): Promise<{ submissionId: string; caseId: string; content: Record<string, string> } | undefined> {
+  ): Promise<{ submissionId: string; caseId: string; content: Record<string, string>; referenceRangeHint: boolean } | undefined> {
     const result = await pool.query<{
       id: string;
       case_id: string;
       content_json: Record<string, string>;
+      type: string;
+      reference_range: GuesstimateReferenceRange | null;
     }>(
-      `SELECT s.id, s.case_id, s.content_json
+      `SELECT s.id, s.case_id, s.content_json, c.type, c.reference_range
        FROM submissions s
+       JOIN cases c ON c.id = s.case_id
        WHERE s.case_id = $1
          AND s.user_id <> $2
          AND s.status = 'Pending_Review'
@@ -662,9 +680,41 @@ export class DatabaseService {
       [caseId, reviewerId]
     );
     const submission = result.rows[0];
+    const estimate = submission?.content_json.final_estimate;
+    let referenceRangeHint = false;
+    if (submission?.type === 'Guesstimate' && submission.reference_range && estimate) {
+      try {
+        const value = parseGuesstimateEstimateValue(estimate);
+        const range = submission.reference_range;
+        referenceRangeHint = value !== undefined && isEstimateFarOutsideReferenceRange(value, range);
+      } catch (error) {
+        console.error('Could not parse stored Guesstimate estimate for reviewer hint:', error);
+      }
+    }
     return submission
-      ? { submissionId: submission.id, caseId: submission.case_id, content: submission.content_json }
+      ? { submissionId: submission.id, caseId: submission.case_id, content: submission.content_json, referenceRangeHint }
       : undefined;
+  }
+
+  public static async getCaseType(caseId: string): Promise<string | undefined> {
+    const result = await pool.query<{ type: string }>('SELECT type FROM cases WHERE id = $1', [caseId]);
+    return result.rows[0]?.type;
+  }
+
+  public static async getReferenceRangeAfterSubmission(
+    caseId: string,
+    userId: string
+  ): Promise<GuesstimateReferenceRange | null> {
+    const result = await pool.query<{ reference_range: GuesstimateReferenceRange | null }>(
+      `SELECT c.reference_range
+       FROM cases c
+       WHERE c.id = $1 AND EXISTS (
+         SELECT 1 FROM submissions s WHERE s.case_id = c.id AND s.user_id = $2
+       )`,
+      [caseId, userId]
+    );
+    if (!result.rows[0]) throw new Error('Reference range is only available after submitting a solution');
+    return result.rows[0].reference_range;
   }
 
   public static async createCaseProposal(
@@ -676,18 +726,20 @@ export class DatabaseService {
       `INSERT INTO case_proposals (
          id, contributor_id, title, type, sector, difficulty, source_kind, source_reference,
          context, prompt, exhibits, deliverables, reviewer_guide, solution_outline
+         , reference_range
        )
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
        RETURNING id, contributor_id AS "contributorId", title, type, sector, difficulty,
          source_kind AS "sourceKind", source_reference AS "sourceReference", context, prompt,
          exhibits, deliverables, reviewer_guide AS "reviewerGuide",
-         solution_outline AS "solutionOutline", status, moderator_notes AS "moderatorNotes",
+         solution_outline AS "solutionOutline", reference_range AS "referenceRange",
+         status, moderator_notes AS "moderatorNotes",
          published_case_id AS "publishedCaseId", created_at AS "createdAt",
          reviewed_at AS "reviewedAt"`,
       [
         id, contributorId, input.title, input.type, input.sector, input.difficulty, input.sourceKind,
         input.sourceReference || null, input.context, input.prompt, input.exhibits || null,
-        input.deliverables, input.reviewerGuide, input.solutionOutline,
+        input.deliverables, input.reviewerGuide, input.solutionOutline, input.referenceRange ?? null,
       ]
     );
     return result.rows[0];
@@ -698,7 +750,8 @@ export class DatabaseService {
       `SELECT id, contributor_id AS "contributorId", title, type, sector, difficulty,
          source_kind AS "sourceKind", source_reference AS "sourceReference", context, prompt,
          exhibits, deliverables, reviewer_guide AS "reviewerGuide",
-         solution_outline AS "solutionOutline", status, moderator_notes AS "moderatorNotes",
+         solution_outline AS "solutionOutline", reference_range AS "referenceRange",
+         status, moderator_notes AS "moderatorNotes",
          published_case_id AS "publishedCaseId", created_at AS "createdAt",
          reviewed_at AS "reviewedAt"
        FROM case_proposals
@@ -717,7 +770,8 @@ export class DatabaseService {
       `SELECT id, contributor_id AS "contributorId", title, type, sector, difficulty,
          source_kind AS "sourceKind", source_reference AS "sourceReference", context, prompt,
          exhibits, deliverables, reviewer_guide AS "reviewerGuide",
-         solution_outline AS "solutionOutline", status, moderator_notes AS "moderatorNotes",
+         solution_outline AS "solutionOutline", reference_range AS "referenceRange",
+         status, moderator_notes AS "moderatorNotes",
          published_case_id AS "publishedCaseId", created_at AS "createdAt",
          reviewed_at AS "reviewedAt"
        FROM case_proposals
@@ -736,19 +790,21 @@ export class DatabaseService {
       `UPDATE case_proposals SET
          title = $3, type = $4, sector = $5, difficulty = $6, source_kind = $7,
          source_reference = $8, context = $9, prompt = $10, exhibits = $11,
-         deliverables = $12, reviewer_guide = $13, solution_outline = $14,
+         deliverables = $12, reviewer_guide = $13, solution_outline = $14, reference_range = $15,
          status = 'Pending', moderator_notes = NULL, reviewed_by = NULL, reviewed_at = NULL
        WHERE id = $1 AND contributor_id = $2 AND status = 'Changes_Requested'
        RETURNING id, contributor_id AS "contributorId", title, type, sector, difficulty,
          source_kind AS "sourceKind", source_reference AS "sourceReference", context, prompt,
          exhibits, deliverables, reviewer_guide AS "reviewerGuide",
-         solution_outline AS "solutionOutline", status, moderator_notes AS "moderatorNotes",
+         solution_outline AS "solutionOutline", reference_range AS "referenceRange",
+         status, moderator_notes AS "moderatorNotes",
          published_case_id AS "publishedCaseId", created_at AS "createdAt",
          reviewed_at AS "reviewedAt"`,
       [
         proposalId, contributorId, input.title, input.type, input.sector, input.difficulty,
         input.sourceKind, input.sourceReference || null, input.context, input.prompt,
         input.exhibits || null, input.deliverables, input.reviewerGuide, input.solutionOutline,
+        input.referenceRange ?? null,
       ]
     );
     return result.rows[0];
@@ -760,6 +816,7 @@ export class DatabaseService {
          p.difficulty, p.source_kind AS "sourceKind", p.source_reference AS "sourceReference",
          p.context, p.prompt, p.exhibits, p.deliverables,
          p.reviewer_guide AS "reviewerGuide", p.solution_outline AS "solutionOutline",
+         p.reference_range AS "referenceRange",
          p.status, p.moderator_notes AS "moderatorNotes",
          p.published_case_id AS "publishedCaseId", p.created_at AS "createdAt",
          p.reviewed_at AS "reviewedAt", COALESCE(u.name, p.contributor_id) AS "contributorName"
@@ -787,7 +844,8 @@ export class DatabaseService {
          RETURNING id, contributor_id AS "contributorId", title, type, sector, difficulty,
            source_kind AS "sourceKind", source_reference AS "sourceReference", context, prompt,
            exhibits, deliverables, reviewer_guide AS "reviewerGuide",
-           solution_outline AS "solutionOutline", status, moderator_notes AS "moderatorNotes",
+           solution_outline AS "solutionOutline", reference_range AS "referenceRange",
+           status, moderator_notes AS "moderatorNotes",
            published_case_id AS "publishedCaseId", created_at AS "createdAt",
            reviewed_at AS "reviewedAt"`,
         [proposalId, status, moderatorNotes || null, moderatorId]
@@ -808,13 +866,13 @@ export class DatabaseService {
         await client.query(
           `INSERT INTO cases (
              id, title, type, sector, difficulty, status, description, deliverables, pts,
-             tags, is_chaos
+             tags, is_chaos, reference_range
            )
-           VALUES ($1, $2, $3, $4, $5, 'Open', $6, $7, 0, $8, $9)`,
+           VALUES ($1, $2, $3, $4, $5, 'Open', $6, $7, 0, $8, $9, $10)`,
           [
             caseId, proposal.title, proposal.type, proposal.sector, proposal.difficulty,
             description, proposal.deliverables, [proposal.sector],
-            proposal.difficulty === 'Chaos',
+            proposal.difficulty === 'Chaos', proposal.referenceRange ?? null,
           ]
         );
         await client.query(

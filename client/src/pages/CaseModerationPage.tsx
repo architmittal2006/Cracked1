@@ -106,6 +106,11 @@ export const CaseModerationPage: React.FC = () => {
                   {proposal.sourceKind === 'original' ? 'Original case' : proposal.sourceKind === 'interview_recollection' ? 'Interview recollection' : 'Public source'}
                   {proposal.sourceReference ? ` · ${proposal.sourceReference}` : ''}
                 </p>
+                {proposal.referenceRange && (
+                  <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+                    Private reference range: {proposal.referenceRange.low}–{proposal.referenceRange.high} {proposal.referenceRange.unit} (reference estimate {proposal.referenceRange.value})
+                  </p>
+                )}
                 <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{proposal.reviewerGuide}</p>
                 <details className="mt-4">
                   <summary className="cursor-pointer text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">

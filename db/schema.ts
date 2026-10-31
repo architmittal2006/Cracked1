@@ -38,6 +38,7 @@ export const cases = pgTable('cases', {
   tags: text('tags').array().notNull().default([]),
   isChaos: boolean('is_chaos').default(false),
   timerDeadline: timestamp('timer_deadline', { withTimezone: true }),
+  referenceRange: jsonb('reference_range').$type<{ value: number; unit: string; low: number; high: number } | null>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
@@ -56,6 +57,7 @@ export const caseProposals = pgTable('case_proposals', {
   deliverables: text('deliverables').array().notNull().default([]),
   reviewerGuide: text('reviewer_guide').notNull(),
   solutionOutline: text('solution_outline').notNull(),
+  referenceRange: jsonb('reference_range').$type<{ value: number; unit: string; low: number; high: number } | null>(),
   status: varchar('status', { length: 50 }).notNull().default('Pending'),
   moderatorNotes: text('moderator_notes'),
   reviewedBy: varchar('reviewed_by', { length: 255 }),

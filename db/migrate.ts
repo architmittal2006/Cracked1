@@ -78,6 +78,7 @@ async function main() {
       tags TEXT[] NOT NULL DEFAULT '{}',
       is_chaos BOOLEAN DEFAULT FALSE,
       timer_deadline TIMESTAMPTZ,
+      reference_range JSONB,
       created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
     );
 

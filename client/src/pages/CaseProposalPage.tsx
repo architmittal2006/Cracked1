@@ -24,6 +24,7 @@ const emptyProposal: CaseProposalInput = {
   deliverables: [''],
   reviewerGuide: '',
   solutionOutline: '',
+  referenceRange: undefined,
   originalityConfirmed: false,
   confidentialityConfirmed: false,
 };
@@ -36,6 +37,7 @@ export const CaseProposalPage: React.FC = () => {
   const { proposalId } = useParams();
   const navigate = useNavigate();
   const [proposal, setProposal] = useState<CaseProposalInput>(emptyProposal);
+  const [rangeDraft, setRangeDraft] = useState({ value: '', unit: '', low: '', high: '' });
   const [isLoading, setIsLoading] = useState(Boolean(proposalId));
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -63,9 +65,18 @@ export const CaseProposalPage: React.FC = () => {
           deliverables: savedProposal.deliverables,
           reviewerGuide: savedProposal.reviewerGuide,
           solutionOutline: savedProposal.solutionOutline,
+          referenceRange: savedProposal.referenceRange ?? undefined,
           originalityConfirmed: true,
           confidentialityConfirmed: true,
         });
+        if (savedProposal.referenceRange) {
+          setRangeDraft({
+            value: String(savedProposal.referenceRange.value),
+            unit: savedProposal.referenceRange.unit,
+            low: String(savedProposal.referenceRange.low),
+            high: String(savedProposal.referenceRange.high),
+          });
+        }
       })
       .catch((loadError: unknown) => {
         if (isCurrent) setError(loadError instanceof Error ? loadError.message : 'Could not load this proposal');
@@ -85,8 +96,23 @@ export const CaseProposalPage: React.FC = () => {
     setError(null);
     setIsSaving(true);
     try {
+      const rangeValues = Object.values(rangeDraft);
+      const hasRange = rangeValues.some((value) => value.trim() !== '');
+      if (proposal.type === 'Guesstimate' && hasRange) {
+        if (rangeValues.some((value) => value.trim() === '') ||
+          ![rangeDraft.value, rangeDraft.low, rangeDraft.high].every((value) => Number.isFinite(Number(value))) ||
+          Number(rangeDraft.low) > Number(rangeDraft.value) ||
+          Number(rangeDraft.value) > Number(rangeDraft.high)) {
+          setError('Complete the optional reference range and ensure low ≤ value ≤ high.');
+          setIsSaving(false);
+          return;
+        }
+      }
       const cleanedProposal = {
         ...proposal,
+        referenceRange: proposal.type === 'Guesstimate' && hasRange
+          ? { value: Number(rangeDraft.value), unit: rangeDraft.unit.trim(), low: Number(rangeDraft.low), high: Number(rangeDraft.high) }
+          : undefined,
         deliverables: proposal.deliverables.map((item) => item.trim()).filter(Boolean),
       };
       if (proposalId) {
@@ -167,6 +193,30 @@ export const CaseProposalPage: React.FC = () => {
                 <option value="Chaos">Chaos</option>
               </select>
             </label>
+            {proposal.type === 'Guesstimate' && (
+              <fieldset className="space-y-3 rounded-md border border-[var(--border-subtle)] p-4">
+                <legend className="px-1 text-sm font-medium text-[var(--text-primary)]">Optional reference range</legend>
+                <p className={helpClass}>This remains hidden from learners until they submit. Reviewers only receive an out-of-range hint.</p>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(['value', 'unit', 'low', 'high'] as const).map((field) => (
+                    <label key={field} className={labelClass}>
+                      {field === 'value' ? 'Reference estimate' : field === 'unit' ? 'Unit' : `Reference ${field}`}
+                      <input
+                        className={fieldClass}
+                        type={field === 'unit' ? 'text' : 'number'}
+                        min={field === 'unit' ? undefined : 0}
+                        step={field === 'unit' ? undefined : 'any'}
+                        value={rangeDraft[field]}
+                        onChange={(event) => setRangeDraft((current) => ({ ...current, [field]: event.target.value }))}
+                      />
+                    </label>
+                  ))}
+                </div>
+                <Button type="button" variant="ghost" size="sm" onClick={() => setRangeDraft({ value: '', unit: '', low: '', high: '' })}>
+                  Clear reference range
+                </Button>
+              </fieldset>
+            )}
           </div>
         </section>
 

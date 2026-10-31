@@ -9,7 +9,8 @@ export type ProblemType =
   | 'Operational'
   | 'Pricing'
   | 'M&A'
-  | 'Growth & Retention';
+  | 'Growth & Retention'
+  | 'Guesstimate';
 
 export type CredibilityTier =
   | 'Analyst'
@@ -34,6 +35,7 @@ export const PROBLEM_TYPES: ProblemType[] = [
   'Pricing',
   'M&A',
   'Growth & Retention',
+  'Guesstimate',
 ];
 
 export const PROBLEM_TYPE_SLUGS: Record<ProblemType, string> = {
@@ -44,6 +46,7 @@ export const PROBLEM_TYPE_SLUGS: Record<ProblemType, string> = {
   Pricing: 'pricing',
   'M&A': 'ma',
   'Growth & Retention': 'growth-retention',
+  Guesstimate: 'guesstimate',
 };
 
 export const SLUG_TO_PROBLEM_TYPE: Record<string, ProblemType> = Object.fromEntries(
@@ -114,13 +117,9 @@ export interface Submission {
   createdAt: string;
 }
 
-export interface ReviewRubric {
-  problem_framing: number;
-  framework_fit: number;
-  data_integrity: number;
-  insight_depth: number;
-  feasibility: number;
-}
+export type ReviewRubric =
+  | { problem_framing: number; framework_fit: number; data_integrity: number; insight_depth: number; feasibility: number }
+  | { structure: number; assumption_quality: number; math_accuracy: number; sanity_check: number; clarity: number };
 
 export interface Review {
   id: string;
@@ -140,6 +139,31 @@ export const RUBRIC_DIMENSIONS = [
   { key: 'insight_depth' as const, label: 'Insight Depth', description: 'Are recommendations non-obvious? Would a smart operator dismiss this?', weight: 0.25, weightLabel: '25%' },
   { key: 'feasibility' as const, label: 'Feasibility', description: 'Can this realistically be implemented given constraints?', weight: 0.10, weightLabel: '10%' },
 ] as const;
+
+export const GUESSTIMATE_RUBRIC_DIMENSIONS = [
+  { key: 'structure' as const, label: 'Structure', description: 'Are the segments relevant, distinct, and complete?', weight: 0.2, weightLabel: '20%' },
+  { key: 'assumption_quality' as const, label: 'Assumption Quality', description: 'Are assumptions explicit, justified, and reasonable?', weight: 0.2, weightLabel: '20%' },
+  { key: 'math_accuracy' as const, label: 'Math Accuracy', description: 'Do calculations follow correctly from the assumptions?', weight: 0.2, weightLabel: '20%' },
+  { key: 'sanity_check' as const, label: 'Sanity Check', description: 'Does the solver test the estimate against a sensible benchmark?', weight: 0.2, weightLabel: '20%' },
+  { key: 'clarity' as const, label: 'Clarity', description: 'Can another person follow the reasoning and final estimate?', weight: 0.2, weightLabel: '20%' },
+] as const;
+
+export const RUBRIC_DIMENSIONS_BY_TYPE = {
+  'Market Sizing': RUBRIC_DIMENSIONS,
+  Profitability: RUBRIC_DIMENSIONS,
+  'Market Entry': RUBRIC_DIMENSIONS,
+  Operational: RUBRIC_DIMENSIONS,
+  Pricing: RUBRIC_DIMENSIONS,
+  'M&A': RUBRIC_DIMENSIONS,
+  'Growth & Retention': RUBRIC_DIMENSIONS,
+  Guesstimate: GUESSTIMATE_RUBRIC_DIMENSIONS,
+} satisfies Record<ProblemType, readonly {
+  key: string;
+  label: string;
+  description: string;
+  weight: number;
+  weightLabel: string;
+}[]>;
 
 export const CREDIBILITY_TIER_THRESHOLDS: { tier: CredibilityTier; min: number; max: number }[] = [
   { tier: 'Analyst', min: 0, max: 999 },
@@ -533,7 +557,15 @@ export const PLATFORM_STATS = {
   mergeBonusesAwarded: 43,
 };
 
-export const SUBMISSION_TEMPLATES: Record<ProblemType, { key: string; label: string; wordLimit: number; placeholder: string }[]> = {
+export interface SubmissionTemplateSection {
+  key: string;
+  label: string;
+  wordLimit: number;
+  placeholder: string;
+  inputKind?: 'segments' | 'assumptions' | 'estimate';
+}
+
+export const SUBMISSION_TEMPLATES: Record<ProblemType, SubmissionTemplateSection[]> = {
   'Market Sizing': [
     { key: 'approach', label: 'Approach Selection', wordLimit: 100, placeholder: 'Top-down, bottom-up, or hybrid — and why...' },
     { key: 'assumptions', label: 'Key Assumptions', wordLimit: 250, placeholder: 'State every assumption explicitly with sources...' },
@@ -585,4 +617,47 @@ export const SUBMISSION_TEMPLATES: Record<ProblemType, { key: string; label: str
     { key: 'experiments', label: 'Recommended Experiments', wordLimit: 300, placeholder: 'Prioritized tests with expected impact...' },
     { key: 'metrics', label: 'Success Metrics', wordLimit: 150, placeholder: 'KPIs and targets for the next 90 days...' },
   ],
+  Guesstimate: [
+    { key: 'clarify_scope', label: 'Clarify and scope', wordLimit: 250, placeholder: 'Define the question, target, and boundaries...' },
+    { key: 'structure_segments', label: 'Structure (segments)', wordLimit: 250, placeholder: 'Add the distinct segments that make up the estimate...', inputKind: 'segments' },
+    { key: 'assumptions', label: 'Assumptions', wordLimit: 500, placeholder: 'Add at least three assumptions with value, unit, and rationale...', inputKind: 'assumptions' },
+    { key: 'calculation_steps', label: 'Calculation steps', wordLimit: 500, placeholder: 'Show the calculation step by step...' },
+    { key: 'sanity_check', label: 'Sanity check', wordLimit: 250, placeholder: 'Check the result against a benchmark or alternative...' },
+    { key: 'final_estimate', label: 'Final estimate', wordLimit: 100, placeholder: 'Enter estimate and plausible range...', inputKind: 'estimate' },
+  ],
 };
+
+export function formatSubmissionSection(key: string, content: string): string {
+  if (key === 'structure_segments') {
+    try {
+      const segments: unknown = JSON.parse(content);
+      if (Array.isArray(segments)) return segments.map((segment) => `• ${segment}`).join('\n');
+    } catch {
+      return content;
+    }
+  }
+  if (key === 'assumptions') {
+    try {
+      const assumptions: unknown = JSON.parse(content);
+      if (Array.isArray(assumptions)) {
+        return assumptions.map((item) =>
+          `${item.name}: ${item.value} ${item.unit} — ${item.rationale}`
+        ).join('\n');
+      }
+    } catch {
+      return content;
+    }
+  }
+  if (key === 'final_estimate') {
+    try {
+      const estimate: unknown = JSON.parse(content);
+      if (estimate && typeof estimate === 'object') {
+        const values = estimate as Record<string, string>;
+        return `${values.value} ${values.unit} (range: ${values.low}–${values.high} ${values.unit})`;
+      }
+    } catch {
+      return content;
+    }
+  }
+  return content;
+}

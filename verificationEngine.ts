@@ -12,6 +12,7 @@ interface ReviewRecord {
 class VerificationEngine {
   public static async validateLayer1Gate(submission: {
     contentJson: unknown;
+    caseType?: string;
   }): Promise<
     | { compliant: true; contentJson: Record<string, string>; wordCount: number }
     | { compliant: false; error: string }
@@ -37,10 +38,81 @@ class VerificationEngine {
       return { compliant: false, error: 'Solution must be 4,000 words or fewer.' };
     }
 
+    if (submission.caseType === 'Guesstimate') {
+      const requiredFields = [
+        'clarify_scope', 'structure_segments', 'assumptions',
+        'calculation_steps', 'sanity_check', 'final_estimate',
+      ];
+      if (requiredFields.some((field) => !contentJson[field])) {
+        return { compliant: false, error: 'Complete every Guesstimate section.' };
+      }
+
+      let assumptions: unknown;
+      let estimate: unknown;
+      try {
+        assumptions = JSON.parse(contentJson.assumptions!);
+        estimate = JSON.parse(contentJson.final_estimate!);
+      } catch {
+        return { compliant: false, error: 'Enter assumptions and the final estimate in the provided fields.' };
+      }
+
+      let segments: unknown;
+      try {
+        segments = JSON.parse(contentJson.structure_segments!);
+      } catch {
+        return { compliant: false, error: 'Add at least one structured segment.' };
+      }
+      if (!Array.isArray(segments) || segments.length === 0 ||
+        !segments.every((segment: unknown) => typeof segment === 'string' && segment.trim())) {
+        return { compliant: false, error: 'Add at least one structured segment.' };
+      }
+
+      const validAssumptions = Array.isArray(assumptions) && assumptions.length >= 3 && assumptions.every((item: unknown) => {
+        if (!item || typeof item !== 'object') return false;
+        const assumption = item as Record<string, unknown>;
+        return typeof assumption.name === 'string' && Boolean(assumption.name.trim()) &&
+          typeof assumption.value === 'string' && Boolean(assumption.value.trim()) &&
+          Number.isFinite(Number(assumption.value)) &&
+          typeof assumption.unit === 'string' && Boolean(assumption.unit.trim()) &&
+          typeof assumption.rationale === 'string' && Boolean(assumption.rationale.trim());
+      });
+      if (!validAssumptions) {
+        return { compliant: false, error: 'Add at least three assumptions with a numeric value, unit, and rationale.' };
+      }
+
+      if (!estimate || typeof estimate !== 'object') {
+        return { compliant: false, error: 'Enter a final estimate, unit, and low/high range.' };
+      }
+      const finalEstimate = estimate as Record<string, unknown>;
+      const numericFields = ['value', 'low', 'high'];
+      if (numericFields.some((field) =>
+        typeof finalEstimate[field] !== 'string' ||
+        !(finalEstimate[field] as string).trim() ||
+        !Number.isFinite(Number(finalEstimate[field]))
+      ) || typeof finalEstimate.unit !== 'string' || !finalEstimate.unit.trim()) {
+        return { compliant: false, error: 'Enter numeric estimate and range values with a unit.' };
+      }
+      const value = Number(finalEstimate.value);
+      const low = Number(finalEstimate.low);
+      const high = Number(finalEstimate.high);
+      if (low > value || value > high) {
+        return { compliant: false, error: 'Final estimate must satisfy low ≤ value ≤ high.' };
+      }
+    }
+
     return { compliant: true, contentJson, wordCount };
   }
 
   public static calculateIndividualWeightedScore(rubric: ReviewRubric): number {
+    if ('structure' in rubric) {
+      return (
+        rubric.structure * 0.2 +
+        rubric.assumption_quality * 0.2 +
+        rubric.math_accuracy * 0.2 +
+        rubric.sanity_check * 0.2 +
+        rubric.clarity * 0.2
+      );
+    }
     return (
       rubric.problem_framing * 0.25 +
       rubric.framework_fit * 0.2 +
