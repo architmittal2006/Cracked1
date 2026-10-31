@@ -20,3 +20,17 @@ Set these environment variables:
 Deploy the Express API on Render with its PostgreSQL database. Configure Vercel's
 rewrite target in `vercel.json` to the public Render service URL if the backend
 hostname changes. Do not point Vercel's client build at the Express process.
+
+## Casebook catalog import
+
+Catalog imports are a local, moderator-only operation. The CSV at
+`data/casebook-catalog.csv` is a template; its `__EXAMPLE_ONLY__` row is always
+excluded. Add one row per case, repeat the casebook metadata for each row, and
+separate multiple `industries` with semicolons. Summaries must be written in
+your own words. The import does not accept PDFs or hosted case text.
+
+Run a validation-only dry run with `npx tsx db/import-casebooks.ts`. To write
+rows, configure `DATABASE_URL`, `CASE_MODERATOR_EMAILS`, and
+`CASEBOOK_IMPORT_UPLOADER_ID` for an existing moderator account, then pass
+`--apply --confirm-rights --confirm-attribution`. Imported casebooks always
+start as `Pending` and must still be approved before appearing publicly.

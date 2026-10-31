@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { HelmetProvider } from 'react-helmet-async';
 import { ErrorBoundary } from './components/ErrorBoundary';
@@ -44,6 +44,10 @@ import { CasebooksPage } from './pages/CasebooksPage';
 import { CasebookDetailPage } from './pages/CasebookDetailPage';
 import { CasebookCasePage } from './pages/CasebookCasePage';
 
+const CasebookProposalPage = lazy(() => import('./pages/CasebookProposalPage').then((module) => ({ default: module.CasebookProposalPage })));
+const MyCasebooksPage = lazy(() => import('./pages/MyCasebooksPage').then((module) => ({ default: module.MyCasebooksPage })));
+const CasebookModerationPage = lazy(() => import('./pages/CasebookModerationPage').then((module) => ({ default: module.CasebookModerationPage })));
+
 const ScrollToTop = () => {
   const { pathname } = useLocation();
   useEffect(() => { window.scrollTo(0, 0); }, [pathname]);
@@ -62,6 +66,7 @@ const App: React.FC = () => {
               <div className="min-h-screen flex flex-col font-sans">
               <Navbar />
               <main className="flex-grow pt-16 relative z-10" aria-label="Main content">
+                <Suspense fallback={<p className="py-8 text-center text-sm text-[var(--text-secondary)]" aria-live="polite">Loading page…</p>}>
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
                   <Route path="/arena" element={<ArenaPage />} />
@@ -76,6 +81,26 @@ const App: React.FC = () => {
                   <Route path="/casebooks" element={<CasebooksPage />} />
                   <Route path="/casebooks/:slug/:caseSlug" element={<CasebookCasePage />} />
                   <Route path="/casebooks/:slug" element={<CasebookDetailPage />} />
+                  <Route path="/contribute/casebooks" element={
+                    <ProtectedRoute>
+                      <CasebookProposalPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/contribute/casebooks/mine" element={
+                    <ProtectedRoute>
+                      <MyCasebooksPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/contribute/casebooks/:casebookId/edit" element={
+                    <ProtectedRoute>
+                      <CasebookProposalPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/moderation/casebooks" element={
+                    <ProtectedRoute>
+                      <CasebookModerationPage />
+                    </ProtectedRoute>
+                  } />
                   <Route path="/contribute/cases" element={
                     <ProtectedRoute>
                       <CaseProposalPage />
@@ -156,6 +181,7 @@ const App: React.FC = () => {
                   <Route path="/callback/google" element={<GoogleOAuthCallback />} />
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
+                </Suspense>
               </main>
               <div className="relative z-10">
                 <Footer />
