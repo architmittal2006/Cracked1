@@ -33,20 +33,21 @@
   --leading-relaxed: 1.75;
 
   --color-eureka-blue: #FF4C25;
-  --color-eureka-dark: #101114;
+  --color-eureka-dark: #000000;
   --color-eureka-card: #191B20;
 }
 
 :root {
   /* Neutral dark surfaces with enough separation for clear reading. */
-  --bg-deep: #101114;
-  --bg-surface: #14161A;
+  --bg-deep: #000000;
+  --bg-surface: #000000;
   --bg-card: #191B20;
   --bg-card-hover: #202329;
 
   /* Accents - Orange primary (matching logo) */
   --accent-primary: #FF4C25;
   --accent-secondary: #E03D18;
+  --accent-hover: var(--accent-secondary);
   --accent-track-arena: #10B981;
   --accent-track-questions: #8B5CF6;
   --accent-track-cases: #F59E0B;
@@ -103,6 +104,7 @@
 
   --accent-primary: #B9381B;
   --accent-secondary: #9F321A;
+  --accent-hover: var(--accent-secondary);
 
   --text-primary: #17191D;
   --text-secondary: #424956;
@@ -144,6 +146,19 @@
 
 [data-theme="dark"] {
   color-scheme: dark;
+}
+
+.brand-wordmark {
+  display: block;
+}
+
+.brand-wordmark--light,
+[data-theme="light"] .brand-wordmark--dark {
+  display: none;
+}
+
+[data-theme="light"] .brand-wordmark--light {
+  display: block;
 }
 
 *, *::before, *::after {
@@ -351,7 +366,7 @@ h1, h2, h3, .font-display {
   text-decoration: none;
 }
 .btn-primary:hover {
-  background: #E03D18;
+  background: var(--accent-hover);
 }
 .btn-primary:disabled {
   opacity: 0.5;
