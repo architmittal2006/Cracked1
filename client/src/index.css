@@ -47,6 +47,7 @@
   /* Accents - Orange primary (matching logo) */
   --accent-primary: #FF4C25;
   --accent-secondary: #E03D18;
+  --accent-hover: var(--accent-secondary);
   --accent-track-arena: #10B981;
   --accent-track-questions: #8B5CF6;
   --accent-track-cases: #F59E0B;
@@ -103,6 +104,7 @@
 
   --accent-primary: #B9381B;
   --accent-secondary: #9F321A;
+  --accent-hover: var(--accent-secondary);
 
   --text-primary: #17191D;
   --text-secondary: #424956;
@@ -364,7 +366,7 @@ h1, h2, h3, .font-display {
   text-decoration: none;
 }
 .btn-primary:hover {
-  background: #E03D18;
+  background: var(--accent-hover);
 }
 .btn-primary:disabled {
   opacity: 0.5;
