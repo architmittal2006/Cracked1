@@ -1,14 +1,14 @@
 /**
  * One-time migration + seed script for existing mock data.
  *
- * Reads mock data from client/src/data/mockData.ts and persists it to
+ * Reads mock data from frontend/src/data/mockData.ts and persists it to
  * PostgreSQL via Drizzle. Safe to re-run (uses INSERT ... ON CONFLICT DO NOTHING
  * for users/cases, and skips existing submissions/reviews).
  *
- * Usage:
- *   DATABASE_URL=postgres://... npx tsx db/migrate.ts
+ * Run manually only against a database where the demo seed data is wanted.
  */
 
+import 'dotenv/config';
 import { Pool } from 'pg';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { eq } from 'drizzle-orm';
@@ -20,7 +20,11 @@ import {
   MOCK_SUBMISSIONS,
   MOCK_REVIEWS,
   GATE_STATE,
-} from '../client/src/data/mockData.js';
+} from '../frontend/src/data/mockData.js';
+
+if (process.env.NODE_ENV === 'production') {
+  throw new Error('Demo data seeding is disabled in production');
+}
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,

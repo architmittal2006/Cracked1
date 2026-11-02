@@ -1,0 +1,43 @@
+import { access, readFile } from 'node:fs/promises';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+  vi.resetModules();
+});
+
+describe('split frontend and backend deployment', () => {
+  it('deploys the API without running the demo-data seeder on every startup', async () => {
+    const renderConfig = await readFile(new URL('./render.yaml', import.meta.url), 'utf8');
+
+    expect(renderConfig).toMatch(/rootDir:\s*backend/);
+    expect(renderConfig).toMatch(/startCommand:\s*npm run start\s*$/m);
+    expect(renderConfig).not.toMatch(/startCommand:.*migrate/);
+  });
+
+  it('keeps Vercel configuration beside the frontend and proxies API requests to Render', async () => {
+    const vercelConfig = JSON.parse(
+      await readFile(new URL('../frontend/vercel.json', import.meta.url), 'utf8'),
+    );
+    const apiRewrite = vercelConfig.rewrites.find(
+      (rewrite: { source: string }) => rewrite.source === '/api/:path*',
+    );
+
+    expect(apiRewrite?.destination).toBe('https://cracked-api.onrender.com/api/:path*');
+    await expect(access(new URL('../vercel.json', import.meta.url))).rejects.toThrow();
+  });
+
+  it('loads migration seed data from the new frontend folder', async () => {
+    const migrationSource = await readFile(new URL('./db/migrate.ts', import.meta.url), 'utf8');
+
+    expect(migrationSource).toContain('../frontend/src/data/mockData.js');
+  });
+
+  it('refuses to run the demo-data seeder in production', async () => {
+    vi.stubEnv('NODE_ENV', 'production');
+
+    await expect(import('./db/migrate.js')).rejects.toThrow(
+      'Demo data seeding is disabled in production',
+    );
+  });
+});

@@ -5,7 +5,7 @@ Comprehensive UI/UX redesign for Cracked?, a peer-reviewed case-solving and cons
 
 ## Technology Stack
 - **Frontend:** React 19, TypeScript, Vite, Tailwind CSS 4.3, Framer Motion, React Router v7
-- **Backend:** Express.js, TypeScript, file-based storage (dbService.ts)
+- **Backend:** Express.js, TypeScript, PostgreSQL via Drizzle ORM
 - **Auth:** GitHub OAuth, Google OAuth
 - **Design:** Custom CSS with design tokens, glass-card aesthetic
 
@@ -16,12 +16,15 @@ npm run dev          # Start backend with ts-node
 npm run build        # Build backend (tsc)
 npm start            # Start production server
 
-# Frontend (in client/ directory)
-npm run dev          # Start Vite dev server (runs on port 5174)
+# Frontend (in frontend/ directory)
+npm run dev          # Start Vite dev server (runs on port 5173)
 npm run build        # Build for production (tsc + vite build)
 npm run lint         # Run oxlint
 npm run preview      # Preview production build
 ```
+
+Backend integration tests require a disposable PostgreSQL database in
+`TEST_DATABASE_URL`; run `npm run test:integration` from the repository root.
 
 ## Key Design Principles from References
 

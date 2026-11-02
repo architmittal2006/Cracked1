@@ -1,8 +1,9 @@
 import React, { useState, useRef } from 'react';
 import { X, Check, Image as ImageIcon, AlertCircle } from 'lucide-react';
+import { uploadImage } from '../services/api';
 
 interface ImageUploaderProps {
-  onImageUpload: (file: File) => void;
+  onImageUpload: (image: { url: string; publicId: string }) => void;
   maxSizeMB?: number;
   acceptedTypes?: string[];
 }
@@ -39,10 +40,23 @@ export const ImageUploader: React.FC<ImageUploaderProps> = ({
 
     // Create preview
     const reader = new FileReader();
-    reader.onload = () => {
-      setPreview(reader.result as string);
-      setUploading(false);
-      onImageUpload(file);
+    reader.onload = async () => {
+      try {
+        if (typeof reader.result !== 'string') {
+          throw new Error('Failed to read file.');
+        }
+
+        const uploadedImage = await uploadImage(file);
+        setPreview(reader.result);
+        onImageUpload(uploadedImage);
+      } catch (uploadError) {
+        setError(uploadError instanceof Error ? uploadError.message : 'Image upload failed.');
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      } finally {
+        setUploading(false);
+      }
     };
     reader.onerror = () => {
       setError('Failed to read file.');

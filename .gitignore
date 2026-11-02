@@ -1,5 +1,8 @@
 # Environment variables
 .env
+.env.local
+.env.*.local
+*.env
 
 # Dependencies
 node_modules/
@@ -7,6 +10,13 @@ node_modules/
 # IDE
 .vscode/
 .idea/
+
+# Agent / Tooling caches
+.agents/
+.kilo/
+.skills/
+.taste-skill/
+skills/
 
 # OS
 .DS_Store
@@ -19,6 +29,16 @@ npm-debug.log*
 # Build outputs
 dist/
 client/dist/
+frontend/dist/
+backend/dist/
+
+# Test / QA reports
+playwright-report/
+frontend/playwright-report/
+qa-screenshots/
+frontend/qa-screenshots/
+test-results/
+frontend/test-results/
 
 # Session files (old file store)
 sessions/

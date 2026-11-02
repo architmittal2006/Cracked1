@@ -545,3 +545,28 @@ export async function getLeaderboard(
     rankDelta: user.rankDelta,
   }));
 }
+
+
+// --- Image Upload (Cloudinary) ---
+
+export async function uploadImage(file: File): Promise<{ url: string; publicId: string }> {
+  const formData = new FormData();
+  formData.append("image", file);
+
+  const url = `${API_BASE}/api/upload/image`;
+  const response = await fetch(url, {
+    method: "POST",
+    credentials: "include",
+    body: formData,
+  });
+
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || "Failed to upload image");
+  }
+
+  return {
+    url: data.url,
+    publicId: data.publicId,
+  };
+}

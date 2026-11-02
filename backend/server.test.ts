@@ -1,20 +1,32 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { app, ensureTables } from './server.js';
 import { Pool } from 'pg';
 
-const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL;
+const { uploadImageBufferMock } = vi.hoisted(() => ({
+  uploadImageBufferMock: vi.fn(),
+}));
+
+vi.mock('./cloudinary.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./cloudinary.js')>()),
+  uploadImageBuffer: uploadImageBufferMock,
+}));
+
+const TEST_DATABASE_URL = process.env.TEST_DATABASE_URL;
 
 if (!TEST_DATABASE_URL) {
-  throw new Error('TEST_DATABASE_URL or DATABASE_URL is required for tests');
+  throw new Error('TEST_DATABASE_URL is required; refusing to run integration tests against DATABASE_URL');
 }
 
+let app: import('express').Express;
 let pool: Pool;
 
 beforeAll(async () => {
+  process.env.DATABASE_URL = TEST_DATABASE_URL;
+  const server = await import('./server.js');
+  app = server.app;
   pool = new Pool({ connectionString: TEST_DATABASE_URL });
-  await ensureTables();
+  await server.ensureTables();
 });
 
 afterAll(async () => {
@@ -24,6 +36,7 @@ afterAll(async () => {
 });
 
 beforeEach(async () => {
+  uploadImageBufferMock.mockReset();
   await pool.query("DELETE FROM casebooks WHERE id LIKE 'casebook_test_%'");
   await pool.query("DELETE FROM users WHERE email LIKE '%@test.cracked.local'");
 });
@@ -153,6 +166,35 @@ describe('Auth endpoints', () => {
         name: 'Test User',
         email: `testuser_${Date.now()}@test.cracked.local`,
         password: 'SecurePass123!',
+      });
+
+      describe('Image upload route', () => {
+        it('requires a signed-in user and returns the Cloudinary image URL', async () => {
+          const image = Buffer.from('test image');
+          const anonymousResponse = await request(app)
+            .post('/api/upload/image')
+            .attach('image', image, { filename: 'case.png', contentType: 'image/png' });
+          expect(anonymousResponse.status).toBe(401);
+
+          const agent = request.agent(app);
+          await registerTestUser(agent, 'image_upload');
+          uploadImageBufferMock.mockResolvedValue({
+            url: 'https://images.example.test/case.png',
+            publicId: 'caseforge/case',
+          });
+
+          const response = await agent
+            .post('/api/upload/image')
+            .attach('image', image, { filename: 'case.png', contentType: 'image/png' });
+
+          expect(response.status).toBe(200);
+          expect(response.body).toEqual({
+            success: true,
+            url: 'https://images.example.test/case.png',
+            publicId: 'caseforge/case',
+          });
+          expect(uploadImageBufferMock).toHaveBeenCalledWith(image, 'caseforge');
+        });
       });
 
     expect(res.status).toBe(201);

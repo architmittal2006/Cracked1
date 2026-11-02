@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import { createHash } from 'node:crypto';
+import 'dotenv/config';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';

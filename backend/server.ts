@@ -1,10 +1,9 @@
+import 'dotenv/config';
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import session from 'express-session';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import fs from 'fs';
 import pgStoreFactory from 'connect-pg-simple';
 import rateLimit from 'express-rate-limit';
@@ -25,13 +24,7 @@ import {
   casebookReviewSchema,
   takedownRequestSchema,
 } from './casebookValidation.js';
-
-// Load environment variables
-dotenv.config();
-
-// Get __dirname in ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { imageUpload, uploadImageBuffer } from './cloudinary.js';
 
 // Extend Session type to include user
 declare module 'express-session' {
@@ -245,7 +238,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 // CORS — allow configured client origin to call the API with credentials
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5174';
+const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
 app.use((_req: Request, res: Response, next: NextFunction) => {
   const origin = _req.get('origin');
   if (origin === CLIENT_ORIGIN) {
@@ -1147,28 +1140,11 @@ app.post('/api/submissions/:submissionId/reviews', requireAuth, async (req: Requ
   }
 });
 
-// Serve static files from client/dist
-// Try multiple possible paths for different deployment environments
-const possiblePaths = [
-  path.join(__dirname, '..', 'client', 'dist'),           // Local development
-  path.join(__dirname, 'client', 'dist'),                // Alternative local
-  path.join(process.cwd(), 'client', 'dist'),             // Render/common
-  path.join(process.cwd(), 'dist', 'client', 'dist'),     // Alternative Render
-];
-
-let clientDistPath = possiblePaths[0];
-for (const testPath of possiblePaths) {
-  if (fs.existsSync(testPath)) {
-    clientDistPath = testPath;
-    break;
-  }
+// Local root builds can serve the frontend; Render runs the API without that folder.
+const frontendDistPath = path.resolve(process.cwd(), '..', 'frontend', 'dist');
+if (fs.existsSync(frontendDistPath)) {
+  app.use(express.static(frontendDistPath));
 }
-
-console.log('Serving static files from:', clientDistPath);
-console.log('__dirname:', __dirname);
-console.log('process.cwd():', process.cwd());
-console.log('File exists:', fs.existsSync(clientDistPath));
-app.use(express.static(clientDistPath));
 
 // In-memory stats cache (5 minutes)
 let statsCache: { data: { solutionsScored: number; contributors: number; mergeBonuses: number }; expires: number } | null = null;
@@ -1195,10 +1171,33 @@ app.get('/api/stats', async (req: Request, res: Response): Promise<void> => {
   }
 });
 
+// Image upload endpoint (Cloudinary)
+app.post('/api/upload/image', requireAuth, imageUpload.single('image'), async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!req.file) {
+      res.status(400).json({ success: false, error: 'No image file provided' });
+      return;
+    }
+    const result = await uploadImageBuffer(req.file.buffer, 'caseforge');
+    res.json({
+      success: true,
+      url: result.url,
+      publicId: result.publicId,
+    });
+  } catch (error: any) {
+    console.error('Image upload error:', error);
+    res.status(500).json({ success: false, error: error.message || 'Image upload failed' });
+  }
+});
+
 // SPA fallback - serve index.html for all non-API routes
 app.get('/*splat', (req: Request, res: Response) => {
-  if (!req.path.startsWith('/api') && !req.path.startsWith('/callback')) {
-    res.sendFile(path.join(clientDistPath, 'index.html'));
+  if (
+    fs.existsSync(frontendDistPath) &&
+    !req.path.startsWith('/api') &&
+    !req.path.startsWith('/callback')
+  ) {
+    res.sendFile(path.join(frontendDistPath, 'index.html'));
   }
 });
 
