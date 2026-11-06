@@ -54,7 +54,37 @@ export interface UserRecord {
   reviewScore: number;
   casesSolved: number;
   mergeBonusCount: number;
+  isActive: boolean;
+  sessionVersion: number;
   role: string;
+}
+
+export interface AccountProfileRecord {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  bio: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface AccountProfileDbRow extends Omit<AccountProfileRecord, 'createdAt'> {
+  createdAt: Date | string;
+}
+
+interface AuditLogRecord {
+  id: string;
+  actorId: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
+
+interface AuditLogDbRow extends Omit<AuditLogRecord, 'createdAt'> {
+  createdAt: Date | string;
 }
 
 export type CaseProposalStatus = 'Pending' | 'Changes_Requested' | 'Approved' | 'Declined';
@@ -202,6 +232,155 @@ export class DatabaseService {
   private static slugify(value: string): string {
     return value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'casebook';
+  }
+
+  private static async insertAuditLog(
+    client: PoolClient,
+    actorId: string | null,
+    action: string,
+    targetType: string,
+    targetId: string | null,
+    details: Record<string, unknown> = {}
+  ): Promise<void> {
+    await client.query(
+      `INSERT INTO admin_audit_logs (id, actor_id, action, target_type, target_id, details)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+      [`audit_${crypto.randomUUID()}`, actorId, action, targetType, targetId, JSON.stringify(details)]
+    );
+  }
+
+  private static accountProfileFromRow(row: AccountProfileDbRow): AccountProfileRecord {
+    return {
+      ...row,
+      createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    };
+  }
+
+  public static async getAccountProfile(userId: string): Promise<AccountProfileRecord | undefined> {
+    const result = await pool.query<AccountProfileDbRow>(
+      `SELECT id, username, name, email, bio, is_active AS "isActive", created_at AS "createdAt"
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+    return result.rows[0] ? this.accountProfileFromRow(result.rows[0]) : undefined;
+  }
+
+  public static async updateAccountProfile(
+    userId: string,
+    input: { username: string; name: string; bio: string | null }
+  ): Promise<AccountProfileRecord | undefined> {
+    const result = await pool.query<AccountProfileDbRow>(
+      `UPDATE users SET username = $2, name = $3, bio = $4
+       WHERE id = $1
+       RETURNING id, username, name, email, bio, is_active AS "isActive", created_at AS "createdAt"`,
+      [userId, input.username, input.name, input.bio]
+    );
+    return result.rows[0] ? this.accountProfileFromRow(result.rows[0]) : undefined;
+  }
+
+  public static async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<boolean> {
+    const user = await this.getUserById(userId);
+    if (!user || !user.isActive || !user.passwordHash ||
+      !(await comparePassword(currentPassword, user.passwordHash))) {
+      return false;
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        'UPDATE users SET password_hash = $2, session_version = session_version + 1 WHERE id = $1',
+        [userId, passwordHash]
+      );
+      await client.query(`DELETE FROM sessions WHERE sess #>> '{user,id}' = $1`, [userId]);
+      await this.insertAuditLog(client, userId, 'account.password_changed', 'user', userId);
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public static async listAdminAccounts(): Promise<AccountProfileRecord[]> {
+    const result = await pool.query<AccountProfileDbRow>(
+      `SELECT id, username, name, email, bio, is_active AS "isActive", created_at AS "createdAt"
+       FROM users ORDER BY created_at DESC LIMIT 200`
+    );
+    return result.rows.map((account) => this.accountProfileFromRow(account));
+  }
+
+  public static async setAccountActive(
+    actorId: string,
+    targetId: string,
+    isActive: boolean
+  ): Promise<AccountProfileRecord | undefined> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query<AccountProfileDbRow>(
+        `UPDATE users SET is_active = $3, session_version = session_version + 1
+         WHERE id = $1 AND id <> $2
+         RETURNING id, username, name, email, bio, is_active AS "isActive", created_at AS "createdAt"`,
+        [targetId, actorId, isActive]
+      );
+      const account = result.rows[0];
+      if (!account) {
+        await client.query('ROLLBACK');
+        return undefined;
+      }
+      if (!isActive) {
+        await client.query(`DELETE FROM sessions WHERE sess #>> '{user,id}' = $1`, [targetId]);
+      }
+      await this.insertAuditLog(
+        client,
+        actorId,
+        isActive ? 'account.reactivated' : 'account.suspended',
+        'user',
+        targetId
+      );
+      await client.query('COMMIT');
+      return this.accountProfileFromRow(account);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public static async getAdminAuditLogs(limit: number): Promise<AuditLogRecord[]> {
+    const result = await pool.query<AuditLogDbRow>(
+      `SELECT id, actor_id AS "actorId", action, target_type AS "targetType",
+         target_id AS "targetId", details, created_at AS "createdAt"
+       FROM admin_audit_logs ORDER BY created_at DESC LIMIT $1`,
+      [limit]
+    );
+    return result.rows.map((entry) => ({
+      ...entry,
+      createdAt: entry.createdAt instanceof Date ? entry.createdAt.toISOString() : String(entry.createdAt),
+    }));
+  }
+
+  public static async recordAdminAuditEvent(
+    actorId: string,
+    action: string,
+    targetType: string,
+    targetId: string | null,
+    details: Record<string, unknown> = {}
+  ): Promise<void> {
+    await pool.query(
+      `INSERT INTO admin_audit_logs (id, actor_id, action, target_type, target_id, details)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+      [`audit_${crypto.randomUUID()}`, actorId, action, targetType, targetId, JSON.stringify(details)]
+    );
   }
 
   private static async insertCasebookCases(
@@ -898,7 +1077,9 @@ export class DatabaseService {
     email: string;
     passwordHash: string;
   }): Promise<string> {
-    const existingEmail = await db.select().from(users).where(eq(users.email, payload.email));
+    const email = payload.email.trim().toLowerCase();
+    const existingEmail = await db.select().from(users)
+      .where(sql`LOWER(${users.email}) = ${email}`);
     if (existingEmail.length > 0) {
       throw new Error('Email already registered');
     }
@@ -910,16 +1091,55 @@ export class DatabaseService {
     const id = 'u_' + crypto.randomUUID().slice(2, 11);
     await db.insert(users).values({
       id,
-      username: payload.username,
+      username: payload.username.trim(),
       name: payload.name,
-      email: payload.email,
+      email,
       passwordHash: payload.passwordHash,
     });
     return id;
   }
 
+  public static async upsertOAuthUser(payload: {
+    email: string;
+    name: string;
+    preferredUsername?: string;
+  }): Promise<UserRecord> {
+    const email = payload.email.trim().toLowerCase();
+    const existing = await this.getUserByEmail(email);
+    if (existing) return existing;
+
+    let baseUsername = (payload.preferredUsername || email.split('@')[0] || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 30);
+    if (baseUsername.length < 3) baseUsername = 'user_' + baseUsername;
+
+    let finalUsername = baseUsername;
+    let counter = 1;
+    while (await this.getUserByUsername(finalUsername)) {
+      finalUsername = baseUsername.slice(0, 25) + '_' + (counter++);
+    }
+
+    const id = 'u_' + crypto.randomUUID().slice(2, 11);
+    await db.insert(users).values({
+      id,
+      username: finalUsername,
+      name: payload.name || finalUsername,
+      email,
+      passwordHash: '',
+      role: 'General',
+    });
+
+    const created = await this.getUserById(id);
+    if (!created) throw new Error('Failed to create OAuth user record');
+    return created;
+  }
+
   public static async getUserByEmail(email: string): Promise<UserRecord | undefined> {
-    const result = await db.select().from(users).where(eq(users.email, email));
+    const normalizedEmail = email.trim().toLowerCase();
+    const result = await db.select().from(users)
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`)
+      .limit(1);
     return result[0];
   }
 

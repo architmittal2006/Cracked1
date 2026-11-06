@@ -7,12 +7,12 @@ afterEach(() => {
 });
 
 describe('split frontend and backend deployment', () => {
-  it('deploys the API without running the demo-data seeder on every startup', async () => {
+  it('runs migrations before starting the API without running the demo-data seeder', async () => {
     const renderConfig = await readFile(new URL('./render.yaml', import.meta.url), 'utf8');
 
     expect(renderConfig).toMatch(/rootDir:\s*backend/);
-    expect(renderConfig).toMatch(/startCommand:\s*npm run start\s*$/m);
-    expect(renderConfig).not.toMatch(/startCommand:.*migrate/);
+    expect(renderConfig).toMatch(/startCommand:\s*npm run migrate\s*&&\s*npm run start\s*$/m);
+    expect(renderConfig).not.toMatch(/startCommand:.*seed:demo/);
   });
 
   it('keeps Vercel configuration beside the frontend and proxies API requests to Render', async () => {

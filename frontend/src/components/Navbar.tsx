@@ -44,22 +44,30 @@ const ThemeSelect: React.FC<{ mobile?: boolean }> = ({ mobile = false }) => {
 
 export const Navbar: React.FC = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [logoutError, setLogoutError] = useState<string | null>(null);
   const { user, isAuthenticated, logout } = useAuth();
   const navigate = useNavigate();
   const visibleNavLinks = [
     ...navLinks,
     ...(isAuthenticated ? [{ to: '/contribute/cases/mine', label: 'My proposals' }] : []),
     ...(user?.role === 'Moderator' ? [{ to: '/moderation/cases', label: 'Review cases' }] : []),
+    ...(user?.accessRole === 'Admin' ? [{ to: '/admin/accounts', label: 'Admin' }] : []),
   ];
 
   const handleLogout = async () => {
-    await logout();
-    navigate('/');
-    setIsMobileMenuOpen(false);
+    setLogoutError(null);
+    try {
+      await logout();
+      navigate('/');
+      setIsMobileMenuOpen(false);
+    } catch (error) {
+      setLogoutError(error instanceof Error ? error.message : 'Logout failed');
+    }
   };
 
   return (
     <nav className="fixed top-0 z-50 h-16 w-full border-b border-[var(--border-subtle)] bg-[var(--bg-deep)]" aria-label="Main navigation">
+      {logoutError && <p className="absolute right-4 top-16 z-[70] rounded border border-red-500/30 bg-[var(--bg-surface)] px-4 py-2 text-sm text-red-300" role="alert">{logoutError}</p>}
       <div className="h-full max-w-7xl mx-auto flex items-center justify-between px-4 sm:px-6 lg:px-8">
         <Link to="/" className="flex items-center gap-2 group transition-opacity hover:opacity-90">
           <BrandLogo className="h-7 w-auto md:h-8" />
@@ -92,6 +100,7 @@ export const Navbar: React.FC = () => {
                   <Avatar initials={user.name.split(' ').map(n => n[0]).join('')} size="sm" />
                   <span className="hidden sm:inline text-sm font-medium text-white">{user.name}</span>
                 </Link>
+                <Link to="/settings" className="text-sm text-slate-400 hover:text-white">Settings</Link>
                 <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-400 hover:text-white">
                   <LogOut className="w-4 h-4" /> Logout
                 </Button>
@@ -155,6 +164,9 @@ export const Navbar: React.FC = () => {
                   <Link to={`/profile/${user.username}`} onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 rounded-lg text-slate-400 hover:bg-white/5 transition-colors">
                     <User className="w-4 h-4" />
                     <span className="text-sm">{user.name}</span>
+                  </Link>
+                  <Link to="/settings" onClick={() => setIsMobileMenuOpen(false)} className="px-4 py-3 text-sm text-slate-400 hover:bg-white/5 transition-colors">
+                    Account settings
                   </Link>
                   <Button variant="ghost" size="sm" onClick={handleLogout} className="w-full justify-center text-slate-400 hover:text-white">
                     <LogOut className="w-4 h-4" /> Logout

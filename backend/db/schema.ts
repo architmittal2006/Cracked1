@@ -6,6 +6,8 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 255 }).notNull().unique(),
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
+  isActive: boolean('is_active').notNull().default(true),
+  sessionVersion: integer('session_version').notNull().default(0),
   role: varchar('role', { length: 50 }).notNull().default('General'),
   credibilityScore: integer('credibility_score').notNull().default(0),
   solveScore: integer('solve_score').notNull().default(0),
@@ -157,3 +159,16 @@ export const credibilityScores = pgTable('credibility_scores', {
   score: integer('score').notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+export const adminAuditLogs = pgTable('admin_audit_logs', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  actorId: varchar('actor_id', { length: 255 }).references(() => users.id, { onDelete: 'set null' }),
+  action: varchar('action', { length: 100 }).notNull(),
+  targetType: varchar('target_type', { length: 100 }).notNull(),
+  targetId: varchar('target_id', { length: 255 }),
+  details: jsonb('details').notNull().default({}),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('admin_audit_logs_created_idx').on(table.createdAt),
+  index('admin_audit_logs_target_idx').on(table.targetType, table.targetId),
+]);

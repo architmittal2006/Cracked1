@@ -5,7 +5,7 @@ services:
     plan: free
     rootDir: backend
     buildCommand: npm ci && npm run build
-    startCommand: npm run start
+    startCommand: npm run migrate && npm run start
     envVars:
       - key: DATABASE_URL
         sync: false # Set in Render dashboard using your Neon PostgreSQL connection string

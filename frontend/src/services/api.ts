@@ -43,6 +43,73 @@ async function request<T>(
   return data;
 }
 
+export interface AccountProfile {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  bio: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export type AdminAccount = AccountProfile & { accessRole: 'Student' | 'Admin' };
+
+export interface AdminAuditLog {
+  id: string;
+  actorId: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
+
+export async function getAccountProfile(): Promise<AccountProfile> {
+  const result = await request<{ success: true; profile: AccountProfile }>('/api/account/profile');
+  return result.profile;
+}
+
+export async function updateAccountProfile(input: {
+  username: string;
+  name: string;
+  bio: string | null;
+}): Promise<AccountProfile> {
+  const result = await request<{ success: true; profile: AccountProfile }>('/api/account/profile', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+  return result.profile;
+}
+
+export async function changeAccountPassword(input: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  await request<{ success: true }>('/api/account/password', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getAdminAccounts(): Promise<AdminAccount[]> {
+  const result = await request<{ success: true; accounts: AdminAccount[] }>('/api/admin/accounts');
+  return result.accounts;
+}
+
+export async function setAdminAccountStatus(id: string, status: 'active' | 'suspended'): Promise<AdminAccount> {
+  const result = await request<{ success: true; account: AdminAccount }>(
+    `/api/admin/accounts/${encodeURIComponent(id)}/status`,
+    { method: 'PATCH', body: JSON.stringify({ status }) }
+  );
+  return result.account;
+}
+
+export async function getAdminAuditLogs(): Promise<AdminAuditLog[]> {
+  const result = await request<{ success: true; logs: AdminAuditLog[] }>('/api/admin/audit-logs');
+  return result.logs;
+}
+
 // ─── Arena (Track 1) ───
 
 export interface ArenaCase {

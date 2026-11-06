@@ -11,7 +11,9 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "dev": "tsx watch server.ts",
-    "migrate": "tsx db/migrate.ts",
+    "migrate": "tsx db/runMigrations.ts",
+    "db:migrate": "tsx db/runMigrations.ts",
+    "seed:demo": "tsx db/migrate.ts",
     "test": "vitest run",
     "test:unit": "vitest run --exclude server.test.ts",
     "test:integration": "vitest run server.test.ts"

@@ -35,6 +35,8 @@ import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { NotFoundPage } from './pages/NotFoundPage';
+import { AccountSettingsPage } from './pages/AccountSettingsPage';
+import { AdminAccountsPage } from './pages/AdminAccountsPage';
 import { CompanyDashboardPage } from './pages/CompanyDashboardPage';
 import { CompanyPostCasePage } from './pages/CompanyPostCasePage';
 import { CaseProposalPage } from './pages/CaseProposalPage';
@@ -159,6 +161,16 @@ const App: React.FC = () => {
                   <Route path="/profile" element={
                     <ProtectedRoute>
                       <ProfilePage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/settings" element={
+                    <ProtectedRoute>
+                      <AccountSettingsPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/admin/accounts" element={
+                    <ProtectedRoute requiredRole="Admin">
+                      <AdminAccountsPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/profile/:username" element={<ProfilePage />} />

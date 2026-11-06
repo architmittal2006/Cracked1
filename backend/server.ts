@@ -9,6 +9,8 @@ import pgStoreFactory from 'connect-pg-simple';
 import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { Pool } from 'pg';
+import { assertMigrationsCurrent } from './db/runMigrations.js';
+import { logError } from './logging.js';
 import {
   DatabaseService,
   hashPassword,
@@ -16,6 +18,7 @@ import {
   InvalidCaseReviewError,
   type CaseProposalInput,
   type CasebookReviewAction,
+  type UserRecord,
 } from './dbService.js';
 import { VerificationEngine } from './verificationEngine.js';
 import {
@@ -29,6 +32,7 @@ import { imageUpload, uploadImageBuffer } from './cloudinary.js';
 // Extend Session type to include user
 declare module 'express-session' {
   interface SessionData {
+    oauthState?: { provider: string; state: string; createdAt: number };
     user?: {
       id: string;
       username: string;
@@ -40,6 +44,8 @@ declare module 'express-session' {
       casesSolved?: number;
       mergeBonusCount?: number;
       role?: string;
+      accessRole?: 'Student' | 'Admin';
+      sessionVersion: number;
     };
   }
 }
@@ -61,177 +67,23 @@ const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
 });
 
+const accountSecurityLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { success: false, error: 'Too many account security attempts. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const pgStore = pgStoreFactory(session);
-
-// Ensure all database tables exist on startup (idempotent)
-async function ensureTables() {
-  await pool.query(`
-    CREATE TABLE IF NOT EXISTS users (
-      id VARCHAR(255) PRIMARY KEY,
-      username VARCHAR(100) NOT NULL UNIQUE,
-      email VARCHAR(255) NOT NULL UNIQUE,
-      password_hash VARCHAR(255) NOT NULL,
-      name VARCHAR(255) NOT NULL,
-      role VARCHAR(50) NOT NULL DEFAULT 'General',
-      credibility_score INTEGER NOT NULL DEFAULT 0,
-      solve_score INTEGER NOT NULL DEFAULT 0,
-      review_score INTEGER NOT NULL DEFAULT 0,
-      cases_solved INTEGER NOT NULL DEFAULT 0,
-      merge_bonus_count INTEGER NOT NULL DEFAULT 0,
-      bio TEXT,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS sessions (
-      sid VARCHAR(255) PRIMARY KEY,
-      sess JSONB NOT NULL,
-      expire TIMESTAMPTZ NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS cases (
-      id VARCHAR(255) PRIMARY KEY,
-      title VARCHAR(255) NOT NULL,
-      type VARCHAR(100) NOT NULL,
-      sector VARCHAR(100) NOT NULL,
-      difficulty VARCHAR(50) NOT NULL,
-      status VARCHAR(50) NOT NULL DEFAULT 'Open',
-      description TEXT NOT NULL,
-      deliverables TEXT[] NOT NULL DEFAULT '{}',
-      pts INTEGER NOT NULL DEFAULT 0,
-      submission_count INTEGER NOT NULL DEFAULT 0,
-      review_count INTEGER NOT NULL DEFAULT 0,
-      deadline TIMESTAMPTZ,
-      tags TEXT[] NOT NULL DEFAULT '{}',
-      is_chaos BOOLEAN DEFAULT FALSE,
-      timer_deadline TIMESTAMPTZ,
-      reference_range JSONB,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    ALTER TABLE cases ADD COLUMN IF NOT EXISTS reference_range JSONB;
-
-    CREATE TABLE IF NOT EXISTS case_proposals (
-      id VARCHAR(255) PRIMARY KEY,
-      contributor_id VARCHAR(255) NOT NULL,
-      title VARCHAR(255) NOT NULL,
-      type VARCHAR(100) NOT NULL,
-      sector VARCHAR(100) NOT NULL,
-      difficulty VARCHAR(50) NOT NULL,
-      source_kind VARCHAR(50) NOT NULL,
-      source_reference TEXT,
-      context TEXT NOT NULL,
-      prompt TEXT NOT NULL,
-      exhibits TEXT,
-      deliverables TEXT[] NOT NULL DEFAULT '{}',
-      reviewer_guide TEXT NOT NULL,
-      solution_outline TEXT NOT NULL,
-      reference_range JSONB,
-      status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-      moderator_notes TEXT,
-      reviewed_by VARCHAR(255),
-      published_case_id VARCHAR(255) REFERENCES cases(id),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      reviewed_at TIMESTAMPTZ
-    );
-    ALTER TABLE case_proposals ADD COLUMN IF NOT EXISTS reference_range JSONB;
-    CREATE INDEX IF NOT EXISTS case_proposals_contributor_created_idx
-      ON case_proposals (contributor_id, created_at DESC);
-    CREATE INDEX IF NOT EXISTS case_proposals_status_created_idx
-      ON case_proposals (status, created_at ASC);
-
-    CREATE TABLE IF NOT EXISTS casebooks (
-      id VARCHAR(255) PRIMARY KEY,
-      slug VARCHAR(255) NOT NULL UNIQUE,
-      title VARCHAR(255) NOT NULL,
-      source_org VARCHAR(255) NOT NULL,
-      source_kind VARCHAR(50) NOT NULL,
-      year INTEGER,
-      description TEXT NOT NULL,
-      license_kind VARCHAR(50) NOT NULL,
-      permission_reference TEXT,
-      external_url TEXT,
-      industries TEXT[] NOT NULL DEFAULT '{}',
-      case_count INTEGER NOT NULL DEFAULT 0,
-      status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-      uploader_id VARCHAR(255) NOT NULL REFERENCES users(id),
-      moderator_notes TEXT,
-      reviewed_by VARCHAR(255) REFERENCES users(id),
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      published_at TIMESTAMPTZ
-    );
-    CREATE INDEX IF NOT EXISTS casebooks_status_created_idx
-      ON casebooks (status, created_at DESC);
-    CREATE INDEX IF NOT EXISTS casebooks_uploader_created_idx
-      ON casebooks (uploader_id, created_at DESC);
-
-    CREATE TABLE IF NOT EXISTS casebook_cases (
-      id VARCHAR(255) PRIMARY KEY,
-      casebook_id VARCHAR(255) NOT NULL REFERENCES casebooks(id) ON DELETE CASCADE,
-      slug VARCHAR(255) NOT NULL,
-      title VARCHAR(255) NOT NULL,
-      firm VARCHAR(255),
-      sector VARCHAR(100) NOT NULL,
-      case_type VARCHAR(100),
-      difficulty VARCHAR(50) NOT NULL,
-      summary TEXT NOT NULL,
-      body TEXT,
-      position INTEGER NOT NULL DEFAULT 0,
-      practice_case_id VARCHAR(255) REFERENCES cases(id) ON DELETE SET NULL,
-      UNIQUE (casebook_id, slug)
-    );
-    CREATE INDEX IF NOT EXISTS casebook_cases_book_position_idx
-      ON casebook_cases (casebook_id, position);
-
-    CREATE TABLE IF NOT EXISTS takedown_requests (
-      id VARCHAR(255) PRIMARY KEY,
-      casebook_id VARCHAR(255) NOT NULL REFERENCES casebooks(id) ON DELETE CASCADE,
-      requester_email VARCHAR(255) NOT NULL,
-      reason TEXT NOT NULL,
-      status VARCHAR(50) NOT NULL DEFAULT 'Pending',
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS submissions (
-      id VARCHAR(255) PRIMARY KEY,
-      case_id VARCHAR(255) NOT NULL REFERENCES cases(id),
-      user_id VARCHAR(255) NOT NULL REFERENCES users(id),
-      content_json JSONB NOT NULL,
-      citations_count INTEGER NOT NULL DEFAULT 0,
-      word_count INTEGER NOT NULL DEFAULT 0,
-      status VARCHAR(50) NOT NULL DEFAULT 'Submitted',
-      structural_compliant BOOLEAN DEFAULT FALSE,
-      final_weighted_score INTEGER,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS reviews (
-      id VARCHAR(255) PRIMARY KEY,
-      submission_id VARCHAR(255) NOT NULL REFERENCES submissions(id),
-      reviewer_id VARCHAR(255) NOT NULL REFERENCES users(id),
-      case_id VARCHAR(255) REFERENCES cases(id),
-      reviewer_tier VARCHAR(50) NOT NULL,
-      scores JSONB NOT NULL,
-      feedback TEXT NOT NULL DEFAULT '',
-      is_voided BOOLEAN DEFAULT FALSE NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-    ALTER TABLE reviews ADD COLUMN IF NOT EXISTS feedback TEXT NOT NULL DEFAULT '';
-
-    CREATE TABLE IF NOT EXISTS votes (
-      id VARCHAR(255) PRIMARY KEY,
-      submission_id VARCHAR(255) NOT NULL REFERENCES submissions(id),
-      user_id VARCHAR(255) NOT NULL REFERENCES users(id),
-      direction VARCHAR(10) NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-
-    CREATE TABLE IF NOT EXISTS credibility_scores (
-      id VARCHAR(255) PRIMARY KEY,
-      user_id VARCHAR(255) NOT NULL REFERENCES users(id),
-      score INTEGER NOT NULL,
-      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-    );
-  `);
-}
+const sessionStore = process.env.NODE_ENV === 'test' &&
+  process.env.TEST_USE_POSTGRES_SESSION_STORE !== 'true'
+  ? undefined
+  : new pgStore({
+      pool,
+      tableName: 'sessions',
+      createTableIfMissing: false,
+    });
 
 // Middleware
 app.use(express.json());
@@ -258,7 +110,7 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20,
+  max: process.env.NODE_ENV === 'test' ? 100 : 20,
   message: { success: false, error: 'Too many attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -266,15 +118,33 @@ const authLimiter = rateLimit({
 
 // Zod validation schemas
 const signupSchema = z.object({
-  username: z.string().min(3).max(100),
-  name: z.string().min(1).max(255),
-  email: z.string().email(),
-  password: z.string().min(8),
+  username: z.string().trim().min(3).max(100),
+  name: z.string().trim().min(1).max(255),
+  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  password: z.string().min(8).max(256),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
-  password: z.string().min(1),
+  email: z.string().trim().email().transform((value) => value.toLowerCase()),
+  password: z.string().min(1).max(256),
+});
+
+const profileUpdateSchema = z.object({
+  username: z.string().trim().min(3).max(100),
+  name: z.string().trim().min(1).max(255),
+  bio: z.string().trim().max(500).nullable(),
+});
+
+const passwordChangeSchema = z.object({
+  currentPassword: z.string().min(1).max(256),
+  newPassword: z.string().min(8).max(256),
+}).refine((value) => value.currentPassword !== value.newPassword, {
+  message: 'Choose a new password different from your current password',
+  path: ['newPassword'],
+});
+
+const accountStatusSchema = z.object({
+  status: z.enum(['active', 'suspended']),
 });
 
 const caseProposalSchema = z.object({
@@ -345,12 +215,34 @@ const guesstimateReviewSchema = z.object({
   feedback: z.string().trim().min(80).max(3000),
 });
 
-const isCaseModeratorEmail = (email: string): boolean => {
-  const moderatorEmails = (process.env.CASE_MODERATOR_EMAILS || '')
+const isCaseModerator = (userId: string): boolean => {
+  const moderatorIds = (process.env.CASE_MODERATOR_USER_IDS || '')
     .split(',')
-    .map((value) => value.trim().toLowerCase())
+    .map((value) => value.trim())
     .filter(Boolean);
-  return moderatorEmails.includes(email.trim().toLowerCase());
+  return moderatorIds.includes(userId);
+};
+
+const isAdmin = (userId: string): boolean => {
+  const adminIds = (process.env.ADMIN_USER_IDS || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean);
+  return adminIds.includes(userId);
+};
+
+const isValidOAuthState = (
+  req: Request,
+  provider: 'github' | 'google',
+  state: unknown
+): boolean => {
+  const saved = req.session.oauthState;
+  const now = Date.now();
+  return typeof state === 'string' &&
+    saved?.provider === provider &&
+    saved.state === state &&
+    saved.createdAt <= now &&
+    now - saved.createdAt <= 10 * 60 * 1000;
 };
 
 const caseProposalLimiter = rateLimit({
@@ -377,17 +269,14 @@ const takedownLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-if (process.env.NODE_ENV === 'production' && !process.env.SESSION_SECRET) {
-  throw new Error('SESSION_SECRET must be set in production');
+if (process.env.NODE_ENV === 'production' &&
+  (!process.env.SESSION_SECRET || process.env.SESSION_SECRET.length < 32)) {
+  throw new Error('SESSION_SECRET must be set to at least 32 characters in production');
 }
 
 // Session configuration with PostgreSQL-backed store
 app.use(session({
-  store: new pgStore({
-    pool,
-    tableName: 'sessions',
-    createTableIfMissing: true,
-  }),
+  store: sessionStore,
   secret: process.env.SESSION_SECRET || 'development-only-session-secret',
   name: 'connect.sid',
   resave: false,
@@ -396,43 +285,127 @@ app.use(session({
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+    path: '/',
   },
 }));
 
 // Authentication middleware
-const requireAuth = (req: Request, res: Response, next: NextFunction) => {
+const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.user) {
     res.status(401).json({ success: false, error: 'Unauthorized' });
     return;
   }
-  next();
+  try {
+    const user = await DatabaseService.getUserById(req.session.user.id);
+    if (!user || !user.isActive || user.sessionVersion !== req.session.user.sessionVersion) {
+      req.session.destroy((error) => {
+        if (error) logError('Could not invalidate inactive session', error);
+      });
+      res.clearCookie('connect.sid', { path: '/' });
+      res.status(401).json({ success: false, error: 'Session is no longer valid' });
+      return;
+    }
+    req.session.user.accessRole = isAdmin(user.id) ? 'Admin' : 'Student';
+    req.session.user.role = isCaseModerator(user.id) ? 'Moderator' : (user.role || 'General');
+    next();
+  } catch (error) {
+    logError('Authentication check failed', error);
+    res.status(503).json({ success: false, error: 'Authentication service unavailable' });
+  }
 };
 
 const requireCaseModerator = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.session.user || !isCaseModeratorEmail(req.session.user.email)) {
+  if (!req.session.user || (!isAdmin(req.session.user.id) && !isCaseModerator(req.session.user.id))) {
     res.status(403).json({ success: false, error: 'Moderator access is required' });
     return;
   }
   next();
 };
 
+async function recordRejectedAdminAction(
+  actorId: string,
+  action: string,
+  reason: string
+): Promise<void> {
+  try {
+    await DatabaseService.recordAdminAuditEvent(actorId, action, 'admin_operation', null, { reason });
+  } catch (error) {
+    logError('Could not record rejected admin action', error);
+  }
+}
+
+const requireAdmin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+  if (!req.session.user || !isAdmin(req.session.user.id)) {
+    if (req.session.user) {
+      await recordRejectedAdminAction(req.session.user.id, 'admin.access_denied', 'insufficient_role');
+    }
+    res.status(403).json({ success: false, error: 'Admin access is required' });
+    return;
+  }
+  next();
+};
+
+function establishUserSession(req: Request, userRecord: UserRecord): Promise<void> {
+  return new Promise((resolve, reject) => {
+    req.session.regenerate((error) => {
+      if (error) return reject(error);
+      req.session.user = {
+        id: userRecord.id,
+        username: userRecord.username,
+        name: userRecord.name,
+        email: userRecord.email,
+        credibilityScore: userRecord.credibilityScore ?? 0,
+        solveScore: userRecord.solveScore ?? 0,
+        reviewScore: userRecord.reviewScore ?? 0,
+        casesSolved: userRecord.casesSolved ?? 0,
+        mergeBonusCount: userRecord.mergeBonusCount ?? 0,
+        role: isCaseModerator(userRecord.id) ? 'Moderator' : (userRecord.role || 'General'),
+        accessRole: isAdmin(userRecord.id) ? 'Admin' : 'Student',
+        sessionVersion: userRecord.sessionVersion,
+      };
+      req.session.save((saveError) => saveError ? reject(saveError) : resolve());
+    });
+  });
+}
+
 // GitHub OAuth endpoints
-app.get('/api/auth/github', (req: Request, res: Response) => {
-  const baseUrl = process.env.BASE_URL || 'http://localhost:5174';
-  const githubAuthUrl = `https://github.com/login/oauth/authorize?client_id=${process.env.GITHUB_CLIENT_ID}&redirect_uri=${encodeURIComponent(`${baseUrl}/callback/github`)}&scope=user:email`;
-  res.json({ authUrl: githubAuthUrl });
+app.get('/api/auth/github', authLimiter, async (req: Request, res: Response): Promise<void> => {
+  const baseUrl = process.env.BASE_URL || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const state = crypto.randomUUID();
+  req.session.oauthState = { provider: 'github', state, createdAt: Date.now() };
+  try {
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((error) => error ? reject(error) : resolve());
+    });
+  } catch (error) {
+    logError('GitHub OAuth state persistence failed', error);
+    res.status(503).json({ success: false, error: 'Could not start authentication' });
+    return;
+  }
+  const githubAuthUrl = 'https://github.com/login/oauth/authorize?client_id=' +
+    process.env.GITHUB_CLIENT_ID +
+    '&redirect_uri=' + encodeURIComponent(baseUrl + '/callback/github') +
+    '&scope=user:email&state=' + encodeURIComponent(state);
+  res.json({ authUrl: githubAuthUrl, state });
 });
 
-app.post('/api/auth/github/callback', async (req: Request, res: Response) => {
-  const { code } = req.body;
+app.post('/api/auth/github/callback', authLimiter, async (req: Request, res: Response) => {
+  const { code, state } = req.body;
 
   if (!code) {
     res.status(400).json({ success: false, error: 'Authorization code is required' });
     return;
   }
 
+  if (!isValidOAuthState(req, 'github', state)) {
+    res.status(403).json({ success: false, error: 'Invalid or expired OAuth state parameter' });
+    return;
+  }
+  delete req.session.oauthState;
+
   try {
+    const baseUrl = process.env.BASE_URL || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
     // Exchange code for access token
     const tokenResponse = await fetch('https://github.com/login/oauth/access_token', {
       method: 'POST',
@@ -443,14 +416,15 @@ app.post('/api/auth/github/callback', async (req: Request, res: Response) => {
       body: JSON.stringify({
         client_id: process.env.GITHUB_CLIENT_ID,
         client_secret: process.env.GITHUB_CLIENT_SECRET,
-        code: code,
+        code,
+        redirect_uri: baseUrl + '/callback/github',
       }),
     });
 
     const tokenData = await tokenResponse.json() as { error?: string; error_description?: string; access_token?: string };
 
-    if (tokenData.error) {
-      res.status(400).json({ success: false, error: tokenData.error_description || 'OAuth failed' });
+    if (tokenData.error || !tokenData.access_token) {
+      res.status(400).json({ success: false, error: tokenData.error_description || 'OAuth token exchange failed' });
       return;
     }
 
@@ -460,45 +434,84 @@ app.post('/api/auth/github/callback', async (req: Request, res: Response) => {
         'Authorization': `Bearer ${tokenData.access_token}`,
       },
     });
+    if (!userResponse.ok) {
+      res.status(401).json({ success: false, error: 'GitHub authentication failed' });
+      return;
+    }
 
-    const userData = await userResponse.json() as { id: number; login: string; name?: string; email?: string };
-
-    // Store user in session
-    req.session.user = {
-      id: userData.id.toString(),
-      username: userData.login,
+    const userData = await userResponse.json() as { id: number; login: string; name?: string };
+    const emailsResponse = await fetch('https://api.github.com/user/emails', {
+      headers: {
+        'Authorization': 'Bearer ' + tokenData.access_token,
+        'User-Agent': 'Cracked-Platform',
+      },
+    });
+    if (!emailsResponse.ok) {
+      res.status(401).json({ success: false, error: 'A verified GitHub email is required' });
+      return;
+    }
+    const emails = await emailsResponse.json() as Array<{ email: string; primary: boolean; verified: boolean }>;
+    const email = emails.find((item) => item.primary && item.verified)?.email
+      || emails.find((item) => item.verified)?.email;
+    if (!email) {
+      res.status(401).json({ success: false, error: 'A verified GitHub email is required' });
+      return;
+    }
+    const user = await DatabaseService.upsertOAuthUser({
+      email,
       name: userData.name || userData.login,
-      email: userData.email || `${userData.login}@github.com`,
-      credibilityScore: 0,
-      solveScore: 0,
-      reviewScore: 0,
-      casesSolved: 0,
-      mergeBonusCount: 0,
-      role: isCaseModeratorEmail(userData.email || `${userData.login}@github.com`) ? 'Moderator' : 'General',
-    };
-
+      preferredUsername: userData.login,
+    });
+    if (!user.isActive) {
+      res.status(401).json({ success: false, error: 'This account is unavailable' });
+      return;
+    }
+    await establishUserSession(req, user);
     res.json({ success: true, user: req.session.user });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error) {
+    logError('GitHub OAuth error', error);
+    res.status(500).json({ success: false, error: 'Authentication failed' });
   }
 });
 
 // Google OAuth endpoints
-app.get('/api/auth/google', (req: Request, res: Response) => {
-  const baseUrl = process.env.BASE_URL || 'http://localhost:5174';
-  const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(`${baseUrl}/callback/google`)}&response_type=code&scope=openid%20email%20profile`;
-  res.json({ authUrl: googleAuthUrl });
+app.get('/api/auth/google', authLimiter, async (req: Request, res: Response): Promise<void> => {
+  const baseUrl = process.env.BASE_URL || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+  const state = crypto.randomUUID();
+  req.session.oauthState = { provider: 'google', state, createdAt: Date.now() };
+  try {
+    await new Promise<void>((resolve, reject) => {
+      req.session.save((error) => error ? reject(error) : resolve());
+    });
+  } catch (error) {
+    logError('Google OAuth state persistence failed', error);
+    res.status(503).json({ success: false, error: 'Could not start authentication' });
+    return;
+  }
+  const googleAuthUrl = 'https://accounts.google.com/o/oauth2/v2/auth?client_id=' +
+    process.env.GOOGLE_CLIENT_ID +
+    '&redirect_uri=' + encodeURIComponent(baseUrl + '/callback/google') +
+    '&response_type=code&scope=openid%20email%20profile&state=' + encodeURIComponent(state);
+  res.json({ authUrl: googleAuthUrl, state });
 });
 
-app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
-  const { code } = req.body;
+app.post('/api/auth/google/callback', authLimiter, async (req: Request, res: Response) => {
+  const { code, state } = req.body;
 
   if (!code) {
     res.status(400).json({ success: false, error: 'Authorization code is required' });
     return;
   }
 
+  if (!isValidOAuthState(req, 'google', state)) {
+    res.status(403).json({ success: false, error: 'Invalid or expired OAuth state parameter' });
+    return;
+  }
+  delete req.session.oauthState;
+
   try {
+    const baseUrl = process.env.BASE_URL || process.env.CLIENT_ORIGIN || 'http://localhost:5173';
+    const redirectUri = baseUrl + '/callback/google';
     // Exchange code for access token
     const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
@@ -509,15 +522,15 @@ app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
         client_id: process.env.GOOGLE_CLIENT_ID,
         client_secret: process.env.GOOGLE_CLIENT_SECRET,
         code: code,
-        redirect_uri: 'http://localhost:5174/callback/google',
+        redirect_uri: redirectUri,
         grant_type: 'authorization_code',
       }),
     });
 
     const tokenData = await tokenResponse.json() as { error?: string; error_description?: string; access_token?: string };
 
-    if (tokenData.error) {
-      res.status(400).json({ success: false, error: tokenData.error_description || 'OAuth failed' });
+    if (tokenData.error || !tokenData.access_token) {
+      res.status(400).json({ success: false, error: tokenData.error_description || 'OAuth token exchange failed' });
       return;
     }
 
@@ -527,26 +540,30 @@ app.post('/api/auth/google/callback', async (req: Request, res: Response) => {
         'Authorization': `Bearer ${tokenData.access_token}`,
       },
     });
+    if (!userResponse.ok) {
+      res.status(401).json({ success: false, error: 'Google authentication failed' });
+      return;
+    }
 
-    const userData = await userResponse.json() as { id: string; name: string; email: string };
-
-    // Store user in session
-    req.session.user = {
-      id: userData.id,
-      username: userData.email.split('@')[0], // Use email prefix as username
-      name: userData.name,
+    const userData = await userResponse.json() as { id: string; name: string; email: string; verified_email?: boolean };
+    if (!userData.email || userData.verified_email !== true) {
+      res.status(401).json({ success: false, error: 'A verified Google email is required' });
+      return;
+    }
+    const user = await DatabaseService.upsertOAuthUser({
       email: userData.email,
-      credibilityScore: 0,
-      solveScore: 0,
-      reviewScore: 0,
-      casesSolved: 0,
-      mergeBonusCount: 0,
-      role: isCaseModeratorEmail(userData.email) ? 'Moderator' : 'General',
-    };
-
+      name: userData.name,
+      preferredUsername: userData.email.split('@')[0],
+    });
+    if (!user.isActive) {
+      res.status(401).json({ success: false, error: 'This account is unavailable' });
+      return;
+    }
+    await establishUserSession(req, user);
     res.json({ success: true, user: req.session.user });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error) {
+    logError('Google OAuth error', error);
+    res.status(500).json({ success: false, error: 'Authentication failed' });
   }
 });
 
@@ -569,21 +586,18 @@ app.post('/api/auth/register', authLimiter, async (req: Request, res: Response):
     });
 
     const newUser = await DatabaseService.getUserById(id);
-    req.session.user = {
-      id: newUser.id,
-      username: newUser.username,
-      name: newUser.name,
-      email: newUser.email,
-      credibilityScore: newUser.credibilityScore,
-      solveScore: newUser.solveScore,
-      reviewScore: newUser.reviewScore,
-      casesSolved: newUser.casesSolved,
-      mergeBonusCount: newUser.mergeBonusCount,
-      role: isCaseModeratorEmail(newUser.email) ? 'Moderator' : newUser.role,
-    };
+    if (!newUser) throw new Error('Registered user could not be loaded');
+    await establishUserSession(req, newUser);
     res.status(201).json({ success: true, user: req.session.user });
-  } catch (error: any) {
-    res.status(400).json({ success: false, error: error.message });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (message === 'Email already registered' || message === 'Username already taken' ||
+      (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505')) {
+      res.status(400).json({ success: false, error: 'Email or username is already in use' });
+      return;
+    }
+    logError('Registration failed', error);
+    res.status(500).json({ success: false, error: 'Could not create account' });
   }
 });
 
@@ -603,32 +617,164 @@ app.post('/api/auth/login', authLimiter, async (req: Request, res: Response): Pr
       return;
     }
 
-    if (!(await comparePassword(password, user.passwordHash))) {
+    if (!user.isActive || !(await comparePassword(password, user.passwordHash))) {
       res.status(401).json({ success: false, error: 'Invalid email or password' });
       return;
     }
 
-    req.session.user = {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      email: user.email,
-      credibilityScore: user.credibilityScore,
-      solveScore: user.solveScore,
-      reviewScore: user.reviewScore,
-      casesSolved: user.casesSolved,
-      mergeBonusCount: user.mergeBonusCount,
-      role: isCaseModeratorEmail(user.email) ? 'Moderator' : user.role,
-    };
+    await establishUserSession(req, user);
     res.json({ success: true, user: req.session.user });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error) {
+    logError('Login failed', error);
+    res.status(500).json({ success: false, error: 'Could not complete login' });
   }
 });
 
 // Get current user
 app.get('/api/auth/me', requireAuth, (req: Request, res: Response) => {
   res.json({ success: true, user: req.session.user });
+});
+
+app.get('/api/account/profile', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const profile = await DatabaseService.getAccountProfile(req.session.user!.id);
+    if (!profile) {
+      res.status(404).json({ success: false, error: 'Account not found' });
+      return;
+    }
+    res.json({ success: true, profile });
+  } catch (error) {
+    logError('Account profile lookup failed', error);
+    res.status(500).json({ success: false, error: 'Could not load account profile' });
+  }
+});
+
+app.put('/api/account/profile', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const parsed = profileUpdateSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid profile' });
+    return;
+  }
+  try {
+    const profile = await DatabaseService.updateAccountProfile(req.session.user!.id, {
+      ...parsed.data,
+      bio: parsed.data.bio ?? null,
+    });
+    if (!profile) {
+      res.status(404).json({ success: false, error: 'Account not found' });
+      return;
+    }
+    req.session.user!.username = profile.username;
+    req.session.user!.name = profile.name;
+    req.session.user!.email = profile.email;
+    req.session.save((error) => {
+      if (error) {
+        logError('Could not update account session', error);
+        res.status(500).json({ success: false, error: 'Profile was saved but the session could not be refreshed' });
+        return;
+      }
+      res.json({ success: true, profile });
+    });
+  } catch (error) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === '23505') {
+      res.status(409).json({ success: false, error: 'That username is already in use' });
+      return;
+    }
+    logError('Account profile update failed', error);
+    res.status(500).json({ success: false, error: 'Could not update account profile' });
+  }
+});
+
+app.post('/api/account/password', requireAuth, accountSecurityLimiter, async (req: Request, res: Response): Promise<void> => {
+  const parsed = passwordChangeSchema.safeParse(req.body);
+  if (!parsed.success) {
+    res.status(400).json({ success: false, error: parsed.error.issues[0]?.message || 'Invalid password change' });
+    return;
+  }
+  try {
+    const changed = await DatabaseService.changePassword(
+      req.session.user!.id,
+      parsed.data.currentPassword,
+      parsed.data.newPassword
+    );
+    if (!changed) {
+      res.status(400).json({ success: false, error: 'Current password is incorrect or password login is unavailable' });
+      return;
+    }
+    const user = await DatabaseService.getUserById(req.session.user!.id);
+    if (!user) {
+      res.status(401).json({ success: false, error: 'Session is no longer valid' });
+      return;
+    }
+    await establishUserSession(req, user);
+    res.json({ success: true });
+  } catch (error) {
+    logError('Password change failed', error);
+    res.status(500).json({ success: false, error: 'Could not change password' });
+  }
+});
+
+app.get('/api/admin/accounts', requireAuth, requireAdmin, async (_req: Request, res: Response): Promise<void> => {
+  try {
+    const accounts = await DatabaseService.listAdminAccounts();
+    res.json({
+      success: true,
+      accounts: accounts.map((account) => ({
+        ...account,
+        accessRole: isAdmin(account.id) ? 'Admin' : 'Student',
+      })),
+    });
+  } catch (error) {
+    logError('Admin account list failed', error);
+    res.status(500).json({ success: false, error: 'Could not load accounts' });
+  }
+});
+
+app.patch('/api/admin/accounts/:id/status', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const accountId = req.params.id;
+  const parsed = accountStatusSchema.safeParse(req.body);
+  if (typeof accountId !== 'string' || !parsed.success) {
+    await recordRejectedAdminAction(req.session.user!.id, 'account.status_change_rejected', 'invalid_request');
+    res.status(400).json({ success: false, error: 'Invalid account status request' });
+    return;
+  }
+  if (isAdmin(accountId)) {
+    await recordRejectedAdminAction(req.session.user!.id, 'account.status_change_rejected', 'protected_admin_account');
+    res.status(409).json({ success: false, error: 'Admin accounts cannot be suspended through this endpoint' });
+    return;
+  }
+  try {
+    const account = await DatabaseService.setAccountActive(
+      req.session.user!.id,
+      accountId,
+      parsed.data.status === 'active'
+    );
+    if (!account) {
+      await recordRejectedAdminAction(req.session.user!.id, 'account.status_change_rejected', 'target_not_found_or_self');
+      res.status(404).json({ success: false, error: 'Account not found' });
+      return;
+    }
+    res.json({ success: true, account: { ...account, accessRole: 'Student' } });
+  } catch (error) {
+    logError('Admin account status update failed', error);
+    await recordRejectedAdminAction(req.session.user!.id, 'account.status_change_failed', 'operation_failed');
+    res.status(500).json({ success: false, error: 'Could not update account status' });
+  }
+});
+
+app.get('/api/admin/audit-logs', requireAuth, requireAdmin, async (req: Request, res: Response): Promise<void> => {
+  const parsed = z.coerce.number().int().min(1).max(100).default(50).safeParse(req.query.limit);
+  if (!parsed.success) {
+    res.status(400).json({ success: false, error: 'Limit must be between 1 and 100' });
+    return;
+  }
+  try {
+    const logs = await DatabaseService.getAdminAuditLogs(parsed.data);
+    res.json({ success: true, logs });
+  } catch (error) {
+    logError('Admin audit log lookup failed', error);
+    res.status(500).json({ success: false, error: 'Could not load audit logs' });
+  }
 });
 
 // Logout
@@ -638,7 +784,12 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
       res.status(500).json({ success: false, error: 'Logout failed' });
       return;
     }
-    res.clearCookie('connect.sid', { path: '/' });
+    res.clearCookie('connect.sid', {
+      path: '/',
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+    });
     res.json({ success: true });
   });
 });
@@ -654,7 +805,7 @@ app.get('/api/cases', async (_req: Request, res: Response): Promise<void> => {
       isFeatured: false,
     })));
   } catch (error) {
-    console.error('Published cases error:', error);
+    logError('Published cases error', error);
     res.status(500).json({ success: false, error: 'Could not load published cases' });
   }
 });
@@ -672,7 +823,7 @@ app.get('/api/cases/:caseId/gate-status', requireAuth, async (req: Request, res:
     );
     res.json({ reviews_completed: reviewsCompleted, can_submit: true });
   } catch (error) {
-    console.error('Case gate status error:', error);
+    logError('Case gate status error', error);
     res.status(500).json({ success: false, error: 'Could not load your review gate status' });
   }
 });
@@ -692,7 +843,7 @@ app.post('/api/case-proposals', requireAuth, caseProposalLimiter, async (req: Re
     );
     res.status(201).json({ success: true, proposal });
   } catch (error) {
-    console.error('Case proposal submission error:', error);
+    logError('Case proposal submission error', error);
     res.status(500).json({ success: false, error: 'Could not submit your case proposal' });
   }
 });
@@ -702,7 +853,7 @@ app.get('/api/case-proposals/mine', requireAuth, async (req: Request, res: Respo
     const proposals = await DatabaseService.getCaseProposalsForContributor(req.session.user!.id);
     res.json({ success: true, proposals });
   } catch (error) {
-    console.error('Contributor case proposals error:', error);
+    logError('Contributor case proposals error', error);
     res.status(500).json({ success: false, error: 'Could not load your proposals' });
   }
 });
@@ -724,7 +875,7 @@ app.get('/api/case-proposals/:proposalId', requireAuth, async (req: Request, res
     }
     res.json({ success: true, proposal });
   } catch (error) {
-    console.error('Case proposal lookup error:', error);
+    logError('Case proposal lookup error', error);
     res.status(500).json({ success: false, error: 'Could not load this proposal' });
   }
 });
@@ -754,7 +905,7 @@ app.put('/api/case-proposals/:proposalId', requireAuth, async (req: Request, res
     }
     res.json({ success: true, proposal });
   } catch (error) {
-    console.error('Case proposal update error:', error);
+    logError('Case proposal update error', error);
     res.status(500).json({ success: false, error: 'Could not update your case proposal' });
   }
 });
@@ -764,7 +915,7 @@ app.get('/api/moderation/case-proposals', requireAuth, requireCaseModerator, asy
     const proposals = await DatabaseService.getPendingCaseProposals();
     res.json({ success: true, proposals });
   } catch (error) {
-    console.error('Moderation queue error:', error);
+    logError('Moderation queue error', error);
     res.status(500).json({ success: false, error: 'Could not load the moderation queue' });
   }
 });
@@ -800,7 +951,7 @@ app.patch('/api/moderation/case-proposals/:proposalId', requireAuth, requireCase
     }
     res.json({ success: true, proposal });
   } catch (error) {
-    console.error('Case proposal review error:', error);
+    logError('Case proposal review error', error);
     res.status(500).json({ success: false, error: 'Could not apply the review decision' });
   }
 });
@@ -815,7 +966,7 @@ app.get('/api/casebooks', async (req: Request, res: Response): Promise<void> => 
     const result = await DatabaseService.getPublishedCasebooks(parse.data);
     res.json({ success: true, ...result });
   } catch (error) {
-    console.error('Published casebooks error:', error);
+    logError('Published casebooks error', error);
     res.status(500).json({ success: false, error: 'Could not load casebooks' });
   }
 });
@@ -825,7 +976,7 @@ app.get('/api/casebooks/mine', requireAuth, async (req: Request, res: Response):
     const casebooks = await DatabaseService.getMyCasebooks(req.session.user!.id);
     res.json({ success: true, casebooks });
   } catch (error) {
-    console.error('Contributor casebooks error:', error);
+    logError('Contributor casebooks error', error);
     res.status(500).json({ success: false, error: 'Could not load your casebooks' });
   }
 });
@@ -844,7 +995,7 @@ app.get('/api/casebooks/mine/:id', requireAuth, async (req: Request, res: Respon
     }
     res.json({ success: true, casebook });
   } catch (error) {
-    console.error('Contributor casebook lookup error:', error);
+    logError('Contributor casebook lookup error', error);
     res.status(500).json({ success: false, error: 'Could not load this casebook' });
   }
 });
@@ -859,7 +1010,7 @@ app.post('/api/casebooks', requireAuth, casebookProposalLimiter, async (req: Req
     const casebook = await DatabaseService.createCasebook(req.session.user!.id, parse.data);
     res.status(201).json({ success: true, casebook });
   } catch (error) {
-    console.error('Casebook submission error:', error);
+    logError('Casebook submission error', error);
     res.status(500).json({ success: false, error: 'Could not submit this casebook' });
   }
 });
@@ -883,7 +1034,7 @@ app.put('/api/casebooks/:id', requireAuth, async (req: Request, res: Response): 
     }
     res.json({ success: true, casebook });
   } catch (error) {
-    console.error('Casebook update error:', error);
+    logError('Casebook update error', error);
     res.status(500).json({ success: false, error: 'Could not update this casebook' });
   }
 });
@@ -902,7 +1053,7 @@ app.get('/api/casebooks/:slug/cases/:caseSlug', async (req: Request, res: Respon
     }
     res.json({ success: true, ...result });
   } catch (error) {
-    console.error('Published casebook case error:', error);
+    logError('Published casebook case error', error);
     res.status(500).json({ success: false, error: 'Could not load this case' });
   }
 });
@@ -921,7 +1072,7 @@ app.get('/api/casebooks/:slug', async (req: Request, res: Response): Promise<voi
     }
     res.json({ success: true, casebook });
   } catch (error) {
-    console.error('Published casebook error:', error);
+    logError('Published casebook error', error);
     res.status(500).json({ success: false, error: 'Could not load this casebook' });
   }
 });
@@ -936,7 +1087,7 @@ app.get('/api/moderation/casebooks', requireAuth, requireCaseModerator, async (r
     const casebooks = await DatabaseService.getCasebookModerationQueue(status);
     res.json({ success: true, casebooks });
   } catch (error) {
-    console.error('Casebook moderation queue error:', error);
+    logError('Casebook moderation queue error', error);
     res.status(500).json({ success: false, error: 'Could not load the casebook review queue' });
   }
 });
@@ -962,7 +1113,7 @@ app.patch('/api/moderation/casebooks/:id', requireAuth, requireCaseModerator, as
     }
     res.json({ success: true, casebook });
   } catch (error) {
-    console.error('Casebook moderation error:', error);
+    logError('Casebook moderation error', error);
     res.status(500).json({ success: false, error: 'Could not apply the casebook decision' });
   }
 });
@@ -981,7 +1132,7 @@ app.post('/api/takedown', takedownLimiter, async (req: Request, res: Response): 
     }
     res.status(201).json({ success: true, requestId });
   } catch (error) {
-    console.error('Casebook takedown request error:', error);
+    logError('Casebook takedown request error', error);
     res.status(500).json({ success: false, error: 'Could not submit this report' });
   }
 });
@@ -1032,8 +1183,9 @@ app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res
       ? await DatabaseService.getReferenceRangeAfterSubmission(caseId, currentUser.id)
       : undefined;
     res.status(201).json({ success: true, submissionId, status: 'Submitted', referenceRange });
-  } catch (error: any) {
-    res.status(500).json({ success: false, error: error.message });
+  } catch (error) {
+    logError('Case submission failed', error);
+    res.status(500).json({ success: false, error: 'Could not submit case response' });
   }
 });
 
@@ -1052,7 +1204,7 @@ app.get('/api/cases/:caseId/solutions', requireAuth, async (req: Request, res: R
     }
     res.json({ success: true, solutions });
   } catch (error) {
-    console.error('Case solutions error:', error);
+    logError('Case solutions error', error);
     res.status(500).json({ success: false, error: 'Could not load case solutions' });
   }
 });
@@ -1072,7 +1224,7 @@ app.get('/api/cases/:caseId/review-queue', requireAuth, async (req: Request, res
     }
     res.json(submission);
   } catch (error) {
-    console.error('Case review queue error:', error);
+    logError('Case review queue error', error);
     res.status(500).json({ success: false, error: 'Could not load a submission to review' });
   }
 });
@@ -1135,8 +1287,8 @@ app.post('/api/submissions/:submissionId/reviews', requireAuth, async (req: Requ
       res.status(400).json({ success: false, error: error.message });
       return;
     }
-    console.error('Case review submission error:', error);
-    res.status(500).json({ success: false, error: error.message });
+    logError('Case review submission error', error);
+    res.status(500).json({ success: false, error: 'Could not submit review' });
   }
 });
 
@@ -1166,7 +1318,7 @@ app.get('/api/stats', async (req: Request, res: Response): Promise<void> => {
     statsCache = { data, expires: Date.now() + 5 * 60 * 1000 };
     res.json(data);
   } catch (err) {
-    console.error('Stats error:', err);
+    logError('Stats error', err);
     res.status(500).json({ error: 'stats unavailable' });
   }
 });
@@ -1185,8 +1337,8 @@ app.post('/api/upload/image', requireAuth, imageUpload.single('image'), async (r
       publicId: result.publicId,
     });
   } catch (error: any) {
-    console.error('Image upload error:', error);
-    res.status(500).json({ success: false, error: error.message || 'Image upload failed' });
+    logError('Image upload error', error);
+    res.status(500).json({ success: false, error: 'Image upload failed' });
   }
 });
 
@@ -1203,15 +1355,16 @@ app.get('/*splat', (req: Request, res: Response) => {
 
 // Start server only when run directly (not when imported for tests)
 if (process.env.NODE_ENV !== 'test') {
-  ensureTables().then(() => {
+  assertMigrationsCurrent(pool).then(() => {
     const PORT = process.env.PORT || 8080;
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
-  }).catch((err) => {
-    console.error('Failed to initialize database tables:', err);
+  }).catch((error) => {
+    logError('Database migration verification failed', error);
+    console.error('Run npm run migrate before starting the API');
     process.exit(1);
   });
 }
 
-export { app, ensureTables };
+export { app };
