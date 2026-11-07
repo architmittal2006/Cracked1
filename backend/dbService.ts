@@ -808,7 +808,7 @@ export class DatabaseService {
       `SELECT id, title, type, sector, difficulty, status, description, deliverables, pts,
               submission_count, review_count, deadline, tags, is_chaos, timer_deadline
        FROM cases
-       WHERE status = 'Open'
+       WHERE status = 'Open' AND current_version_id IS NOT NULL
        ORDER BY created_at DESC, id ASC`
     );
 
@@ -876,7 +876,10 @@ export class DatabaseService {
   }
 
   public static async getCaseType(caseId: string): Promise<string | undefined> {
-    const result = await pool.query<{ type: string }>('SELECT type FROM cases WHERE id = $1', [caseId]);
+    const result = await pool.query<{ type: string }>(
+      `SELECT type FROM cases WHERE id = $1 AND current_version_id IS NOT NULL`,
+      [caseId]
+    );
     return result.rows[0]?.type;
   }
 
@@ -1035,32 +1038,8 @@ export class DatabaseService {
         return undefined;
       }
 
-      if (status === 'Approved') {
-        const caseId = `case_${crypto.randomUUID()}`;
-        const description = [
-          proposal.context,
-          `## Case prompt\n\n${proposal.prompt}`,
-          proposal.exhibits ? `## Available information\n\n${proposal.exhibits}` : '',
-        ].filter(Boolean).join('\n\n');
-        await client.query(
-          `INSERT INTO cases (
-             id, title, type, sector, difficulty, status, description, deliverables, pts,
-             tags, is_chaos, reference_range
-           )
-           VALUES ($1, $2, $3, $4, $5, 'Open', $6, $7, 0, $8, $9, $10)`,
-          [
-            caseId, proposal.title, proposal.type, proposal.sector, proposal.difficulty,
-            description, proposal.deliverables, [proposal.sector],
-            proposal.difficulty === 'Chaos', proposal.referenceRange ?? null,
-          ]
-        );
-        await client.query(
-          'UPDATE case_proposals SET published_case_id = $2 WHERE id = $1',
-          [proposalId, caseId]
-        );
-        proposal.publishedCaseId = caseId;
-      }
-
+      // Proposal approval no longer publishes content. Cases are only created
+      // and published through the admin content CMS (case_versions flow).
       await client.query('COMMIT');
       return proposal;
     } catch (error) {

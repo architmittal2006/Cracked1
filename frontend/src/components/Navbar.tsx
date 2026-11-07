@@ -49,9 +49,12 @@ export const Navbar: React.FC = () => {
   const navigate = useNavigate();
   const visibleNavLinks = [
     ...navLinks,
-    ...(isAuthenticated ? [{ to: '/contribute/cases/mine', label: 'My proposals' }] : []),
-    ...(user?.role === 'Moderator' ? [{ to: '/moderation/cases', label: 'Review cases' }] : []),
-    ...(user?.accessRole === 'Admin' ? [{ to: '/admin/accounts', label: 'Admin' }] : []),
+    ...(user?.accessRole === 'Admin'
+      ? [
+          { to: '/admin/content', label: 'Content' },
+          { to: '/admin/accounts', label: 'Admin' },
+        ]
+      : []),
   ];
 
   const handleLogout = async () => {

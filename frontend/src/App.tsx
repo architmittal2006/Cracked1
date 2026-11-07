@@ -37,11 +37,10 @@ import { RegisterPage } from './pages/RegisterPage';
 import { NotFoundPage } from './pages/NotFoundPage';
 import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import { AdminAccountsPage } from './pages/AdminAccountsPage';
+import { AdminContentPage } from './pages/AdminContentPage';
+import { AdminContentEditorPage } from './pages/AdminContentEditorPage';
 import { CompanyDashboardPage } from './pages/CompanyDashboardPage';
 import { CompanyPostCasePage } from './pages/CompanyPostCasePage';
-import { CaseProposalPage } from './pages/CaseProposalPage';
-import { MyCaseProposalsPage } from './pages/MyCaseProposalsPage';
-import { CaseModerationPage } from './pages/CaseModerationPage';
 import { CasebooksPage } from './pages/CasebooksPage';
 import { CasebookDetailPage } from './pages/CasebookDetailPage';
 import { CasebookCasePage } from './pages/CasebookCasePage';
@@ -103,24 +102,19 @@ const App: React.FC = () => {
                       <CasebookModerationPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/contribute/cases" element={
-                    <ProtectedRoute>
-                      <CaseProposalPage />
+                  <Route path="/admin/accounts" element={
+                    <ProtectedRoute requiredRole="Admin">
+                      <AdminAccountsPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/contribute/cases/mine" element={
-                    <ProtectedRoute>
-                      <MyCaseProposalsPage />
+                  <Route path="/admin/content" element={
+                    <ProtectedRoute requiredRole="Admin">
+                      <AdminContentPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/contribute/cases/:proposalId/edit" element={
-                    <ProtectedRoute>
-                      <CaseProposalPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/moderation/cases" element={
-                    <ProtectedRoute>
-                      <CaseModerationPage />
+                  <Route path="/admin/content/:caseId" element={
+                    <ProtectedRoute requiredRole="Admin">
+                      <AdminContentEditorPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/cases/:id/submit" element={
@@ -166,11 +160,6 @@ const App: React.FC = () => {
                   <Route path="/settings" element={
                     <ProtectedRoute>
                       <AccountSettingsPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/admin/accounts" element={
-                    <ProtectedRoute requiredRole="Admin">
-                      <AdminAccountsPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/profile/:username" element={<ProfilePage />} />

@@ -637,3 +637,189 @@ export async function uploadImage(file: File): Promise<{ url: string; publicId: 
     publicId: data.publicId,
   };
 }
+
+// ─── Admin content CMS ───
+
+export type CaseContentType =
+  | 'Market Sizing' | 'Profitability' | 'Market Entry' | 'Operational'
+  | 'Pricing' | 'M&A' | 'Growth & Retention' | 'Guesstimate';
+
+export interface RubricCriterion { name: string; description: string }
+
+export interface ReferenceRange { value: number; unit: string; low: number; high: number }
+
+export interface CaseContentInput {
+  title: string;
+  type: CaseContentType;
+  sector: string;
+  difficulty: 'Standard' | 'High' | 'Chaos';
+  description: string;
+  exhibits?: string;
+  deliverables: string[];
+  referenceRange?: ReferenceRange | null;
+  referenceSolution: string;
+  rubricCriteria: RubricCriterion[];
+  contentOwner: string;
+  authorCredit?: string | null;
+  sourceKind: 'original' | 'licensed' | 'public_domain' | 'permission_granted';
+  sourceReference?: string | null;
+  rightsDeclaration: string;
+  rightsConfirmed: true;
+}
+
+export interface AdminContentItem {
+  id: string;
+  title: string;
+  type: string;
+  sector: string;
+  difficulty: string;
+  caseStatus: string;
+  contentStatus: 'Draft' | 'Published' | 'Unpublished';
+  hasDraft: boolean;
+  latestVersion: number | null;
+  createdAt: string;
+}
+
+export interface CaseVersionSnapshot {
+  id: string;
+  case_id: string;
+  version_number: number;
+  status: 'Draft' | 'Published';
+  title: string;
+  type: string;
+  sector: string;
+  difficulty: string;
+  description: string;
+  exhibits: string | null;
+  deliverables: string[];
+  reference_range: ReferenceRange | null;
+  reference_solution: string;
+  rubric_criteria: RubricCriterion[];
+  content_owner: string;
+  author_credit: string | null;
+  source_kind: string;
+  source_reference: string | null;
+  rights_declaration: string;
+  rights_verified: boolean;
+  created_by: string | null;
+  published_by: string | null;
+  created_at: string;
+  published_at: string | null;
+}
+
+export interface AdminContentDetail {
+  case: Record<string, unknown> & { id: string; status: string; current_version_id: string | null };
+  draft: CaseVersionSnapshot | null;
+  published: CaseVersionSnapshot | null;
+  versionCount: number;
+}
+
+export interface ContentVersionSummary {
+  id: string;
+  versionNumber: number;
+  status: 'Draft' | 'Published';
+  title: string;
+  type: string;
+  createdAt: string;
+  publishedAt: string | null;
+  createdBy: string | null;
+  publishedBy: string | null;
+}
+
+const snapshotToInput = (snapshot: CaseVersionSnapshot): CaseContentInput => ({
+  title: snapshot.title,
+  type: snapshot.type as CaseContentType,
+  sector: snapshot.sector,
+  difficulty: snapshot.difficulty as CaseContentInput['difficulty'],
+  description: snapshot.description,
+  exhibits: snapshot.exhibits ?? undefined,
+  deliverables: snapshot.deliverables ?? [],
+  referenceRange: snapshot.reference_range ?? null,
+  referenceSolution: snapshot.reference_solution,
+  rubricCriteria: snapshot.rubric_criteria ?? [],
+  contentOwner: snapshot.content_owner,
+  authorCredit: snapshot.author_credit ?? null,
+  sourceKind: snapshot.source_kind as CaseContentInput['sourceKind'],
+  sourceReference: snapshot.source_reference ?? null,
+  rightsDeclaration: snapshot.rights_declaration,
+  rightsConfirmed: true,
+});
+
+export async function getAdminContent(filters: {
+  type?: string; status?: string; q?: string;
+} = {}): Promise<AdminContentItem[]> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, value);
+  }
+  const query = params.toString();
+  const result = await request<{ success: true; content: AdminContentItem[] }>(
+    `/api/admin/content${query ? `?${query}` : ''}`
+  );
+  return result.content;
+}
+
+export async function createAdminContent(input: CaseContentInput): Promise<{ caseId: string }> {
+  const result = await request<{ success: true; caseId: string }>('/api/admin/content', {
+    method: 'POST', body: JSON.stringify(input),
+  });
+  return { caseId: result.caseId };
+}
+
+export async function previewAdminContent(input: CaseContentInput): Promise<CaseContentInput> {
+  const result = await request<{ success: true; content: CaseContentInput }>(
+    '/api/admin/content/preview', { method: 'POST', body: JSON.stringify(input) }
+  );
+  return result.content;
+}
+
+export async function getAdminContentDetail(caseId: string): Promise<AdminContentDetail | null> {
+  try {
+    const result = await request<{ success: true } & AdminContentDetail>(
+      `/api/admin/content/${encodeURIComponent(caseId)}`
+    );
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+export async function getAdminContentEditorState(caseId: string): Promise<{
+  detail: AdminContentDetail;
+  initial: CaseContentInput;
+}> {
+  const detail = await getAdminContentDetail(caseId);
+  if (!detail) throw new Error('Content not found');
+  const source = detail.draft ?? detail.published;
+  if (!source) throw new Error('Content has no versions yet');
+  return { detail, initial: snapshotToInput(source) };
+}
+
+export async function saveAdminContentDraft(caseId: string, input: CaseContentInput): Promise<{ versionId: string; versionNumber: number }> {
+  const result = await request<{ success: true; versionId: string; versionNumber: number }>(
+    `/api/admin/content/${encodeURIComponent(caseId)}`,
+    { method: 'PUT', body: JSON.stringify(input) }
+  );
+  return { versionId: result.versionId, versionNumber: result.versionNumber };
+}
+
+export async function getAdminContentVersions(caseId: string): Promise<ContentVersionSummary[]> {
+  const result = await request<{ success: true; versions: ContentVersionSummary[] }>(
+    `/api/admin/content/${encodeURIComponent(caseId)}/versions`
+  );
+  return result.versions;
+}
+
+export async function publishAdminContent(caseId: string): Promise<{ versionId: string; versionNumber: number }> {
+  const result = await request<{ success: true; versionId: string; versionNumber: number }>(
+    `/api/admin/content/${encodeURIComponent(caseId)}/publish`, { method: 'POST' }
+  );
+  return { versionId: result.versionId, versionNumber: result.versionNumber };
+}
+
+export async function unpublishAdminContent(caseId: string): Promise<{ versionId: string }> {
+  const result = await request<{ success: true; versionId: string }>(
+    `/api/admin/content/${encodeURIComponent(caseId)}/unpublish`, { method: 'POST' }
+  );
+  return { versionId: result.versionId };
+}

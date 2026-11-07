@@ -11,12 +11,14 @@ import { z } from 'zod';
 import { Pool } from 'pg';
 import { assertMigrationsCurrent } from './db/runMigrations.js';
 import { logError } from './logging.js';
+import { hasCapability, isAdminUser, isCaseModeratorUser, type Capability } from './authorization.js';
+import { caseContentSchema } from './contentValidation.js';
+import { contentService, ContentError } from './contentService.js';
 import {
   DatabaseService,
   hashPassword,
   comparePassword,
   InvalidCaseReviewError,
-  type CaseProposalInput,
   type CasebookReviewAction,
   type UserRecord,
 } from './dbService.js';
@@ -147,47 +149,6 @@ const accountStatusSchema = z.object({
   status: z.enum(['active', 'suspended']),
 });
 
-const caseProposalSchema = z.object({
-  title: z.string().trim().min(8).max(120),
-  type: z.enum([
-    'Market Sizing',
-    'Profitability',
-    'Market Entry',
-    'Operational',
-    'Pricing',
-    'M&A',
-    'Growth & Retention',
-    'Guesstimate',
-  ]),
-  referenceRange: z.object({
-    value: z.number().finite().nonnegative(),
-    unit: z.string().trim().min(1).max(80),
-    low: z.number().finite().nonnegative(),
-    high: z.number().finite().nonnegative(),
-  }).optional(),
-  sector: z.string().trim().min(2).max(80),
-  difficulty: z.enum(['Standard', 'High', 'Chaos']),
-  sourceKind: z.enum(['original', 'interview_recollection', 'public_source']),
-  sourceReference: z.string().trim().max(500).optional(),
-  context: z.string().trim().min(50).max(5000),
-  prompt: z.string().trim().min(40).max(5000),
-  exhibits: z.string().trim().max(5000).optional(),
-  deliverables: z.array(z.string().trim().min(2).max(160)).min(1).max(8),
-  reviewerGuide: z.string().trim().min(50).max(3000),
-  solutionOutline: z.string().trim().min(50).max(5000),
-  originalityConfirmed: z.literal(true),
-  confidentialityConfirmed: z.literal(true),
-}).refine(
-  (proposal) => proposal.sourceKind !== 'public_source' || Boolean(proposal.sourceReference),
-  { message: 'Add a link or citation for a public source', path: ['sourceReference'] }
-).refine(
-  (proposal) => proposal.type === 'Guesstimate' || !proposal.referenceRange,
-  { message: 'Reference ranges are only supported for Guesstimate cases', path: ['referenceRange'] }
-).refine(
-  (proposal) => !proposal.referenceRange || proposal.referenceRange.low <= proposal.referenceRange.value && proposal.referenceRange.value <= proposal.referenceRange.high,
-  { message: 'Reference range must satisfy low ≤ value ≤ high', path: ['referenceRange'] }
-);
-
 const caseProposalReviewSchema = z.object({
   action: z.enum(['approve', 'request_changes', 'decline']),
   notes: z.string().trim().max(3000).optional().default(''),
@@ -214,22 +175,6 @@ const guesstimateReviewSchema = z.object({
   clarity: z.number().int().min(1).max(5),
   feedback: z.string().trim().min(80).max(3000),
 });
-
-const isCaseModerator = (userId: string): boolean => {
-  const moderatorIds = (process.env.CASE_MODERATOR_USER_IDS || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-  return moderatorIds.includes(userId);
-};
-
-const isAdmin = (userId: string): boolean => {
-  const adminIds = (process.env.ADMIN_USER_IDS || '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean);
-  return adminIds.includes(userId);
-};
 
 const isValidOAuthState = (
   req: Request,
@@ -306,8 +251,8 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
       res.status(401).json({ success: false, error: 'Session is no longer valid' });
       return;
     }
-    req.session.user.accessRole = isAdmin(user.id) ? 'Admin' : 'Student';
-    req.session.user.role = isCaseModerator(user.id) ? 'Moderator' : (user.role || 'General');
+    req.session.user.accessRole = isAdminUser(user.id) ? 'Admin' : 'Student';
+    req.session.user.role = isCaseModeratorUser(user.id) ? 'Moderator' : (user.role || 'General');
     next();
   } catch (error) {
     logError('Authentication check failed', error);
@@ -316,7 +261,7 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
 };
 
 const requireCaseModerator = (req: Request, res: Response, next: NextFunction) => {
-  if (!req.session.user || (!isAdmin(req.session.user.id) && !isCaseModerator(req.session.user.id))) {
+  if (!req.session.user || !hasCapability(req.session.user.id, 'case-proposals:moderate')) {
     res.status(403).json({ success: false, error: 'Moderator access is required' });
     return;
   }
@@ -336,7 +281,7 @@ async function recordRejectedAdminAction(
 }
 
 const requireAdmin = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-  if (!req.session.user || !isAdmin(req.session.user.id)) {
+  if (!req.session.user || !hasCapability(req.session.user.id, 'admin:accounts:manage')) {
     if (req.session.user) {
       await recordRejectedAdminAction(req.session.user.id, 'admin.access_denied', 'insufficient_role');
     }
@@ -345,6 +290,15 @@ const requireAdmin = async (req: Request, res: Response, next: NextFunction): Pr
   }
   next();
 };
+
+const requireCapability = (capability: Capability) =>
+  (req: Request, res: Response, next: NextFunction): void => {
+    if (!req.session.user || !hasCapability(req.session.user.id, capability)) {
+      res.status(403).json({ success: false, error: 'Insufficient permissions' });
+      return;
+    }
+    next();
+  };
 
 function establishUserSession(req: Request, userRecord: UserRecord): Promise<void> {
   return new Promise((resolve, reject) => {
@@ -360,8 +314,8 @@ function establishUserSession(req: Request, userRecord: UserRecord): Promise<voi
         reviewScore: userRecord.reviewScore ?? 0,
         casesSolved: userRecord.casesSolved ?? 0,
         mergeBonusCount: userRecord.mergeBonusCount ?? 0,
-        role: isCaseModerator(userRecord.id) ? 'Moderator' : (userRecord.role || 'General'),
-        accessRole: isAdmin(userRecord.id) ? 'Admin' : 'Student',
+        role: isCaseModeratorUser(userRecord.id) ? 'Moderator' : (userRecord.role || 'General'),
+        accessRole: isAdminUser(userRecord.id) ? 'Admin' : 'Student',
         sessionVersion: userRecord.sessionVersion,
       };
       req.session.save((saveError) => saveError ? reject(saveError) : resolve());
@@ -721,7 +675,7 @@ app.get('/api/admin/accounts', requireAuth, requireAdmin, async (_req: Request, 
       success: true,
       accounts: accounts.map((account) => ({
         ...account,
-        accessRole: isAdmin(account.id) ? 'Admin' : 'Student',
+        accessRole: isAdminUser(account.id) ? 'Admin' : 'Student',
       })),
     });
   } catch (error) {
@@ -738,7 +692,7 @@ app.patch('/api/admin/accounts/:id/status', requireAuth, requireAdmin, async (re
     res.status(400).json({ success: false, error: 'Invalid account status request' });
     return;
   }
-  if (isAdmin(accountId)) {
+  if (isAdminUser(accountId)) {
     await recordRejectedAdminAction(req.session.user!.id, 'account.status_change_rejected', 'protected_admin_account');
     res.status(409).json({ success: false, error: 'Admin accounts cannot be suspended through this endpoint' });
     return;
@@ -777,6 +731,154 @@ app.get('/api/admin/audit-logs', requireAuth, requireAdmin, async (req: Request,
   }
 });
 
+// Admin content CMS — draft management requires content:manage, publishing
+// actions require content:publish. Both resolve through the centralized
+// capability allowlist; users.role is never consulted.
+app.get('/api/admin/content', requireAuth, requireCapability('content:manage'), async (req: Request, res: Response): Promise<void> => {
+  const type = typeof req.query.type === 'string' ? req.query.type : undefined;
+  const q = typeof req.query.q === 'string' ? req.query.q.slice(0, 120) : undefined;
+  const status = req.query.status;
+  if (status !== undefined && status !== 'Draft' && status !== 'Published' && status !== 'Unpublished') {
+    res.status(400).json({ success: false, error: 'Status must be Draft, Published or Unpublished' });
+    return;
+  }
+  try {
+    const items = await contentService.listAdminContent({
+      type,
+      q,
+      status: status as 'Draft' | 'Published' | 'Unpublished' | undefined,
+    });
+    res.json({ success: true, content: items });
+  } catch (error) {
+    logError('Admin content list failed', error);
+    res.status(500).json({ success: false, error: 'Could not load content' });
+  }
+});
+
+app.post('/api/admin/content', requireAuth, requireCapability('content:manage'), async (req: Request, res: Response): Promise<void> => {
+  const parse = caseContentSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid content' });
+    return;
+  }
+  try {
+    const result = await contentService.createContent(req.session.user!.id, parse.data);
+    res.status(201).json({ success: true, caseId: result.caseId });
+  } catch (error) {
+    logError('Admin content create failed', error);
+    res.status(500).json({ success: false, error: 'Could not create content' });
+  }
+});
+
+app.post('/api/admin/content/preview', requireAuth, requireCapability('content:manage'), async (req: Request, res: Response): Promise<void> => {
+  const parse = caseContentSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({
+      success: false,
+      error: parse.error.issues[0]?.message || 'Invalid content',
+      issues: parse.error.issues.map((issue) => ({ path: issue.path.join('.'), message: issue.message })),
+    });
+    return;
+  }
+  res.json({ success: true, content: parse.data });
+});
+
+app.get('/api/admin/content/:caseId', requireAuth, requireCapability('content:manage'), async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+  try {
+    const detail = await contentService.getAdminContentDetail(caseId);
+    if (!detail) {
+      res.status(404).json({ success: false, error: 'Content not found' });
+      return;
+    }
+    res.json({ success: true, ...detail });
+  } catch (error) {
+    logError('Admin content detail failed', error);
+    res.status(500).json({ success: false, error: 'Could not load content' });
+  }
+});
+
+app.put('/api/admin/content/:caseId', requireAuth, requireCapability('content:manage'), async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+  const parse = caseContentSchema.safeParse(req.body);
+  if (!parse.success) {
+    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid content' });
+    return;
+  }
+  try {
+    const result = await contentService.saveContentDraft(req.session.user!.id, caseId, parse.data);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if (error instanceof ContentError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
+    logError('Admin content draft save failed', error);
+    res.status(500).json({ success: false, error: 'Could not save draft' });
+  }
+});
+
+app.get('/api/admin/content/:caseId/versions', requireAuth, requireCapability('content:manage'), async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+  try {
+    const versions = await contentService.listContentVersions(caseId);
+    res.json({ success: true, versions });
+  } catch (error) {
+    logError('Admin content versions failed', error);
+    res.status(500).json({ success: false, error: 'Could not load version history' });
+  }
+});
+
+app.post('/api/admin/content/:caseId/publish', requireAuth, requireCapability('content:publish'), async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+  try {
+    const result = await contentService.publishContent(req.session.user!.id, caseId);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if (error instanceof ContentError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
+    logError('Admin content publish failed', error);
+    res.status(500).json({ success: false, error: 'Could not publish content' });
+  }
+});
+
+app.post('/api/admin/content/:caseId/unpublish', requireAuth, requireCapability('content:publish'), async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+  try {
+    const result = await contentService.unpublishContent(req.session.user!.id, caseId);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    if (error instanceof ContentError) {
+      res.status(error.status).json({ success: false, error: error.message });
+      return;
+    }
+    logError('Admin content unpublish failed', error);
+    res.status(500).json({ success: false, error: 'Could not unpublish content' });
+  }
+});
+
 // Logout
 app.post('/api/auth/logout', (req: Request, res: Response) => {
   req.session.destroy((err) => {
@@ -810,6 +912,25 @@ app.get('/api/cases', async (_req: Request, res: Response): Promise<void> => {
   }
 });
 
+app.get('/api/cases/:caseId', async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+  try {
+    const detail = await contentService.getPublishedCaseDetail(caseId);
+    if (!detail) {
+      res.status(404).json({ success: false, error: 'Case not found' });
+      return;
+    }
+    res.json(detail);
+  } catch (error) {
+    logError('Published case detail error', error);
+    res.status(500).json({ success: false, error: 'Could not load this case' });
+  }
+});
+
 app.get('/api/cases/:caseId/gate-status', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const caseId = req.params.caseId;
   if (typeof caseId !== 'string') {
@@ -828,24 +949,11 @@ app.get('/api/cases/:caseId/gate-status', requireAuth, async (req: Request, res:
   }
 });
 
-app.post('/api/case-proposals', requireAuth, caseProposalLimiter, async (req: Request, res: Response): Promise<void> => {
-  const parse = caseProposalSchema.safeParse(req.body);
-  if (!parse.success) {
-    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid case proposal' });
-    return;
-  }
-
-  const input: CaseProposalInput = parse.data;
-  try {
-    const proposal = await DatabaseService.createCaseProposal(
-      req.session.user!.id,
-      input
-    );
-    res.status(201).json({ success: true, proposal });
-  } catch (error) {
-    logError('Case proposal submission error', error);
-    res.status(500).json({ success: false, error: 'Could not submit your case proposal' });
-  }
+// Legacy case proposals are disabled: historical records remain readable, but
+// new submissions, resubmissions and approval-based publishing are closed.
+// Admin-managed publishing happens exclusively through /api/admin/content.
+app.post('/api/case-proposals', requireAuth, caseProposalLimiter, async (_req: Request, res: Response): Promise<void> => {
+  res.status(410).json({ success: false, error: 'Case proposals are no longer accepted' });
 });
 
 app.get('/api/case-proposals/mine', requireAuth, async (req: Request, res: Response): Promise<void> => {
@@ -880,34 +988,8 @@ app.get('/api/case-proposals/:proposalId', requireAuth, async (req: Request, res
   }
 });
 
-app.put('/api/case-proposals/:proposalId', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const proposalId = req.params.proposalId;
-  if (typeof proposalId !== 'string') {
-    res.status(400).json({ success: false, error: 'Invalid proposalId parameter' });
-    return;
-  }
-  const parse = caseProposalSchema.safeParse(req.body);
-  if (!parse.success) {
-    res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid case proposal' });
-    return;
-  }
-
-  const input: CaseProposalInput = parse.data;
-  try {
-    const proposal = await DatabaseService.updateCaseProposal(
-      proposalId,
-      req.session.user!.id,
-      input
-    );
-    if (!proposal) {
-      res.status(409).json({ success: false, error: 'Only proposals requesting changes can be edited and resubmitted' });
-      return;
-    }
-    res.json({ success: true, proposal });
-  } catch (error) {
-    logError('Case proposal update error', error);
-    res.status(500).json({ success: false, error: 'Could not update your case proposal' });
-  }
+app.put('/api/case-proposals/:proposalId', requireAuth, async (_req: Request, res: Response): Promise<void> => {
+  res.status(410).json({ success: false, error: 'Case proposals are no longer editable' });
 });
 
 app.get('/api/moderation/case-proposals', requireAuth, requireCaseModerator, async (_req: Request, res: Response): Promise<void> => {
@@ -929,6 +1011,13 @@ app.patch('/api/moderation/case-proposals/:proposalId', requireAuth, requireCase
   const parse = caseProposalReviewSchema.safeParse(req.body);
   if (!parse.success) {
     res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid review decision' });
+    return;
+  }
+  if (parse.data.action === 'approve') {
+    res.status(410).json({
+      success: false,
+      error: 'Proposal approval no longer publishes cases; use the admin content CMS',
+    });
     return;
   }
 

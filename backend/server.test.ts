@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import request from 'supertest';
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Pool } from 'pg';
@@ -68,6 +68,55 @@ const withMigrationDirectory = async (
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+};
+
+const withLegacyMigrationDirectory = async (
+  run: (directory: string) => Promise<void>
+): Promise<void> => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'phase2-legacy-migrations-'));
+  try {
+    const migrationsDir = path.resolve(process.cwd(), 'db', 'migrations');
+    for (const filename of ['0000_core_schema.sql', '0001_phase1_security.sql']) {
+      await copyFile(path.join(migrationsDir, filename), path.join(directory, filename));
+    }
+    await run(directory);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+};
+
+const insertLegacyCase = async (pool: Pool, id: string) => {
+  await pool.query(
+    `INSERT INTO cases (id, title, type, sector, difficulty, status, description, deliverables, reference_range)
+     VALUES ($1, 'Legacy profitability case', 'Profitability', 'Retail', 'Standard', 'Open',
+       'A legacy case description with enough detail to be realistic published content.',
+       ARRAY['Recommend'], NULL)`,
+    [id]
+  );
+};
+
+const insertCaseVersion = async (
+  pool: Pool,
+  values: {
+    id: string;
+    caseId: string;
+    versionNumber: number;
+    status: 'Draft' | 'Published';
+    publishedAt?: string | null;
+  }
+) => {
+  await pool.query(
+    `INSERT INTO case_versions (
+       id, case_id, version_number, status, title, type, sector, difficulty,
+       description, reference_solution, content_owner, source_kind, rights_declaration, published_at
+     ) VALUES ($1, $2, $3, $4, 'Versioned case title', 'Profitability', 'Retail', 'Standard',
+       'A versioned case description with enough detail to satisfy content rules.',
+       'Reference solution text long enough to be meaningful for reviewers.',
+       'Cracked content team', 'original',
+       'Original work created for Cracked; all rights reserved by the platform.',
+       $5)`,
+    [values.id, values.caseId, values.versionNumber, values.status, values.publishedAt ?? null]
+  );
 };
 
 beforeAll(async () => {
@@ -239,6 +288,390 @@ describe('Migration runner', () => {
         await secondPool.end();
       }
     });
+  });
+});
+
+describe('Case versioning migration', () => {
+  it('backfills legacy cases into published versions, sets the pointer, and preserves data', async () => {
+    await withIsolatedSchema(async (isolatedPool) => {
+      await withLegacyMigrationDirectory(async (directory) => {
+        await applyMigrations(isolatedPool, directory);
+        await insertLegacyCase(isolatedPool, 'legacy_case_1');
+        await insertLegacyCase(isolatedPool, 'legacy_case_2');
+
+        // Applying the full migration set upgrades the legacy schema in place.
+        await applyMigrations(isolatedPool);
+        await assertMigrationsCurrent(isolatedPool);
+
+        const versions = await isolatedPool.query<{
+          case_id: string;
+          version_number: number;
+          status: string;
+          source_kind: string;
+          rights_verified: boolean;
+          reference_solution: string;
+          published_at: Date | null;
+        }>(
+          `SELECT case_id, version_number, status, source_kind, rights_verified,
+                  reference_solution, published_at
+           FROM case_versions ORDER BY case_id`
+        );
+        expect(versions.rows).toHaveLength(2);
+        for (const row of versions.rows) {
+          expect(row.version_number).toBe(1);
+          expect(row.status).toBe('Published');
+          expect(row.source_kind).toBe('legacy_unverified');
+          expect(row.rights_verified).toBe(false);
+          expect(row.reference_solution).not.toBe('');
+          expect(row.published_at).not.toBeNull();
+        }
+
+        const cases = await isolatedPool.query<{
+          id: string;
+          title: string;
+          current_version_id: string | null;
+        }>(
+          `SELECT id, title, current_version_id FROM cases ORDER BY id`
+        );
+        expect(cases.rows.map((row) => row.title)).toEqual([
+          'Legacy profitability case',
+          'Legacy profitability case',
+        ]);
+        for (const row of cases.rows) {
+          expect(row.current_version_id).toMatch(/^legacy_case_version_/);
+        }
+        const pointers = await isolatedPool.query<{ count: string }>(
+          `SELECT COUNT(*)::text AS count FROM cases c
+           JOIN case_versions v ON v.id = c.current_version_id
+           WHERE v.case_id = c.id AND v.status = 'Published'`
+        );
+        expect(pointers.rows[0].count).toBe('2');
+
+        // Hiding a case (unpublish) keeps its version history and pointer data.
+        await isolatedPool.query(`UPDATE cases SET status = 'Unpublished' WHERE id = 'legacy_case_1'`);
+        const preserved = await isolatedPool.query<{ count: string }>(
+          `SELECT COUNT(*)::text AS count FROM case_versions WHERE case_id = 'legacy_case_1'`
+        );
+        expect(preserved.rows[0].count).toBe('1');
+
+        // Rerunning migrations is a no-op and does not duplicate versions.
+        await applyMigrations(isolatedPool);
+        const recount = await isolatedPool.query<{ count: string }>(
+          `SELECT COUNT(*)::text AS count FROM case_versions`
+        );
+        expect(recount.rows[0].count).toBe('2');
+        await assertMigrationsCurrent(isolatedPool);
+      });
+    });
+  });
+
+  it('enforces one draft per case, published immutability, and pointer integrity', async () => {
+    await withIsolatedSchema(async (isolatedPool) => {
+      await applyMigrations(isolatedPool);
+      await insertLegacyCase(isolatedPool, 'versioned_case');
+
+      // A case created after migration has no version until one is published.
+      const fresh = await isolatedPool.query<{ current_version_id: string | null }>(
+        `SELECT current_version_id FROM cases WHERE id = 'versioned_case'`
+      );
+      expect(fresh.rows[0].current_version_id).toBeNull();
+
+      await insertCaseVersion(isolatedPool, {
+        id: 'draft_v1', caseId: 'versioned_case', versionNumber: 1, status: 'Draft',
+      });
+
+      // Only one draft may exist per case.
+      await expect(insertCaseVersion(isolatedPool, {
+        id: 'draft_v2', caseId: 'versioned_case', versionNumber: 2, status: 'Draft',
+      })).rejects.toThrow();
+
+      // Drafts are editable.
+      await isolatedPool.query(`UPDATE case_versions SET title = 'Edited draft title' WHERE id = 'draft_v1'`);
+
+      // Publishing the draft requires published_at and then freezes the row.
+      await expect(isolatedPool.query(
+        `UPDATE case_versions SET status = 'Published' WHERE id = 'draft_v1'`
+      )).rejects.toThrow();
+      await isolatedPool.query(
+        `UPDATE case_versions SET status = 'Published', published_at = NOW() WHERE id = 'draft_v1'`
+      );
+      await expect(isolatedPool.query(
+        `UPDATE case_versions SET title = 'Mutated' WHERE id = 'draft_v1'`
+      )).rejects.toThrow(/immutable/);
+      await expect(isolatedPool.query(
+        `DELETE FROM case_versions WHERE id = 'draft_v1'`
+      )).rejects.toThrow(/immutable/);
+
+      // The pointer accepts only a Published version of the same case.
+      await expect(isolatedPool.query(
+        `UPDATE cases SET current_version_id = 'missing_version' WHERE id = 'versioned_case'`
+      )).rejects.toThrow();
+      await insertLegacyCase(isolatedPool, 'other_case');
+      await insertCaseVersion(isolatedPool, {
+        id: 'other_draft', caseId: 'other_case', versionNumber: 1, status: 'Draft',
+      });
+      await expect(isolatedPool.query(
+        `UPDATE cases SET current_version_id = 'other_draft' WHERE id = 'versioned_case'`
+      )).rejects.toThrow(/Published version of the same case/);
+      await isolatedPool.query(
+        `UPDATE cases SET current_version_id = 'draft_v1' WHERE id = 'versioned_case'`
+      );
+      const pointed = await isolatedPool.query<{ current_version_id: string }>(
+        `SELECT current_version_id FROM cases WHERE id = 'versioned_case'`
+      );
+      expect(pointed.rows[0].current_version_id).toBe('draft_v1');
+
+      // Drafts remain deletable; published rows cannot be deleted even via FK paths.
+      await isolatedPool.query(`DELETE FROM case_versions WHERE id = 'other_draft'`);
+      await expect(isolatedPool.query(
+        `DELETE FROM case_versions WHERE id = 'draft_v1'`
+      )).rejects.toThrow(/immutable/);
+      await expect(isolatedPool.query(
+        `UPDATE cases SET current_version_id = NULL WHERE id = 'versioned_case'`
+      )).resolves.toBeDefined();
+    });
+  });
+});
+
+describe('Admin content CMS', () => {
+  const validContent = {
+    title: 'Admin-managed profitability case',
+    type: 'Profitability',
+    sector: 'Retail',
+    difficulty: 'Standard',
+    description: 'An admin-authored case description with enough detail to satisfy the content contract rules.',
+    exhibits: 'Chart 1: revenue bridge',
+    deliverables: ['Issue tree', 'Recommendation'],
+    referenceRange: null,
+    referenceSolution: 'Margins fell because of shrink and mix; fix shrink first, then renegotiate supply terms.',
+    rubricCriteria: [{ name: 'Structure', description: 'MECE issue tree covering revenue and cost drivers.' }],
+    contentOwner: 'Cracked content team',
+    authorCredit: 'Written by the Cracked team',
+    sourceKind: 'original',
+    sourceReference: null,
+    rightsDeclaration: 'Original work created for Cracked; all rights reserved by the platform.',
+    rightsConfirmed: true,
+  };
+
+  const setAdminEnv = (userId: string): (() => void) => {
+    const previous = process.env.ADMIN_USER_IDS;
+    process.env.ADMIN_USER_IDS = [previous, userId].filter(Boolean).join(',');
+    return () => {
+      if (previous === undefined) delete process.env.ADMIN_USER_IDS;
+      else process.env.ADMIN_USER_IDS = previous;
+    };
+  };
+
+  it('rejects students and anonymous users from every admin content endpoint', async () => {
+    const studentAgent = request.agent(app);
+    await registerTestUser(studentAgent, 'cms_student');
+    const anonymous = request.agent(app);
+
+    for (const [agent, expected] of [[studentAgent, 403], [anonymous, 401]] as const) {
+      expect((await agent.get('/api/admin/content')).status).toBe(expected);
+      expect((await agent.post('/api/admin/content').send(validContent)).status).toBe(expected);
+      expect((await agent.put('/api/admin/content/case_x').send(validContent)).status).toBe(expected);
+      expect((await agent.post('/api/admin/content/case_x/publish')).status).toBe(expected);
+      expect((await agent.post('/api/admin/content/case_x/unpublish')).status).toBe(expected);
+      expect((await agent.get('/api/admin/content/case_x/versions')).status).toBe(expected);
+    }
+  });
+
+  it('creates drafts invisible to the public, publishes atomically, and isolates draft edits', async () => {
+    const adminAgent = request.agent(app);
+    const admin = await registerTestUser(adminAgent, 'cms_admin');
+    const restoreAdmin = setAdminEnv(admin.id);
+    try {
+    const me = await adminAgent.get('/api/auth/me');
+    expect(me.body.user.accessRole).toBe('Admin');
+
+    // Create draft.
+    const create = await adminAgent.post('/api/admin/content').send(validContent);
+    expect(create.status).toBe(201);
+    const caseId = create.body.caseId as string;
+
+    // Draft is hidden from public reads.
+    expect((await request(app).get('/api/cases')).body.map((c: { id: string }) => c.id)).not.toContain(caseId);
+    expect((await request(app).get(`/api/cases/${caseId}`)).status).toBe(404);
+
+    // Admin list shows it as Draft; detail returns the draft payload.
+    const list = await adminAgent.get('/api/admin/content?status=Draft');
+    expect(list.body.content.map((item: { id: string }) => item.id)).toContain(caseId);
+    const detail = await adminAgent.get(`/api/admin/content/${caseId}`);
+    expect(detail.body.draft.title).toBe(validContent.title);
+    expect(detail.body.published).toBeNull();
+
+    // Preview validates without persisting.
+    const badPreview = await adminAgent.post('/api/admin/content/preview').send({ ...validContent, title: 'no' });
+    expect(badPreview.status).toBe(400);
+    const goodPreview = await adminAgent.post('/api/admin/content/preview').send(validContent);
+    expect(goodPreview.status).toBe(200);
+    expect(goodPreview.body.content.title).toBe(validContent.title);
+
+    // Publish.
+    const publish = await adminAgent.post(`/api/admin/content/${caseId}/publish`);
+    expect(publish.status).toBe(200);
+    expect(publish.body.versionNumber).toBe(1);
+
+    // Public reads now expose the published projection + version fields.
+    const publicList = await request(app).get('/api/cases');
+    expect(publicList.body.map((c: { id: string }) => c.id)).toContain(caseId);
+    const publicDetail = await request(app).get(`/api/cases/${caseId}`);
+    expect(publicDetail.status).toBe(200);
+    expect(publicDetail.body.reference_solution).toContain('Margins fell');
+    expect(publicDetail.body.content_owner).toBe('Cracked content team');
+    expect(publicDetail.body.version_number).toBe(1);
+
+    // Audit log recorded inside the publish transaction.
+    const audit = await pool.query(
+      `SELECT action, target_id FROM admin_audit_logs
+       WHERE target_id = $1 AND action = 'content.published'`,
+      [caseId]
+    );
+    expect(audit.rows).toHaveLength(1);
+
+    // Editing a published case creates a new draft; public content is unchanged.
+    const edit = await adminAgent.put(`/api/admin/content/${caseId}`).send({
+      ...validContent,
+      title: 'Admin-managed profitability case v2',
+      referenceSolution: 'Updated solution text that is long enough to satisfy the minimum length rule.',
+    });
+    expect(edit.status).toBe(200);
+    expect(edit.body.versionNumber).toBe(2);
+    const stillV1 = await request(app).get(`/api/cases/${caseId}`);
+    expect(stillV1.body.title).toBe(validContent.title);
+    expect(stillV1.body.reference_solution).toContain('Margins fell');
+
+    // Version history shows draft v2 + published v1.
+    const versions = await adminAgent.get(`/api/admin/content/${caseId}/versions`);
+    expect(versions.body.versions).toHaveLength(2);
+    expect(versions.body.versions.map((v: { status: string }) => v.status).sort()).toEqual(['Draft', 'Published']);
+
+    // Publish v2; pointer moves, v1 stays immutable history.
+    const republish = await adminAgent.post(`/api/admin/content/${caseId}/publish`);
+    expect(republish.status).toBe(200);
+    expect(republish.body.versionNumber).toBe(2);
+    const nowV2 = await request(app).get(`/api/cases/${caseId}`);
+    expect(nowV2.body.title).toBe('Admin-managed profitability case v2');
+    expect(nowV2.body.version_number).toBe(2);
+    const history = await pool.query(
+      `SELECT version_number, status FROM case_versions WHERE case_id = $1 ORDER BY version_number`,
+      [caseId]
+    );
+    expect(history.rows).toEqual([
+      { version_number: 1, status: 'Published' },
+      { version_number: 2, status: 'Published' },
+    ]);
+
+    // Unpublish hides content but preserves history.
+    const unpublish = await adminAgent.post(`/api/admin/content/${caseId}/unpublish`);
+    expect(unpublish.status).toBe(200);
+    expect((await request(app).get(`/api/cases/${caseId}`)).status).toBe(404);
+    expect((await request(app).get('/api/cases')).body.map((c: { id: string }) => c.id)).not.toContain(caseId);
+    const afterUnpublish = await pool.query(
+      `SELECT COUNT(*)::text AS count FROM case_versions WHERE case_id = $1`,
+      [caseId]
+    );
+    expect(afterUnpublish.rows[0].count).toBe('2');
+    const unpublishAudit = await pool.query(
+      `SELECT action FROM admin_audit_logs WHERE target_id = $1 AND action = 'content.unpublished'`,
+      [caseId]
+    );
+    expect(unpublishAudit.rows).toHaveLength(1);
+    // Second unpublish is rejected.
+    expect((await adminAgent.post(`/api/admin/content/${caseId}/unpublish`)).status).toBe(409);
+    } finally {
+      restoreAdmin();
+    }
+  });
+
+  it('rejects publishing an invalid stored draft without changing state', async () => {
+    const adminAgent = request.agent(app);
+    const admin = await registerTestUser(adminAgent, 'cms_admin_invalid');
+    const restoreAdmin = setAdminEnv(admin.id);
+    try {
+    const create = await adminAgent.post('/api/admin/content').send(validContent);
+    const caseId = create.body.caseId as string;
+    // Corrupt the draft directly, bypassing API validation.
+    await pool.query(`UPDATE case_versions SET title = 'x' WHERE case_id = $1 AND status = 'Draft'`, [caseId]);
+
+    const publish = await adminAgent.post(`/api/admin/content/${caseId}/publish`);
+    expect(publish.status).toBe(422);
+    const state = await pool.query(
+      `SELECT v.status AS version_status, c.current_version_id
+       FROM case_versions v, cases c WHERE v.case_id = c.id AND c.id = $1`,
+      [caseId]
+    );
+    expect(state.rows[0]).toEqual({ version_status: 'Draft', current_version_id: null });
+    } finally {
+      restoreAdmin();
+    }
+  });
+
+  it('rolls back publish when the audit write fails', async () => {
+    const adminAgent = request.agent(app);
+    const admin = await registerTestUser(adminAgent, 'cms_admin_rollback');
+    const restoreAdmin = setAdminEnv(admin.id);
+    try {
+    const create = await adminAgent.post('/api/admin/content').send(validContent);
+    const caseId = create.body.caseId as string;
+    await adminAgent.post(`/api/admin/content/${caseId}/publish`);
+
+    // Create a second draft, then force a mid-transaction failure by using a
+    // nonexistent actor id (audit actor FK violation) at the service layer.
+    await adminAgent.put(`/api/admin/content/${caseId}`).send({
+      ...validContent,
+      title: 'Rollback test content title',
+    });
+    const { contentService } = await import('./contentService.js');
+    await expect(contentService.publishContent('ghost_user', caseId)).rejects.toThrow();
+
+    const state = await pool.query(
+      `SELECT v.version_number, v.status, c.current_version_id
+       FROM case_versions v JOIN cases c ON c.id = v.case_id
+       WHERE v.case_id = $1 ORDER BY v.version_number`,
+      [caseId]
+    );
+    // v1 still published pointer; v2 draft untouched; no partial publish.
+    expect(state.rows).toEqual([
+      { version_number: 1, status: 'Published', current_version_id: expect.any(String) },
+      { version_number: 2, status: 'Draft', current_version_id: expect.any(String) },
+    ]);
+    } finally {
+      restoreAdmin();
+    }
+  });
+
+  it('keeps legacy proposal records readable while blocking new proposals and approval publishing', async () => {
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'legacy_proposer');
+
+    const submit = await agent.post('/api/case-proposals').send({ title: 'x' });
+    expect(submit.status).toBe(410);
+
+    // Historical proposals remain listable for their owner.
+    const mine = await agent.get('/api/case-proposals/mine');
+    expect(mine.status).toBe(200);
+    expect(mine.body.proposals).toEqual([]);
+
+    // Moderation approve no longer publishes; non-admins are still blocked.
+    const moderatorAgent = request.agent(app);
+    const moderator = await registerTestUser(moderatorAgent, 'legacy_mod');
+    const previousMods = process.env.CASE_MODERATOR_USER_IDS;
+    process.env.CASE_MODERATOR_USER_IDS = [previousMods, moderator.id].filter(Boolean).join(',');
+    try {
+      const approve = await moderatorAgent
+        .patch('/api/moderation/case-proposals/proposal_x')
+        .send({ action: 'approve', notes: '' });
+      expect(approve.status).toBe(410);
+      const decline = await moderatorAgent
+        .patch('/api/moderation/case-proposals/proposal_x')
+        .send({ action: 'decline', notes: 'Historical record cleanup only.' });
+      expect([404, 409]).toContain(decline.status);
+    } finally {
+      if (previousMods === undefined) delete process.env.CASE_MODERATOR_USER_IDS;
+      else process.env.CASE_MODERATOR_USER_IDS = previousMods;
+    }
   });
 });
 

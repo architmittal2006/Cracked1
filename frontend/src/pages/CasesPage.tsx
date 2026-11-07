@@ -71,12 +71,8 @@ export const CasesPage: React.FC = () => {
           <div>
             <h1 className="text-2xl font-semibold tracking-tight text-[var(--text-primary)]">Case library</h1>
             <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-              Work through structured case studies. Community proposals are reviewed before publication.
+              Work through structured case studies and guesstimates.
             </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" size="sm" as="a" href="/contribute/cases/mine">My proposals</Button>
-            <Button variant="primary" size="sm" as="a" href="/contribute/cases">Propose a case</Button>
           </div>
         </header>
 
@@ -127,16 +123,14 @@ export const CasesPage: React.FC = () => {
             <p className="mt-2 max-w-xl text-sm leading-6 text-[var(--text-secondary)]">
               {cases.length
                 ? 'Try a different search or clear your filters.'
-                : 'Help build the library by proposing an original, well-structured case. A moderator reviews every proposal before it is published.'}
+                : 'Published cases will appear here once the content team releases them.'}
             </p>
             <div className="mt-5 flex flex-wrap gap-3">
               {cases.length ? (
                 <Button variant="secondary" size="sm" onClick={clearFilters}>Clear filters</Button>
-              ) : (
-                <Button variant="primary" size="sm" as="a" href="/contribute/cases">Propose the first case</Button>
-              )}
+              ) : null}
               <Link className="inline-flex h-9 items-center px-3 text-sm text-[var(--text-secondary)] underline underline-offset-4" to="/how-it-works">
-                How case review works
+                How it works
               </Link>
             </div>
           </div>

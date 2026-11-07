@@ -42,7 +42,38 @@ export const cases = pgTable('cases', {
   timerDeadline: timestamp('timer_deadline', { withTimezone: true }),
   referenceRange: jsonb('reference_range').$type<{ value: number; unit: string; low: number; high: number } | null>(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  currentVersionId: varchar('current_version_id', { length: 255 }).references(() => caseVersions.id),
 });
+
+export const caseVersions = pgTable('case_versions', {
+  id: varchar('id', { length: 255 }).primaryKey(),
+  caseId: varchar('case_id', { length: 255 }).notNull().references(() => cases.id),
+  versionNumber: integer('version_number').notNull(),
+  status: varchar('status', { length: 20 }).notNull(),
+  title: varchar('title', { length: 255 }).notNull(),
+  type: varchar('type', { length: 100 }).notNull(),
+  sector: varchar('sector', { length: 100 }).notNull(),
+  difficulty: varchar('difficulty', { length: 50 }).notNull(),
+  description: text('description').notNull(),
+  exhibits: text('exhibits'),
+  deliverables: text('deliverables').array().notNull().default([]),
+  referenceRange: jsonb('reference_range').$type<{ value: number; unit: string; low: number; high: number } | null>(),
+  referenceSolution: text('reference_solution').notNull(),
+  rubricCriteria: jsonb('rubric_criteria').notNull().default([]),
+  contentOwner: varchar('content_owner', { length: 255 }).notNull(),
+  authorCredit: varchar('author_credit', { length: 255 }),
+  sourceKind: varchar('source_kind', { length: 50 }).notNull(),
+  sourceReference: text('source_reference'),
+  rightsDeclaration: text('rights_declaration').notNull(),
+  rightsVerified: boolean('rights_verified').notNull().default(false),
+  createdBy: varchar('created_by', { length: 255 }).references(() => users.id, { onDelete: 'set null' }),
+  publishedBy: varchar('published_by', { length: 255 }).references(() => users.id, { onDelete: 'set null' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  publishedAt: timestamp('published_at', { withTimezone: true }),
+}, (table) => [
+  uniqueIndex('case_versions_case_number_idx').on(table.caseId, table.versionNumber),
+  index('case_versions_history_idx').on(table.caseId, table.versionNumber),
+]);
 
 export const caseProposals = pgTable('case_proposals', {
   id: varchar('id', { length: 255 }).primaryKey(),

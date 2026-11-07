@@ -68,12 +68,12 @@ export const HowItWorksPage: React.FC = () => {
       </section>
 
       <section className="border-t border-[var(--border-subtle)] py-8">
-        <h2 className="text-xl font-semibold text-[var(--text-primary)]">Contribute a case</h2>
+        <h2 className="text-xl font-semibold text-[var(--text-primary)]">The case library</h2>
         <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-secondary)]">
-          Share an original case brief for the community. A moderator reviews proposals before they appear in the library.
+          Cases and guesstimates are prepared and published by the Cracked content team. Browse the published library to get started.
         </p>
-        <Link to="/contribute/cases" className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">
-          Propose a case <ArrowRight aria-hidden="true" className="h-4 w-4" />
+        <Link to="/cases" className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-[var(--text-primary)] underline underline-offset-4">
+          Browse cases <ArrowRight aria-hidden="true" className="h-4 w-4" />
         </Link>
       </section>
     </PageWrapper>
