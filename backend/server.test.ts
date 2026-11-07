@@ -811,6 +811,143 @@ describe('Student workspace drafts', () => {
   });
 });
 
+describe('Submission integrity', () => {
+  const content = {
+    title: 'Integrity case',
+    type: 'Profitability',
+    sector: 'Retail',
+    difficulty: 'Standard',
+    description: 'A submission integrity test case description with enough detail to satisfy the content contract.',
+    deliverables: ['Issue tree', 'Recommendation'],
+    referenceSolution: 'Hidden reference solution for integrity testing purposes.',
+    rubricCriteria: [{ name: 'Structure', description: 'MECE issue tree.' }],
+    contentOwner: 'Cracked content team',
+    sourceKind: 'original',
+    rightsDeclaration: 'Original work created for Cracked.',
+    rightsConfirmed: true,
+  };
+
+  const publishCase = async (): Promise<string> => {
+    const adminAgent = request.agent(app);
+    const admin = await registerTestUser(adminAgent, 'si_admin');
+    const previous = process.env.ADMIN_USER_IDS;
+    process.env.ADMIN_USER_IDS = [previous, admin.id].filter(Boolean).join(',');
+    try {
+      const create = await adminAgent.post('/api/admin/content').send(content);
+      expect(create.status).toBe(201);
+      const caseId = create.body.caseId as string;
+      expect((await adminAgent.post(`/api/admin/content/${caseId}/publish`)).status).toBe(200);
+      return caseId;
+    } finally {
+      if (previous === undefined) delete process.env.ADMIN_USER_IDS;
+      else process.env.ADMIN_USER_IDS = previous;
+    }
+  };
+
+  it('keeps _notes in drafts but strips it from persisted submissions and peer solutions', async () => {
+    const caseId = await publishCase();
+    const agentA = request.agent(app);
+    const agentB = request.agent(app);
+    await registerTestUser(agentA, 'si_student_a');
+    await registerTestUser(agentB, 'si_student_b');
+
+    // _notes survives draft save and retrieval.
+    const draft = await agentA.put(`/api/cases/${caseId}/draft`).send({
+      contentJson: { issue_tree: 'Costs up', _notes: 'private scratch: check shrinkage' },
+    });
+    expect(draft.status).toBe(200);
+    const resumed = await agentA.get(`/api/cases/${caseId}/draft`);
+    expect(resumed.body.draft.content._notes).toBe('private scratch: check shrinkage');
+
+    // Submission with _notes persists without it.
+    const submit = await agentA.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: {
+        issue_tree: 'Costs rose on shrinkage and freight; revenue was flat.',
+        recommendation: 'Renegotiate freight contracts and fix shrinkage.',
+        _notes: 'private scratch: do not share',
+      },
+      citationsCount: 0,
+    });
+    expect(submit.status).toBe(201);
+
+    const meA = await agentA.get('/api/auth/me');
+    const stored = await pool.query(
+      `SELECT content_json FROM submissions WHERE case_id = $1 AND user_id = $2 AND status <> 'Draft'`,
+      [caseId, meA.body.user.id]
+    );
+    expect(stored.rows[0].content_json._notes).toBeUndefined();
+    expect(stored.rows[0].content_json.issue_tree).toContain('shrinkage');
+
+    // Peer solutions never expose _notes.
+    await agentB.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: { issue_tree: 'Margin pressure from input costs.', recommendation: 'Renegotiate supplier terms.' },
+      citationsCount: 0,
+    });
+    const solutions = await agentA.get(`/api/cases/${caseId}/solutions`);
+    expect(solutions.status).toBe(200);
+    expect(solutions.body.solutions.length).toBeGreaterThanOrEqual(1);
+    for (const solution of solutions.body.solutions) {
+      expect(solution.content._notes).toBeUndefined();
+      for (const key of Object.keys(solution.content)) {
+        expect(key.startsWith('_')).toBe(false);
+      }
+    }
+  });
+
+  it('rejects notes-only and underscore-only submissions', async () => {
+    const caseId = await publishCase();
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'si_student_notes');
+
+    for (const contentJson of [
+      { _notes: 'only private notes here' },
+      { _notes: 'a', _internal: 'b', _meta: 'c' },
+      { _notes: 'word '.repeat(50) },
+    ]) {
+      const res = await agent.post(`/api/cases/${caseId}/submissions`).send({ contentJson, citationsCount: 0 });
+      expect(res.status).toBe(400);
+    }
+
+    // A real submission still succeeds afterwards.
+    const valid = await agent.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: { issue_tree: 'Real analysis with enough words to count.', recommendation: 'Act on the biggest driver.' },
+      citationsCount: 0,
+    });
+    expect(valid.status).toBe(201);
+  });
+
+  it('denies peer solutions to draft-only users but allows submitted users', async () => {
+    const caseId = await publishCase();
+    const agentA = request.agent(app);
+    const agentB = request.agent(app);
+    await registerTestUser(agentA, 'si_gate_a');
+    await registerTestUser(agentB, 'si_gate_b');
+
+    // A submits a real solution so peer solutions exist.
+    await agentA.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: { issue_tree: 'Submitted solution content for peers to compare.', recommendation: 'Clear recommendation text.' },
+      citationsCount: 0,
+    });
+
+    // B saves only a draft: must not unlock peer solutions.
+    await agentB.put(`/api/cases/${caseId}/draft`).send({ contentJson: { issue_tree: 'WIP' } });
+    const draftOnly = await agentB.get(`/api/cases/${caseId}/solutions`);
+    expect(draftOnly.status).toBe(403);
+
+    // Reference solution still gated for draft-only user.
+    expect((await agentB.get(`/api/cases/${caseId}/reference-solution`)).status).toBe(403);
+
+    // B submits for real: access restored.
+    await agentB.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: { issue_tree: 'Second real solution with substantive content.', recommendation: 'Another clear recommendation.' },
+      citationsCount: 0,
+    });
+    const submitted = await agentB.get(`/api/cases/${caseId}/solutions`);
+    expect(submitted.status).toBe(200);
+    expect(submitted.body.solutions.length).toBe(1); // only A's solution, not own
+  });
+});
+
 describe('Casebook routes', () => {
   it('returns only published casebooks and hides unpublished details and private metadata', async () => {
     const { id: uploaderId } = await registerTestUser(request.agent(app), 'catalog_owner');

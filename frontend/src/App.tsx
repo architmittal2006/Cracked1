@@ -22,7 +22,6 @@ import { CasesPage } from './pages/CasesPage';
 import { CasesByTypePage } from './pages/CasesByTypePage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
 import { CaseSolvePage } from './pages/CaseSolvePage';
-import { SubmitPage } from './pages/SubmitPage';
 import { CaseSolutionsPage } from './pages/CaseSolutionsPage';
 import { ReviewDetailPage } from './pages/ReviewDetailPage';
 import { FollowUpPage } from './pages/FollowUpPage';
@@ -124,9 +123,7 @@ const App: React.FC = () => {
                     </ProtectedRoute>
                   } />
                   <Route path="/cases/:id/submit" element={
-                    <ProtectedRoute>
-                      <SubmitPage />
-                    </ProtectedRoute>
+                    <Navigate to="../solve" relative="path" replace />
                   } />
                   <Route path="/cases/:id/solutions" element={
                     <ProtectedRoute>

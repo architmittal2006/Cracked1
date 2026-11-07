@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { Shield, CheckCircle, Clock, AlertCircle, TrendingUp } from 'lucide-react';
-import { formatSubmissionSection, RUBRIC_DIMENSIONS, RUBRIC_DIMENSIONS_BY_TYPE } from '../data/mockData';
+import { formatSubmissionSection, submissionSectionLabel, RUBRIC_DIMENSIONS, RUBRIC_DIMENSIONS_BY_TYPE } from '../data/mockData';
 import type { Case } from '../data/mockData';
 import { RubricSlider } from '../components/RubricSlider';
 import { RadarChart } from '../components/RadarChart';
@@ -161,7 +161,7 @@ export const ReviewPage: React.FC = () => {
               <div className="space-y-4 rounded-md border border-[var(--border-subtle)] bg-[var(--bg-card-hover)] p-4">
                 {Object.entries(reviewSubmission?.content ?? {}).map(([key, value]) => (
                   <div key={key}>
-                    <h3 className="text-sm font-medium text-[var(--text-primary)]">{key.replaceAll('_', ' ')}</h3>
+                    <h3 className="text-sm font-medium text-[var(--text-primary)]">{submissionSectionLabel(key, caseData.deliverables)}</h3>
                     <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{formatSubmissionSection(key, value)}</p>
                   </div>
                 ))}

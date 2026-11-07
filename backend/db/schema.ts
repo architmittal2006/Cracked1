@@ -162,6 +162,7 @@ export const submissions = pgTable('submissions', {
   structuralCompliant: boolean('structural_compliant').default(false),
   finalWeightedScore: integer('final_weighted_score'),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }),
 });
 
 export const reviews = pgTable('reviews', {

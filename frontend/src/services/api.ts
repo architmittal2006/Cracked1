@@ -37,7 +37,9 @@ async function request<T>(
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || `API error: ${response.statusText}`);
+    const error = new Error(data.error || `API error: ${response.statusText}`) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
 
   return data;
@@ -868,6 +870,7 @@ export interface CaseDraft {
   id: string;
   content: Record<string, unknown>;
   createdAt: string;
+  updatedAt?: string;
 }
 
 export async function getCaseDraft(caseId: string): Promise<CaseDraft | null> {

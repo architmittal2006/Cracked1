@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ArrowLeft, FileText } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
 import type { Case } from '../data/mockData';
-import { formatSubmissionSection } from '../data/mockData';
+import { formatSubmissionSection, submissionSectionLabel } from '../data/mockData';
 import { Button } from '../components/Button';
 import { PageWrapper } from '../components/PageWrapper';
 import { getCaseById, getCaseSolutions } from '../services/api';
@@ -83,7 +83,7 @@ export const CaseSolutionsPage: React.FC = () => {
           <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">
             Submit your own approach first. Then you can read other learners’ solutions and compare perspectives.
           </p>
-          <Button variant="primary" size="sm" onClick={() => navigate(`/cases/${caseData.id}/submit`)} className="mt-5">
+          <Button variant="primary" size="sm" onClick={() => navigate(`/cases/${caseData.id}/solve`)} className="mt-5">
             Write your solution
           </Button>
         </div>
@@ -127,7 +127,7 @@ export const CaseSolutionsPage: React.FC = () => {
               <div className="space-y-5">
                 {Object.entries(solution.content).map(([section, content]) => (
                   <section key={section}>
-                    <h3 className="text-sm font-medium capitalize text-[var(--text-primary)]">{section.replaceAll('_', ' ')}</h3>
+                    <h3 className="text-sm font-medium text-[var(--text-primary)]">{submissionSectionLabel(section, caseData.deliverables)}</h3>
                     <p className="mt-1 whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{formatSubmissionSection(section, content)}</p>
                   </section>
                 ))}

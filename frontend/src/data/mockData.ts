@@ -661,3 +661,13 @@ export function formatSubmissionSection(key: string, content: string): string {
   }
   return content;
 }
+
+export function submissionSectionLabel(key: string, deliverables: string[] = []): string {
+  const sectionMatch = /^section_(\d+)$/.exec(key);
+  if (sectionMatch) {
+    const index = Number(sectionMatch[1]);
+    return deliverables[index] ?? `Section ${index + 1}`;
+  }
+  const label = key.replaceAll('_', ' ');
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}

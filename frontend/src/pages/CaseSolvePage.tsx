@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { ArrowLeft, CheckCircle2, Eye, PenLine } from 'lucide-react';
 import { PageWrapper } from '../components/PageWrapper';
 import { Button } from '../components/Button';
@@ -22,6 +22,19 @@ const labelClass = 'mb-1 block text-xs font-medium uppercase tracking-wide text-
 
 const sectionKey = (index: number) => `section_${index}`;
 const NOTES_KEY = '_notes';
+const snapshotKeyFor = (caseId: string) => `cracked:workspace-snapshot:${caseId}`;
+
+const readWorkspaceSnapshot = (caseId: string): { savedAt: number; content: Record<string, unknown> } | null => {
+  try {
+    const raw = sessionStorage.getItem(snapshotKeyFor(caseId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { savedAt?: number; content?: Record<string, unknown> };
+    if (typeof parsed.savedAt !== 'number' || !parsed.content || typeof parsed.content !== 'object') return null;
+    return { savedAt: parsed.savedAt, content: parsed.content };
+  } catch {
+    return null;
+  }
+};
 
 interface GuesstimateAssumption { name: string; value: string; unit: string; rationale: string }
 interface GuesstimateState {
@@ -107,50 +120,212 @@ export const CaseSolvePage: React.FC = () => {
   const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'error'>('idle');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitNotice, setSubmitNotice] = useState<string | null>(null);
+  const [validationShown, setValidationShown] = useState(false);
+
+  const [isDirty, setIsDirty] = useState(false);
+  const [auxLoaded, setAuxLoaded] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const [solutionError, setSolutionError] = useState<string | null>(null);
+  const [externalSubmitNotice, setExternalSubmitNotice] = useState<string | null>(null);
+  const [sessionExpired, setSessionExpired] = useState(false);
+  const location = useLocation();
+  const savedSignature = useRef<string | null>(null);
+  const signatureRef = useRef('');
+  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveInFlight = useRef(false);
+  const pendingSave = useRef(false);
+  const statusCheckInFlight = useRef(false);
+  const lastStatusCheck = useRef(0);
+  const mountedRef = useRef(true);
+  const submittedRef = useRef(false);
+  const dirtyRef = useRef(false);
+
+  const restoreDraft = (loadedCase: PublishedCaseDetail, draft: { content: Record<string, unknown> } | null) => {
+    if (!draft) return;
+    setHasDraft(true);
+    if (loadedCase.type === 'Guesstimate') {
+      setGuesstimate(guesstimateFromContent(draft.content));
+    } else {
+      const nextAnswers: Record<number, string> = {};
+      loadedCase.deliverables.forEach((_, index) => {
+        const value = draft.content[sectionKey(index)];
+        if (typeof value === 'string') nextAnswers[index] = value;
+      });
+      setAnswers(nextAnswers);
+    }
+    const draftNotes = draft.content[NOTES_KEY];
+    if (typeof draftNotes === 'string') setNotes(draftNotes);
+  };
+
+  const loadAuxData = async (loadedCase: PublishedCaseDetail) => {
+    setDraftError(null);
+    setSolutionError(null);
+    const [draftResult, solutionResult] = await Promise.allSettled([
+      getCaseDraft(id!),
+      getReferenceSolution(id!),
+    ]);
+    let draftToRestore = draftResult.status === 'fulfilled' ? draftResult.value : null;
+    if (draftResult.status === 'rejected') {
+      setDraftError('Could not load your saved draft.');
+    }
+    // A local snapshot holds content newer than the last confirmed server save
+    // (e.g. edits made after the session expired). Prefer it when newer.
+    const snapshot = id ? readWorkspaceSnapshot(id) : null;
+    if (snapshot) {
+      const draftSavedAt = draftToRestore?.updatedAt ?? draftToRestore?.createdAt;
+      const draftSavedAtMs = draftSavedAt ? Date.parse(draftSavedAt) : 0;
+      if (!draftToRestore || snapshot.savedAt > draftSavedAtMs) {
+        draftToRestore = { id: '', content: snapshot.content, createdAt: '' };
+      }
+      if (id) sessionStorage.removeItem(snapshotKeyFor(id));
+    }
+    if (draftToRestore) restoreDraft(loadedCase, draftToRestore);
+    if (solutionResult.status === 'fulfilled') {
+      if (solutionResult.value) {
+        setSubmitted(true);
+        setReferenceSolution(solutionResult.value);
+      }
+    } else {
+      setSolutionError('Could not check your submission status.');
+    }
+    setAuxLoaded(true);
+  };
 
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
     (async () => {
+      setIsLoading(true);
+      setLoadError(null);
+      const loadedCase = await getPublishedCase(id);
+      if (cancelled) return;
+      if (!loadedCase) {
+        setLoadError('This case is not published or does not exist.');
+        setIsLoading(false);
+        return;
+      }
+      setCaseData(loadedCase);
+      setIsLoading(false);
       try {
-        const [loadedCase, draft, solution] = await Promise.all([
-          getPublishedCase(id),
-          getCaseDraft(id).catch(() => null),
-          getReferenceSolution(id),
-        ]);
-        if (cancelled) return;
-        if (!loadedCase) {
-          setLoadError('This case is not published or does not exist.');
-          return;
-        }
-        setCaseData(loadedCase);
-        if (draft) {
-          setHasDraft(true);
-          if (loadedCase.type === 'Guesstimate') {
-            setGuesstimate(guesstimateFromContent(draft.content));
-          } else {
-            const nextAnswers: Record<number, string> = {};
-            loadedCase.deliverables.forEach((_, index) => {
-              const value = draft.content[sectionKey(index)];
-              if (typeof value === 'string') nextAnswers[index] = value;
-            });
-            setAnswers(nextAnswers);
-            const draftNotes = draft.content[NOTES_KEY];
-            if (typeof draftNotes === 'string') setNotes(draftNotes);
-          }
-        }
-        if (solution) {
-          setSubmitted(true);
-          setReferenceSolution(solution);
-        }
-      } catch (error) {
-        if (!cancelled) setLoadError(error instanceof Error ? error.message : 'Could not load the workspace');
-      } finally {
-        if (!cancelled) setIsLoading(false);
+        await loadAuxData(loadedCase);
+      } catch {
+        if (!cancelled) setAuxLoaded(true);
       }
     })();
     return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
+
+  // Dirty tracking + debounced autosave: signature of current content vs last saved/loaded content.
+  useEffect(() => {
+    if (!auxLoaded || !caseData) return;
+    signatureRef.current = JSON.stringify(buildContentJson());
+    if (savedSignature.current === null) savedSignature.current = signatureRef.current;
+    const dirtyNow = signatureRef.current !== savedSignature.current;
+    setIsDirty(dirtyNow);
+    // Persist a local snapshot of unsaved work so it survives unmounts
+    // (e.g. the session-expired re-login flow) and accidental tab closure.
+    if (id) {
+      if (dirtyNow) {
+        try {
+          sessionStorage.setItem(snapshotKeyFor(id), JSON.stringify({ savedAt: Date.now(), content: JSON.parse(signatureRef.current) }));
+        } catch { /* storage full/blocked — ignore */ }
+      } else {
+        sessionStorage.removeItem(snapshotKeyFor(id));
+      }
+    }
+    if (dirtyNow && !submitted && !draftError) scheduleAutosave(1500);
+    return () => {
+      if (autosaveTimer.current) {
+        clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [answers, notes, guesstimate, auxLoaded, caseData, submitted, draftError]);
+
+  // Clear any pending autosave timer on unmount.
+  useEffect(() => () => {
+    mountedRef.current = false;
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+  }, []);
+
+  useEffect(() => { submittedRef.current = submitted; }, [submitted]);
+  useEffect(() => { dirtyRef.current = isDirty; }, [isDirty]);
+
+  // Refresh submission status when the tab regains attention, so a submission
+  // made in another tab/device is detected without a manual reload.
+  const refreshSubmissionStatus = async () => {
+    if (!id || submittedRef.current || statusCheckInFlight.current) return;
+    if (Date.now() - lastStatusCheck.current < 2000) return;
+    lastStatusCheck.current = Date.now();
+    statusCheckInFlight.current = true;
+    try {
+      const solution = await getReferenceSolution(id);
+      if (!mountedRef.current || !solution) return;
+      if (dirtyRef.current && !window.confirm('A submission was found for this case. Discard your unsaved changes and view it?')) {
+        setExternalSubmitNotice('This case was already submitted — possibly in another tab or device. Your unsaved changes are preserved and autosave continues.');
+        return;
+      }
+      setExternalSubmitNotice(null);
+      if (autosaveTimer.current) {
+        clearTimeout(autosaveTimer.current);
+        autosaveTimer.current = null;
+      }
+      savedSignature.current = signatureRef.current;
+      setIsDirty(false);
+      setSubmitted(true);
+      setReferenceSolution(solution);
+      setSubmitNotice('A submission was detected — it may have been made in another tab or device.');
+    } catch {
+      // Status unknown (network/500): do not treat as proof of non-submission.
+      if (mountedRef.current) setSolutionError('Could not check your submission status.');
+    } finally {
+      statusCheckInFlight.current = false;
+    }
+  };
+
+  useEffect(() => {
+    if (!id) return;
+    const onAttention = () => {
+      if (document.visibilityState === 'visible') void refreshSubmissionStatus();
+    };
+    window.addEventListener('focus', onAttention);
+    document.addEventListener('visibilitychange', onAttention);
+    return () => {
+      window.removeEventListener('focus', onAttention);
+      document.removeEventListener('visibilitychange', onAttention);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Unsaved-work protection: tab close/refresh.
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [isDirty]);
+
+  // Unsaved-work protection: internal link clicks (React Router <Link>/<a>).
+  useEffect(() => {
+    if (!isDirty) return;
+    const handler = (event: MouseEvent) => {
+      const anchor = (event.target as HTMLElement | null)?.closest?.('a[href]');
+      if (!(anchor instanceof HTMLAnchorElement)) return;
+      const href = anchor.getAttribute('href') ?? '';
+      if (!href.startsWith('/') || anchor.target === '_blank') return;
+      if (!window.confirm('You have unsaved changes. Leave without saving?')) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+    };
+    document.addEventListener('click', handler, true);
+    return () => document.removeEventListener('click', handler, true);
+  }, [isDirty]);
 
   const buildContentJson = (): Record<string, string> => {
     if (!caseData) return {};
@@ -170,7 +345,6 @@ export const CaseSolvePage: React.FC = () => {
   };
 
   const hasContent = useMemo(() => {
-    if (notes.trim()) return true;
     if (!caseData) return false;
     if (caseData.type === 'Guesstimate') {
       return Boolean(
@@ -184,20 +358,98 @@ export const CaseSolvePage: React.FC = () => {
       );
     }
     return Object.values(answers).some((value) => value.trim());
-  }, [answers, notes, guesstimate, caseData]);
+  }, [answers, guesstimate, caseData]);
 
-  const handleSaveDraft = async () => {
-    if (!id || !caseData) return;
+  // Mirrors backend validateLayer1Gate guesstimate rules; backend remains authoritative.
+  const guesstimateErrors = useMemo<Record<string, string>>(() => {
+    const errors: Record<string, string> = {};
+    if (caseData?.type !== 'Guesstimate') return errors;
+    const g = guesstimate;
+    if (!g.clarify_scope.trim()) errors.clarify_scope = 'Clarify the question scope and unit.';
+    if (!g.segments.some((s) => s.trim())) errors.segments = 'Add at least one structure segment.';
+    const filledAssumptions = g.assumptions.filter((a) => a.name.trim() || a.value.trim() || a.unit.trim() || a.rationale.trim());
+    const completeAssumptions = filledAssumptions.filter((a) =>
+      a.name.trim() && a.unit.trim() && a.rationale.trim() && a.value.trim() && Number.isFinite(Number(a.value))
+    );
+    if (filledAssumptions.length > 0 && completeAssumptions.length < filledAssumptions.length) {
+      errors.assumptions = 'Each assumption needs a name, numeric value, unit and rationale.';
+    } else if (completeAssumptions.length < 3) {
+      errors.assumptions = `Add at least three complete assumptions (${completeAssumptions.length}/3).`;
+    }
+    if (!g.calculation_steps.trim()) errors.calculation_steps = 'Show your calculation steps.';
+    if (!g.sanity_check.trim()) errors.sanity_check = 'Add a sanity check.';
+    const { value, unit, low, high } = g.estimate;
+    const numeric = [value, low, high].every((f) => f.trim() !== '' && Number.isFinite(Number(f)));
+    if (!numeric || !unit.trim()) {
+      errors.estimate = 'Enter numeric value, low and high with a unit.';
+    } else {
+      const numValue = Number(value);
+      const numLow = Number(low);
+      const numHigh = Number(high);
+      if (numLow > numValue || numValue > numHigh) {
+        errors.estimate = 'Value must satisfy low ≤ value ≤ high.';
+      }
+    }
+    return errors;
+  }, [guesstimate, caseData]);
+
+  const scheduleAutosave = (delay: number) => {
+    if (autosaveTimer.current) clearTimeout(autosaveTimer.current);
+    autosaveTimer.current = setTimeout(() => {
+      autosaveTimer.current = null;
+      void persistDraft();
+    }, delay);
+  };
+
+  // Single-flight draft persistence shared by autosave and the manual button.
+  // Older responses can never mark newer edits as saved: cleanliness is decided
+  // by comparing the live signatureRef against the signature actually sent.
+  const persistDraft = async () => {
+    if (!id || !caseData || submitted) return;
+    if (saveInFlight.current) {
+      pendingSave.current = true;
+      return;
+    }
+    const contentJson = buildContentJson();
+    const sentSignature = JSON.stringify(contentJson);
+    if (sentSignature === savedSignature.current) {
+      setIsDirty(false);
+      return;
+    }
+    saveInFlight.current = true;
     setSaveState('saving');
     setSaveError(null);
+    let succeeded = false;
     try {
-      await saveCaseDraft(id, buildContentJson());
+      await saveCaseDraft(id, contentJson);
+      succeeded = true;
+      savedSignature.current = sentSignature;
       setHasDraft(true);
-      setSaveState('saved');
+      setIsDirty(signatureRef.current !== sentSignature);
     } catch (error) {
-      setSaveState('error');
-      setSaveError(error instanceof Error ? error.message : 'Could not save draft');
+      if ((error as { status?: number }).status === 401) {
+        setSessionExpired(true);
+      } else {
+        setSaveError(error instanceof Error ? error.message : 'Could not save draft');
+      }
+    } finally {
+      saveInFlight.current = false;
+      setSaveState(succeeded ? 'saved' : 'error');
+      if (succeeded && (pendingSave.current || signatureRef.current !== savedSignature.current)) {
+        pendingSave.current = false;
+        scheduleAutosave(300);
+      } else {
+        pendingSave.current = false;
+      }
     }
+  };
+
+  const handleSaveDraft = () => {
+    if (autosaveTimer.current) {
+      clearTimeout(autosaveTimer.current);
+      autosaveTimer.current = null;
+    }
+    void persistDraft();
   };
 
   const handleSubmit = async () => {
@@ -208,36 +460,32 @@ export const CaseSolvePage: React.FC = () => {
       setSubmitError('Write your solution before submitting.');
       return;
     }
-    if (caseData.type === 'Guesstimate') {
-      const { value, unit, low, high } = guesstimate.estimate;
-      const numeric = [value, low, high].every((field) => field.trim() !== '' && Number.isFinite(Number(field)));
-      if (!numeric || !unit.trim()) {
-        setSubmitState('error');
-        setSubmitError('Enter a numeric final estimate with a unit and low/high range.');
-        return;
-      }
-      const numValue = Number(value);
-      const numLow = Number(low);
-      const numHigh = Number(high);
-      if (numLow > numValue || numValue > numHigh) {
-        setSubmitState('error');
-        setSubmitError('Final estimate must satisfy low ≤ value ≤ high.');
-        return;
-      }
+    if (caseData.type === 'Guesstimate' && Object.keys(guesstimateErrors).length > 0) {
+      setValidationShown(true);
+      setSubmitState('error');
+      setSubmitError('Complete the highlighted fields before submitting.');
+      return;
     }
+    setValidationShown(false);
     setSubmitState('submitting');
     setSubmitError(null);
     setSubmitNotice(null);
     try {
       const response = await createSubmission(id, contentJson, 0, 0);
       setSubmitted(true);
+      savedSignature.current = signatureRef.current;
+      setIsDirty(false);
       setSubmitState('idle');
       setSubmitNotice(`Attempt submitted (${response.submissionId}).`);
       const solution = await getReferenceSolution(id);
       setReferenceSolution(solution);
     } catch (error) {
-      setSubmitState('error');
-      setSubmitError(error instanceof Error ? error.message : 'Could not submit your solution');
+      if ((error as { status?: number }).status === 401) {
+        setSessionExpired(true);
+      } else {
+        setSubmitState('error');
+        setSubmitError(error instanceof Error ? error.message : 'Could not submit your solution');
+      }
     }
   };
 
@@ -259,9 +507,34 @@ export const CaseSolvePage: React.FC = () => {
 
   return (
     <PageWrapper className="py-8">
-      <Button variant="ghost" size="sm" onClick={() => navigate(`/cases/${caseData.id}`)} className="mb-5 inline-flex gap-2">
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          if (isDirty && !window.confirm('You have unsaved changes. Leave without saving?')) return;
+          navigate(`/cases/${caseData.id}`);
+        }}
+        className="mb-5 inline-flex gap-2"
+      >
         <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Back to case
       </Button>
+
+      {(draftError || solutionError) && (
+        <div className="mb-6 space-y-2">
+          {draftError && (
+            <p className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200" role="alert">
+              {draftError}
+              <button type="button" className="font-medium underline" onClick={() => caseData && void loadAuxData(caseData)}>Retry</button>
+            </p>
+          )}
+          {solutionError && (
+            <p className="flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200" role="alert">
+              {solutionError} The workspace is still usable.
+              <button type="button" className="font-medium underline" onClick={() => caseData && void loadAuxData(caseData)}>Retry</button>
+            </p>
+          )}
+        </div>
+      )}
 
       <header className="mb-8 border-b border-[var(--border-subtle)] pb-7">
         <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -313,6 +586,23 @@ export const CaseSolvePage: React.FC = () => {
               Draft restored — your saved work is loaded below. It is not submitted until you submit it.
             </p>
           )}
+          {externalSubmitNotice && (
+            <p className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-200" role="status">
+              {externalSubmitNotice}
+            </p>
+          )}
+          {sessionExpired && (
+            <p className="flex flex-wrap items-center gap-3 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200" role="alert">
+              Your session expired. Your unsaved work is still here — sign in again to keep saving.
+              <Link
+                to="/login"
+                state={{ from: { pathname: location.pathname } }}
+                className="font-medium underline"
+              >
+                Sign in again
+              </Link>
+            </p>
+          )}
 
           <section aria-label="Structured answer">
             <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Your solution</h2>
@@ -323,6 +613,9 @@ export const CaseSolvePage: React.FC = () => {
                   <textarea id="g-clarify" rows={3} className={inputClass} value={guesstimate.clarify_scope}
                     onChange={(e) => setGuesstimate((c) => ({ ...c, clarify_scope: e.target.value }))}
                     placeholder="What exactly is being asked? Define scope and unit." />
+                  {validationShown && guesstimateErrors.clarify_scope && (
+                    <p className="mt-2 text-sm text-red-300" role="alert">{guesstimateErrors.clarify_scope}</p>
+                  )}
                 </div>
 
                 <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
@@ -331,9 +624,10 @@ export const CaseSolvePage: React.FC = () => {
                     {guesstimate.segments.map((segment, index) => (
                       <div key={index} className="flex gap-2">
                         <input className={inputClass} value={segment} placeholder={`Segment ${index + 1}`}
+                          aria-label={`Structure segment ${index + 1}`}
                           onChange={(e) => setGuesstimate((c) => ({ ...c, segments: c.segments.map((s, i) => (i === index ? e.target.value : s)) }))} />
                         {guesstimate.segments.length > 1 && (
-                          <Button size="sm" variant="ghost" onClick={() => setGuesstimate((c) => ({ ...c, segments: c.segments.filter((_, i) => i !== index) }))}>×</Button>
+                          <Button size="sm" variant="ghost" aria-label={`Remove segment ${index + 1}`} onClick={() => setGuesstimate((c) => ({ ...c, segments: c.segments.filter((_, i) => i !== index) }))}>×</Button>
                         )}
                       </div>
                     ))}
@@ -341,6 +635,9 @@ export const CaseSolvePage: React.FC = () => {
                       <Button size="sm" variant="secondary" onClick={() => setGuesstimate((c) => ({ ...c, segments: [...c.segments, ''] }))}>Add segment</Button>
                     )}
                   </div>
+                  {validationShown && guesstimateErrors.segments && (
+                    <p className="mt-2 text-sm text-red-300" role="alert">{guesstimateErrors.segments}</p>
+                  )}
                 </div>
 
                 <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
@@ -349,14 +646,18 @@ export const CaseSolvePage: React.FC = () => {
                     {guesstimate.assumptions.map((assumption, index) => (
                       <div key={index} className="grid gap-2 rounded-lg border border-[var(--border-subtle)] p-3 sm:grid-cols-2">
                         <input className={inputClass} placeholder="Assumption name" value={assumption.name}
+                          aria-label={`Assumption ${index + 1} name`}
                           onChange={(e) => setGuesstimate((c) => ({ ...c, assumptions: c.assumptions.map((a, i) => (i === index ? { ...a, name: e.target.value } : a)) }))} />
                         <div className="grid grid-cols-2 gap-2">
                           <input className={inputClass} placeholder="Value" value={assumption.value}
+                            aria-label={`Assumption ${index + 1} value`}
                             onChange={(e) => setGuesstimate((c) => ({ ...c, assumptions: c.assumptions.map((a, i) => (i === index ? { ...a, value: e.target.value } : a)) }))} />
                           <input className={inputClass} placeholder="Unit" value={assumption.unit}
+                            aria-label={`Assumption ${index + 1} unit`}
                             onChange={(e) => setGuesstimate((c) => ({ ...c, assumptions: c.assumptions.map((a, i) => (i === index ? { ...a, unit: e.target.value } : a)) }))} />
                         </div>
                         <input className={`${inputClass} sm:col-span-2`} placeholder="Rationale" value={assumption.rationale}
+                          aria-label={`Assumption ${index + 1} rationale`}
                           onChange={(e) => setGuesstimate((c) => ({ ...c, assumptions: c.assumptions.map((a, i) => (i === index ? { ...a, rationale: e.target.value } : a)) }))} />
                       </div>
                     ))}
@@ -364,6 +665,9 @@ export const CaseSolvePage: React.FC = () => {
                       <Button size="sm" variant="secondary" onClick={() => setGuesstimate((c) => ({ ...c, assumptions: [...c.assumptions, { name: '', value: '', unit: '', rationale: '' }] }))}>Add assumption</Button>
                     )}
                   </div>
+                  {validationShown && guesstimateErrors.assumptions && (
+                    <p className="mt-2 text-sm text-red-300" role="alert">{guesstimateErrors.assumptions}</p>
+                  )}
                 </div>
 
                 <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
@@ -371,6 +675,9 @@ export const CaseSolvePage: React.FC = () => {
                   <textarea id="g-calc" rows={4} className={inputClass} value={guesstimate.calculation_steps}
                     onChange={(e) => setGuesstimate((c) => ({ ...c, calculation_steps: e.target.value }))}
                     placeholder="Show your math step by step." />
+                  {validationShown && guesstimateErrors.calculation_steps && (
+                    <p className="mt-2 text-sm text-red-300" role="alert">{guesstimateErrors.calculation_steps}</p>
+                  )}
                 </div>
 
                 <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
@@ -378,6 +685,9 @@ export const CaseSolvePage: React.FC = () => {
                   <textarea id="g-sanity" rows={3} className={inputClass} value={guesstimate.sanity_check}
                     onChange={(e) => setGuesstimate((c) => ({ ...c, sanity_check: e.target.value }))}
                     placeholder="Does the answer pass a reality check? Compare to benchmarks." />
+                  {validationShown && guesstimateErrors.sanity_check && (
+                    <p className="mt-2 text-sm text-red-300" role="alert">{guesstimateErrors.sanity_check}</p>
+                  )}
                 </div>
 
                 <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
@@ -392,6 +702,9 @@ export const CaseSolvePage: React.FC = () => {
                     <input className={inputClass} type="number" placeholder="High" value={guesstimate.estimate.high}
                       onChange={(e) => setGuesstimate((c) => ({ ...c, estimate: { ...c.estimate, high: e.target.value } }))} aria-label="Estimate high" />
                   </div>
+                  {validationShown && guesstimateErrors.estimate && (
+                    <p className="mt-2 text-sm text-red-300" role="alert">{guesstimateErrors.estimate}</p>
+                  )}
                 </div>
 
                 <div className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-4">
@@ -466,7 +779,19 @@ export const CaseSolvePage: React.FC = () => {
               <PenLine aria-hidden="true" className="h-4 w-4" />
               {submitState === 'submitting' ? 'Submitting…' : 'Submit attempt'}
             </Button>
-            {!hasContent && (
+            {isDirty && (
+              <span className="text-xs font-medium text-amber-300">Unsaved changes</span>
+            )}
+            {!isDirty && saveState === 'saving' && (
+              <span className="text-xs text-[var(--text-secondary)]">Saving…</span>
+            )}
+            {!isDirty && saveState === 'saved' && hasDraft && (
+              <span className="text-xs text-emerald-300">Draft saved</span>
+            )}
+            {saveState === 'error' && (
+              <span className="text-xs font-medium text-red-300">Save failed</span>
+            )}
+            {!hasContent && !isDirty && saveState === 'idle' && (
               <span className="text-xs text-[var(--text-secondary)]">Write at least one section to save or submit.</span>
             )}
           </div>

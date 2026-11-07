@@ -10,7 +10,7 @@ export const GitHubLoginButton: React.FC<GitHubLoginButtonProps> = () => {
   const handleGitHubLogin = async () => {
     try {
       // Get GitHub auth URL from backend
-      const response = await fetch('http://localhost:8080/api/auth/github');
+      const response = await fetch('/api/auth/github');
       const data = await response.json();
       
       if (data.authUrl) {
@@ -56,7 +56,7 @@ export const GitHubOAuthCallback: React.FC = () => {
 
       try {
         // Send code to backend for secure token exchange
-        const response = await fetch('http://localhost:8080/api/auth/github/callback', {
+        const response = await fetch('/api/auth/github/callback', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

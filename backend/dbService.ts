@@ -1174,39 +1174,46 @@ export class DatabaseService {
     caseId: string,
     userId: string,
     contentJson: Record<string, unknown>
-  ): Promise<{ id: string; content: Record<string, unknown>; createdAt: string }> {
+  ): Promise<{ id: string; content: Record<string, unknown>; createdAt: string; updatedAt: string }> {
     const result = await pool.query<{
       id: string;
       content_json: Record<string, unknown>;
       created_at: Date;
+      updated_at: Date;
     }>(
-      `INSERT INTO submissions (id, case_id, user_id, content_json, status, structural_compliant)
-       VALUES ($1, $2, $3, $4::jsonb, 'Draft', FALSE)
+      `INSERT INTO submissions (id, case_id, user_id, content_json, status, structural_compliant, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, 'Draft', FALSE, NOW())
        ON CONFLICT (case_id, user_id) WHERE status = 'Draft'
-       DO UPDATE SET content_json = EXCLUDED.content_json
-       RETURNING id, content_json, created_at`,
+       DO UPDATE SET content_json = EXCLUDED.content_json, updated_at = NOW()
+       RETURNING id, content_json, created_at, updated_at`,
       [`sub_${crypto.randomUUID().slice(2, 11)}`, caseId, userId, JSON.stringify(contentJson)]
     );
     const row = result.rows[0];
-    return { id: row.id, content: row.content_json, createdAt: row.created_at.toISOString() };
+    return { id: row.id, content: row.content_json, createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString() };
   }
 
   public static async getCaseDraft(
     caseId: string,
     userId: string
-  ): Promise<{ id: string; content: Record<string, unknown>; createdAt: string } | null> {
+  ): Promise<{ id: string; content: Record<string, unknown>; createdAt: string; updatedAt: string } | null> {
     const result = await pool.query<{
       id: string;
       content_json: Record<string, unknown>;
       created_at: Date;
+      updated_at: Date | null;
     }>(
-      `SELECT id, content_json, created_at FROM submissions
+      `SELECT id, content_json, created_at, updated_at FROM submissions
        WHERE case_id = $1 AND user_id = $2 AND status = 'Draft'`,
       [caseId, userId]
     );
     const row = result.rows[0];
     if (!row) return null;
-    return { id: row.id, content: row.content_json, createdAt: row.created_at.toISOString() };
+    return {
+      id: row.id,
+      content: row.content_json,
+      createdAt: row.created_at.toISOString(),
+      updatedAt: (row.updated_at ?? row.created_at).toISOString(),
+    };
   }
 
   public static async hasSubmittedAttempt(caseId: string, userId: string): Promise<boolean> {
@@ -1230,6 +1237,7 @@ export class DatabaseService {
          EXISTS (
            SELECT 1 FROM submissions
            WHERE case_id = $1 AND user_id = $2
+             AND status <> 'Draft' AND structural_compliant = TRUE
          ) OR EXISTS (
            SELECT 1 FROM case_proposals
            WHERE published_case_id = $1 AND contributor_id = $2

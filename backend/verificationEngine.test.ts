@@ -140,3 +140,64 @@ describe('solution validation', () => {
     })).toBeCloseTo(2.75);
   });
 });
+
+describe('private field handling', () => {
+  it('strips underscore-prefixed fields from persisted submission content', async () => {
+    const result = await VerificationEngine.validateLayer1Gate({
+      contentJson: {
+        framing: 'Start with the bottleneck.',
+        _notes: 'private scratch work',
+        _draft_meta: 'internal',
+      },
+    });
+
+    expect(result).toEqual({
+      compliant: true,
+      contentJson: { framing: 'Start with the bottleneck.' },
+      wordCount: 4,
+    });
+  });
+
+  it('rejects notes-only submissions for non-guesstimate cases', async () => {
+    await expect(VerificationEngine.validateLayer1Gate({
+      contentJson: { _notes: 'just my private notes' },
+    })).resolves.toMatchObject({ compliant: false });
+  });
+
+  it('rejects underscore-only submissions for non-guesstimate cases', async () => {
+    await expect(VerificationEngine.validateLayer1Gate({
+      contentJson: { _notes: 'a', _internal: 'b', _meta: 'c' },
+    })).resolves.toMatchObject({ compliant: false });
+  });
+
+  it('does not let private fields contribute to word count', async () => {
+    const result = await VerificationEngine.validateLayer1Gate({
+      contentJson: {
+        framing: 'word '.repeat(3999).trim(),
+        _notes: 'word '.repeat(100),
+      },
+    });
+
+    expect(result.compliant).toBe(true);
+    if (result.compliant) expect(result.wordCount).toBe(3999);
+  });
+
+  it('keeps guesstimate validation unchanged when private fields are present', async () => {
+    const contentJson = {
+      clarify_scope: 'Scope.',
+      structure_segments: JSON.stringify(['Segment']),
+      assumptions: JSON.stringify([
+        { name: 'A', value: '1', unit: 'x', rationale: 'Reason' },
+        { name: 'B', value: '2', unit: 'x', rationale: 'Reason' },
+        { name: 'C', value: '3', unit: 'x', rationale: 'Reason' },
+      ]),
+      calculation_steps: 'Calculation.',
+      sanity_check: 'Sanity check.',
+      final_estimate: JSON.stringify({ value: '6', unit: 'x', low: '4', high: '8' }),
+      _notes: 'private',
+    };
+    const result = await VerificationEngine.validateLayer1Gate({ caseType: 'Guesstimate', contentJson });
+    expect(result.compliant).toBe(true);
+    if (result.compliant) expect(result.contentJson._notes).toBeUndefined();
+  });
+});
