@@ -823,3 +823,77 @@ export async function unpublishAdminContent(caseId: string): Promise<{ versionId
   );
   return { versionId: result.versionId };
 }
+
+// ─── Published case detail (versioned content) ───
+
+export interface PublishedCaseDetail {
+  id: string;
+  title: string;
+  type: string;
+  sector: string;
+  difficulty: string;
+  status: string;
+  description: string;
+  deliverables: string[];
+  pts: number;
+  submission_count: number;
+  review_count: number;
+  deadline: string | null;
+  tags: string[];
+  is_chaos: boolean | null;
+  timer_deadline: string | null;
+  created_at: string;
+  version_number: number;
+  exhibits: string | null;
+  rubric_criteria: RubricCriterion[];
+  content_owner: string;
+  author_credit: string | null;
+  source_kind: string;
+  source_reference: string | null;
+  rights_declaration: string;
+  published_at: string | null;
+}
+
+export async function getPublishedCase(id: string): Promise<PublishedCaseDetail | null> {
+  try {
+    return await request<PublishedCaseDetail>(`/api/cases/${encodeURIComponent(id)}`);
+  } catch {
+    return null;
+  }
+}
+
+// ─── Student solving workspace ───
+
+export interface CaseDraft {
+  id: string;
+  content: Record<string, unknown>;
+  createdAt: string;
+}
+
+export async function getCaseDraft(caseId: string): Promise<CaseDraft | null> {
+  const result = await request<{ success: true; draft: CaseDraft | null }>(
+    `/api/cases/${encodeURIComponent(caseId)}/draft`
+  );
+  return result.draft;
+}
+
+export async function saveCaseDraft(caseId: string, contentJson: Record<string, unknown>): Promise<CaseDraft> {
+  const result = await request<{ success: true; draft: CaseDraft }>(
+    `/api/cases/${encodeURIComponent(caseId)}/draft`,
+    { method: 'PUT', body: JSON.stringify({ contentJson }) }
+  );
+  return result.draft;
+}
+
+export async function getReferenceSolution(caseId: string): Promise<string | null> {
+  const response = await fetch(
+    `${API_BASE}/api/cases/${encodeURIComponent(caseId)}/reference-solution`,
+    { credentials: 'include' }
+  );
+  if (response.status === 403) return null;
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || 'Could not check submission status');
+  }
+  return data.referenceSolution;
+}

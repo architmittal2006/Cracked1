@@ -150,6 +150,9 @@ beforeEach(async () => {
     SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
   )`);
   await pool.query("DELETE FROM casebooks WHERE id LIKE 'casebook_test_%'");
+  await pool.query(`DELETE FROM submissions WHERE user_id IN (
+    SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
+  )`);
   await pool.query("DELETE FROM users WHERE email LIKE '%@test.cracked.local'");
 });
 
@@ -518,7 +521,7 @@ describe('Admin content CMS', () => {
     expect(publicList.body.map((c: { id: string }) => c.id)).toContain(caseId);
     const publicDetail = await request(app).get(`/api/cases/${caseId}`);
     expect(publicDetail.status).toBe(200);
-    expect(publicDetail.body.reference_solution).toContain('Margins fell');
+    expect(publicDetail.body.reference_solution).toBeUndefined();
     expect(publicDetail.body.content_owner).toBe('Cracked content team');
     expect(publicDetail.body.version_number).toBe(1);
 
@@ -540,7 +543,7 @@ describe('Admin content CMS', () => {
     expect(edit.body.versionNumber).toBe(2);
     const stillV1 = await request(app).get(`/api/cases/${caseId}`);
     expect(stillV1.body.title).toBe(validContent.title);
-    expect(stillV1.body.reference_solution).toContain('Margins fell');
+    expect(stillV1.body.reference_solution).toBeUndefined();
 
     // Version history shows draft v2 + published v1.
     const versions = await adminAgent.get(`/api/admin/content/${caseId}/versions`);
@@ -672,6 +675,139 @@ describe('Admin content CMS', () => {
       if (previousMods === undefined) delete process.env.CASE_MODERATOR_USER_IDS;
       else process.env.CASE_MODERATOR_USER_IDS = previousMods;
     }
+  });
+});
+
+describe('Student workspace drafts', () => {
+  const content = {
+    title: 'Workspace profitability case',
+    type: 'Profitability',
+    sector: 'Retail',
+    difficulty: 'Standard',
+    description: 'A workspace test case description with enough detail to satisfy the content contract rules.',
+    deliverables: ['Issue tree', 'Recommendation'],
+    referenceSolution: 'The reference solution text that must stay hidden until submission.',
+    rubricCriteria: [{ name: 'Structure', description: 'MECE issue tree.' }],
+    contentOwner: 'Cracked content team',
+    sourceKind: 'original',
+    rightsDeclaration: 'Original work created for Cracked.',
+    rightsConfirmed: true,
+  };
+
+  const publishCase = async (): Promise<string> => {
+    const adminAgent = request.agent(app);
+    const admin = await registerTestUser(adminAgent, 'ws_admin');
+    const restoreAdmin = setAdminEnvForWorkspace(admin.id);
+    try {
+      const create = await adminAgent.post('/api/admin/content').send(content);
+      expect(create.status).toBe(201);
+      const caseId = create.body.caseId as string;
+      const publish = await adminAgent.post(`/api/admin/content/${caseId}/publish`);
+      expect(publish.status).toBe(200);
+      return caseId;
+    } finally {
+      restoreAdmin();
+    }
+  };
+
+  const setAdminEnvForWorkspace = (userId: string): (() => void) => {
+    const previous = process.env.ADMIN_USER_IDS;
+    process.env.ADMIN_USER_IDS = [previous, userId].filter(Boolean).join(',');
+    return () => {
+      if (previous === undefined) delete process.env.ADMIN_USER_IDS;
+      else process.env.ADMIN_USER_IDS = previous;
+    };
+  };
+
+  it('saves, resumes and isolates drafts with one active draft per user', async () => {
+    const caseId = await publishCase();
+    const agentA = request.agent(app);
+    const agentB = request.agent(app);
+    await registerTestUser(agentA, 'ws_student_a');
+    await registerTestUser(agentB, 'ws_student_b');
+
+    // Anonymous and draft payload validation.
+    expect((await request(app).put(`/api/cases/${caseId}/draft`).send({ contentJson: {} })).status).toBe(401);
+    expect((await agentA.put(`/api/cases/${caseId}/draft`).send({ contentJson: 'nope' })).status).toBe(400);
+    expect((await agentA.put('/api/cases/nonexistent_case/draft').send({ contentJson: {} })).status).toBe(404);
+
+    // Save then resume.
+    const first = await agentA.put(`/api/cases/${caseId}/draft`).send({
+      contentJson: { issue_tree: 'Revenue down, costs up', _notes: 'remember to check shrink' },
+    });
+    expect(first.status).toBe(200);
+    const draftId = first.body.draft.id as string;
+
+    const resumed = await agentA.get(`/api/cases/${caseId}/draft`);
+    expect(resumed.status).toBe(200);
+    expect(resumed.body.draft.id).toBe(draftId);
+    expect(resumed.body.draft.content._notes).toBe('remember to check shrink');
+
+    // Second save upserts the same draft row.
+    const second = await agentA.put(`/api/cases/${caseId}/draft`).send({
+      contentJson: { issue_tree: 'Updated tree', recommendation: 'Fix shrink' },
+    });
+    expect(second.status).toBe(200);
+    expect(second.body.draft.id).toBe(draftId);
+    const rows = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM submissions WHERE case_id = $1 AND status = 'Draft'`,
+      [caseId]
+    );
+    // Only this user's draft counted here because other tests use fresh cases; assert per-user below.
+    const ownRows = await pool.query(
+      `SELECT COUNT(*)::int AS c FROM submissions WHERE case_id = $1 AND user_id = $2 AND status = 'Draft'`,
+      [caseId, (await agentA.get('/api/auth/me')).body.user.id]
+    );
+    expect(ownRows.rows[0].c).toBe(1);
+    expect(rows.rows[0].c).toBeGreaterThanOrEqual(1);
+
+    // Other user cannot see the draft.
+    const otherDraft = await agentB.get(`/api/cases/${caseId}/draft`);
+    expect(otherDraft.status).toBe(200);
+    expect(otherDraft.body.draft).toBeNull();
+  });
+
+  it('hides reference_solution publicly and reveals it only after a real submission', async () => {
+    const caseId = await publishCase();
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'ws_student_sol');
+
+    // Public detail must not leak the reference solution.
+    const publicDetail = await request(app).get(`/api/cases/${caseId}`);
+    expect(publicDetail.status).toBe(200);
+    expect(publicDetail.body.reference_solution).toBeUndefined();
+
+    // Draft alone must not unlock the solution.
+    await agent.put(`/api/cases/${caseId}/draft`).send({ contentJson: { notes: 'working on it' } });
+    expect((await agent.get(`/api/cases/${caseId}/reference-solution`)).status).toBe(403);
+
+    // Real submission unlocks it.
+    const submit = await agent.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: { issue_tree: 'Costs rose on shrink and freight; revenue flat.', recommendation: 'Renegotiate freight and fix shrink.' },
+      citationsCount: 0,
+    });
+    expect(submit.status).toBe(201);
+
+    const solution = await agent.get(`/api/cases/${caseId}/reference-solution`);
+    expect(solution.status).toBe(200);
+    expect(solution.body.referenceSolution).toContain('reference solution text');
+
+    // A non-compliant row (e.g. bypassed validation) must not unlock the solution.
+    const fresh = request.agent(app);
+    await registerTestUser(fresh, 'ws_student_fresh');
+    const freshMe = await fresh.get('/api/auth/me');
+    await pool.query(
+      `INSERT INTO submissions (id, case_id, user_id, content_json, status, structural_compliant)
+       VALUES ($1, $2, $3, '{"notes":"invalid"}'::jsonb, 'Submitted', FALSE)`,
+      [`sub_test_${randomUUID()}`, caseId, freshMe.body.user.id]
+    );
+    expect((await fresh.get(`/api/cases/${caseId}/reference-solution`)).status).toBe(403);
+    await pool.query(`DELETE FROM submissions WHERE id LIKE 'sub_test_%'`);
+
+    // Another student is still gated.
+    const other = request.agent(app);
+    await registerTestUser(other, 'ws_student_other');
+    expect((await other.get(`/api/cases/${caseId}/reference-solution`)).status).toBe(403);
   });
 });
 

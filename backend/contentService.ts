@@ -457,9 +457,20 @@ export const contentService = {
       `SELECT c.id, c.title, c.type, c.sector, c.difficulty, c.status, c.description,
          c.deliverables, c.pts, c.submission_count, c.review_count, c.deadline,
          c.tags, c.is_chaos, c.timer_deadline, c.created_at,
-         v.version_number, v.exhibits, v.reference_solution, v.rubric_criteria,
+         v.version_number, v.exhibits, v.rubric_criteria,
          v.content_owner, v.author_credit, v.source_kind, v.source_reference,
          v.rights_declaration, v.published_at
+       FROM cases c
+       JOIN case_versions v ON v.id = c.current_version_id
+       WHERE c.id = $1 AND c.status = 'Open' AND c.current_version_id IS NOT NULL`,
+      [caseId]
+    );
+    return result.rows[0];
+  },
+
+  async getPublishedReferenceSolution(caseId: string) {
+    const result = await pool.query<{ reference_solution: string }>(
+      `SELECT v.reference_solution
        FROM cases c
        JOIN case_versions v ON v.id = c.current_version_id
        WHERE c.id = $1 AND c.status = 'Open' AND c.current_version_id IS NOT NULL`,

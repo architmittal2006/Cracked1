@@ -1278,6 +1278,75 @@ app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res
   }
 });
 
+app.put('/api/cases/:caseId/draft', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  const { contentJson } = req.body ?? {};
+  const currentUser = req.session.user!;
+
+  try {
+    if (typeof caseId !== 'string') {
+      res.status(400).json({ success: false, error: 'Invalid caseId parameter.' });
+      return;
+    }
+    if (!contentJson || typeof contentJson !== 'object' || Array.isArray(contentJson)) {
+      res.status(400).json({ success: false, error: 'Draft content must be a JSON object of text sections.' });
+      return;
+    }
+
+    const caseType = await DatabaseService.getCaseType(caseId);
+    if (!caseType) {
+      res.status(404).json({ success: false, error: 'Case not found' });
+      return;
+    }
+
+    const draft = await DatabaseService.upsertCaseDraft(caseId, currentUser.id, contentJson);
+    res.json({ success: true, draft });
+  } catch (error) {
+    logError('Case draft save failed', error);
+    res.status(500).json({ success: false, error: 'Could not save draft' });
+  }
+});
+
+app.get('/api/cases/:caseId/draft', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  try {
+    if (typeof caseId !== 'string') {
+      res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+      return;
+    }
+    const draft = await DatabaseService.getCaseDraft(caseId, req.session.user!.id);
+    res.json({ success: true, draft });
+  } catch (error) {
+    logError('Case draft load failed', error);
+    res.status(500).json({ success: false, error: 'Could not load draft' });
+  }
+});
+
+app.get('/api/cases/:caseId/reference-solution', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  const currentUser = req.session.user!;
+  try {
+    if (typeof caseId !== 'string') {
+      res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+      return;
+    }
+    const submitted = await DatabaseService.hasSubmittedAttempt(caseId, currentUser.id);
+    if (!submitted) {
+      res.status(403).json({ success: false, error: 'Submit a solution to view the reference solution' });
+      return;
+    }
+    const row = await contentService.getPublishedReferenceSolution(caseId);
+    if (!row) {
+      res.status(404).json({ success: false, error: 'Case not found' });
+      return;
+    }
+    res.json({ success: true, referenceSolution: row.reference_solution });
+  } catch (error) {
+    logError('Reference solution load failed', error);
+    res.status(500).json({ success: false, error: 'Could not load reference solution' });
+  }
+});
+
 app.get('/api/cases/:caseId/solutions', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const caseId = req.params.caseId;
   if (typeof caseId !== 'string') {

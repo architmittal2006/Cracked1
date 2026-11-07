@@ -21,6 +21,7 @@ import { QuestionsAskPage } from './pages/QuestionsAskPage';
 import { CasesPage } from './pages/CasesPage';
 import { CasesByTypePage } from './pages/CasesByTypePage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
+import { CaseSolvePage } from './pages/CaseSolvePage';
 import { SubmitPage } from './pages/SubmitPage';
 import { CaseSolutionsPage } from './pages/CaseSolutionsPage';
 import { ReviewDetailPage } from './pages/ReviewDetailPage';
@@ -115,6 +116,11 @@ const App: React.FC = () => {
                   <Route path="/admin/content/:caseId" element={
                     <ProtectedRoute requiredRole="Admin">
                       <AdminContentEditorPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/cases/:id/solve" element={
+                    <ProtectedRoute>
+                      <CaseSolvePage />
                     </ProtectedRoute>
                   } />
                   <Route path="/cases/:id/submit" element={

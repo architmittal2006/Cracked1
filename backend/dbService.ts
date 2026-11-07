@@ -892,6 +892,7 @@ export class DatabaseService {
        FROM cases c
        WHERE c.id = $1 AND EXISTS (
          SELECT 1 FROM submissions s WHERE s.case_id = c.id AND s.user_id = $2
+           AND s.status <> 'Draft'
        )`,
       [caseId, userId]
     );
@@ -1167,6 +1168,57 @@ export class DatabaseService {
         .where(eq(cases.id, payload.caseId));
     });
     return id;
+  }
+
+  public static async upsertCaseDraft(
+    caseId: string,
+    userId: string,
+    contentJson: Record<string, unknown>
+  ): Promise<{ id: string; content: Record<string, unknown>; createdAt: string }> {
+    const result = await pool.query<{
+      id: string;
+      content_json: Record<string, unknown>;
+      created_at: Date;
+    }>(
+      `INSERT INTO submissions (id, case_id, user_id, content_json, status, structural_compliant)
+       VALUES ($1, $2, $3, $4::jsonb, 'Draft', FALSE)
+       ON CONFLICT (case_id, user_id) WHERE status = 'Draft'
+       DO UPDATE SET content_json = EXCLUDED.content_json
+       RETURNING id, content_json, created_at`,
+      [`sub_${crypto.randomUUID().slice(2, 11)}`, caseId, userId, JSON.stringify(contentJson)]
+    );
+    const row = result.rows[0];
+    return { id: row.id, content: row.content_json, createdAt: row.created_at.toISOString() };
+  }
+
+  public static async getCaseDraft(
+    caseId: string,
+    userId: string
+  ): Promise<{ id: string; content: Record<string, unknown>; createdAt: string } | null> {
+    const result = await pool.query<{
+      id: string;
+      content_json: Record<string, unknown>;
+      created_at: Date;
+    }>(
+      `SELECT id, content_json, created_at FROM submissions
+       WHERE case_id = $1 AND user_id = $2 AND status = 'Draft'`,
+      [caseId, userId]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return { id: row.id, content: row.content_json, createdAt: row.created_at.toISOString() };
+  }
+
+  public static async hasSubmittedAttempt(caseId: string, userId: string): Promise<boolean> {
+    const result = await pool.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM submissions
+         WHERE case_id = $1 AND user_id = $2 AND status <> 'Draft'
+           AND structural_compliant = TRUE
+       ) AS exists`,
+      [caseId, userId]
+    );
+    return result.rows[0]?.exists === true;
   }
 
   public static async getCaseSolutionsForUser(
