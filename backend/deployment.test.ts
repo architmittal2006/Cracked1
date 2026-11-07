@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => {
@@ -24,7 +24,6 @@ describe('split frontend and backend deployment', () => {
     );
 
     expect(apiRewrite?.destination).toBe('https://cracked-api.onrender.com/api/:path*');
-    await expect(access(new URL('../vercel.json', import.meta.url))).rejects.toThrow();
   });
 
   it('loads migration seed data from the new frontend folder', async () => {

@@ -688,7 +688,7 @@ export class DatabaseService {
 
   public static async getCasebookModerationQueue(status: 'Pending' | 'Published'): Promise<CasebookRecord[]> {
     const result = await pool.query<CasebookDbRow>(
-      `SELECT b.${this.casebookSelect.trim().replaceAll(', ', ', b.')},
+      `SELECT b.${this.casebookSelect.trim().replace(/,\s*/g, ', b.')},
           COALESCE(u.name, b.uploader_id) AS "uploaderName"
        FROM casebooks b
        LEFT JOIN users u ON u.id = b.uploader_id
