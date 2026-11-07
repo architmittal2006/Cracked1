@@ -31,15 +31,13 @@ export const Footer: React.FC = () => {
             <ul className="space-y-3">
               <li><Link to="/cases" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Case Library</Link></li>
               <li><Link to="/casebooks" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Casebooks</Link></li>
-              <li><Link to="/arena" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Open Arena</Link></li>
               <li><Link to="/how-it-works" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">How It Works</Link></li>
             </ul>
           </div>
 
           <div>
-            <h4 className="text-[var(--text-primary)] font-semibold mb-4 text-sm">Questions</h4>
+            <h4 className="text-[var(--text-primary)] font-semibold mb-4 text-sm">Account</h4>
             <ul className="space-y-3">
-              <li><Link to="/questions" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Community Questions</Link></li>
               <li><Link to="/register" className="text-slate-400 hover:text-[#C75B39] transition-colors text-sm">Create Account</Link></li>
             </ul>
           </div>

@@ -11,25 +11,13 @@ import { ThemeProvider } from './contexts/ThemeProvider';
 import { GitHubOAuthCallback } from './components/GitHubOAuth';
 import { GoogleOAuthCallback } from './components/GoogleOAuth';
 import { LandingPage } from './pages/LandingPage';
-import { ArenaPage } from './pages/ArenaPage';
-import { ArenaDetailPage } from './pages/ArenaDetailPage';
-import { ArenaSubmitPage } from './pages/ArenaSubmitPage';
-import { QuestionsPage } from './pages/QuestionsPage';
-import { QuestionsDetailPage } from './pages/QuestionsDetailPage';
-import { QuestionsAnswerPage } from './pages/QuestionsAnswerPage';
-import { QuestionsAskPage } from './pages/QuestionsAskPage';
 import { CasesPage } from './pages/CasesPage';
 import { CasesByTypePage } from './pages/CasesByTypePage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
 import { CaseSolvePage } from './pages/CaseSolvePage';
 import { CaseSolutionsPage } from './pages/CaseSolutionsPage';
-import { ReviewDetailPage } from './pages/ReviewDetailPage';
-import { FollowUpPage } from './pages/FollowUpPage';
 import { DashboardPage } from './pages/DashboardPage';
-import { LeaderboardPage } from './pages/LeaderboardPage';
-import { LeaderboardByTypePage } from './pages/LeaderboardByTypePage';
 import { ProfilePage } from './pages/ProfilePage';
-import { CertificatePage } from './pages/CertificatePage';
 import { HowItWorksPage } from './pages/HowItWorksPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
 import { LoginPage } from './pages/LoginPage';
@@ -39,8 +27,6 @@ import { AccountSettingsPage } from './pages/AccountSettingsPage';
 import { AdminAccountsPage } from './pages/AdminAccountsPage';
 import { AdminContentPage } from './pages/AdminContentPage';
 import { AdminContentEditorPage } from './pages/AdminContentEditorPage';
-import { CompanyDashboardPage } from './pages/CompanyDashboardPage';
-import { CompanyPostCasePage } from './pages/CompanyPostCasePage';
 import { CasebooksPage } from './pages/CasebooksPage';
 import { CasebookDetailPage } from './pages/CasebookDetailPage';
 import { CasebookCasePage } from './pages/CasebookCasePage';
@@ -70,13 +56,8 @@ const App: React.FC = () => {
                 <Suspense fallback={<p className="py-8 text-center text-sm text-[var(--text-secondary)]" aria-live="polite">Loading page…</p>}>
                 <Routes>
                   <Route path="/" element={<LandingPage />} />
-                  <Route path="/arena" element={<ArenaPage />} />
-                  <Route path="/arena/:id" element={<ArenaDetailPage />} />
-                  <Route path="/arena/:id/submit" element={<ArenaSubmitPage />} />
-                  <Route path="/questions" element={<QuestionsPage />} />
-                  <Route path="/questions/ask" element={<QuestionsAskPage />} />
-                  <Route path="/questions/:id" element={<QuestionsDetailPage />} />
-                  <Route path="/questions/:id/answer" element={<QuestionsAnswerPage />} />
+
+
                   <Route path="/cases" element={<CasesPage />} />
                   <Route path="/cases/type/:type" element={<CasesByTypePage />} />
                   <Route path="/casebooks" element={<CasebooksPage />} />
@@ -130,11 +111,6 @@ const App: React.FC = () => {
                       <CaseSolutionsPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/cases/:id/followup" element={
-                    <ProtectedRoute>
-                      <FollowUpPage />
-                    </ProtectedRoute>
-                  } />
                   <Route path="/cases/:id/review" element={
                     <Navigate to="/cases" replace />
                   } />
@@ -148,13 +124,6 @@ const App: React.FC = () => {
                       <DashboardPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/reviews/:id" element={
-                    <ProtectedRoute>
-                      <ReviewDetailPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/leaderboard" element={<LeaderboardPage />} />
-                  <Route path="/leaderboard/:type" element={<LeaderboardByTypePage />} />
                   <Route path="/profile" element={
                     <ProtectedRoute>
                       <ProfilePage />
@@ -165,20 +134,9 @@ const App: React.FC = () => {
                       <AccountSettingsPage />
                     </ProtectedRoute>
                   } />
-                  <Route path="/profile/:username" element={<ProfilePage />} />
-                  <Route path="/certificate/:username" element={<CertificatePage />} />
+                  <Route path="/profile/:username" element={<Navigate to="/profile" replace />} />
                   <Route path="/how-it-works" element={<HowItWorksPage />} />
                   <Route path="/privacy" element={<PrivacyPolicyPage />} />
-                  <Route path="/company/dashboard" element={
-                    <ProtectedRoute>
-                      <CompanyDashboardPage />
-                    </ProtectedRoute>
-                  } />
-                  <Route path="/company/cases/new" element={
-                    <ProtectedRoute>
-                      <CompanyPostCasePage />
-                    </ProtectedRoute>
-                  } />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterPage />} />
                   <Route path="/callback/github" element={<GitHubOAuthCallback />} />

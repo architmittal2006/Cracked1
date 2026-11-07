@@ -6,12 +6,10 @@ import {
   BookOpen,
   BrainCircuit,
   BriefcaseBusiness,
-  CircleHelp,
   GraduationCap,
   ShieldCheck,
   Sparkles,
-  Trophy,
-} from 'lucide-react';
+  } from 'lucide-react';
 import { Button } from '../components/Button';
 import { Section } from '../components/Section';
 import { Container } from '../components/Container';
@@ -29,7 +27,7 @@ const steps = [
   {
     number: '01',
     title: 'Choose a challenge',
-    copy: 'Explore curated cases, community questions, or open practice.',
+    copy: 'Explore curated cases or open practice.',
   },
   {
     number: '02',
@@ -52,24 +50,6 @@ const tracks = [
     color: 'text-amber-400',
     iconBackground: 'bg-amber-400/10',
     href: '/cases',
-  },
-  {
-    title: 'Community questions',
-    description: 'Ask a focused question, share an answer, and learn from other approaches.',
-    detail: 'Learn with the community',
-    icon: CircleHelp,
-    color: 'text-violet-400',
-    iconBackground: 'bg-violet-400/10',
-    href: '/questions',
-  },
-  {
-    title: 'Open arena',
-    description: 'Practice solving without a review gate and build confidence through repetition.',
-    detail: 'Practice at your own pace',
-    icon: Trophy,
-    color: 'text-emerald-400',
-    iconBackground: 'bg-emerald-400/10',
-    href: '/arena',
   },
 ];
 

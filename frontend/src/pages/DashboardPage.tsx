@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Trophy, ArrowRight, FileText, Clock } from 'lucide-react';
+import { ArrowRight, FileText, Clock } from 'lucide-react';
 import { getTierProgress } from '../data/mockData';
 import { ScoreRing } from '../components/ScoreRing';
 import { TierBadge } from '../components/TierBadge';
@@ -33,12 +33,17 @@ export const DashboardPage: React.FC = () => {
     }
   }, [user]);
 
+  useEffect(() => {
+    if (!isLoading && (!isAuthenticated || !user)) {
+      navigate('/login', { replace: true });
+    }
+  }, [isLoading, isAuthenticated, user, navigate]);
+
   if (isLoading) {
     return null;
   }
 
   if (!isAuthenticated || !user) {
-    navigate('/login');
     return null;
   }
 
@@ -96,7 +101,7 @@ export const DashboardPage: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-white">Active Submissions</h2>
+            <h2 className="text-xl font-semibold text-white">Your progress</h2>
             <Button variant="ghost" size="sm" onClick={() => navigate('/cases')}>Browse cases</Button>
           </div>
           <div className="space-y-4">
@@ -104,7 +109,8 @@ export const DashboardPage: React.FC = () => {
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/50 mb-3">
                 <FileText className="w-6 h-6 text-slate-500" />
               </div>
-              <p className="text-slate-400 text-sm mb-3">No active submissions yet.</p>
+              <p className="text-slate-400 text-sm mb-1">No case attempts yet.</p>
+              <p className="text-slate-500 text-xs mb-3">Your submissions and drafts will appear here once you start solving.</p>
               <Button variant="primary" size="sm" onClick={() => navigate('/cases')}>
                 Browse Cases
               </Button>
@@ -114,33 +120,24 @@ export const DashboardPage: React.FC = () => {
 
         <Card>
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-white">Solution Library</h2>
-            <span className="text-xs text-slate-500">Compare approaches after solving</span>
+            <h2 className="text-xl font-semibold text-white">Compare solutions</h2>
+            <span className="text-xs text-slate-500">After you submit</span>
           </div>
           <div className="space-y-4">
             <div className="flex flex-col items-center py-6 text-center">
               <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/50 mb-3">
                 <Clock className="w-6 h-6 text-slate-500" />
               </div>
-              <p className="text-slate-400 text-sm mb-3">No solutions to compare yet.</p>
-              <p className="text-slate-500 text-sm">Submit a case solution to explore other approaches.</p>
+              <p className="text-slate-400 text-sm mb-1">Nothing to compare yet.</p>
+              <p className="text-slate-500 text-xs">Submit a solution to a case to see how other students approached it.</p>
             </div>
           </div>
         </Card>
       </div>
 
-      <Card className="mt-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <Trophy className="w-6 h-6 text-amber-400" />
-          <div>
-            <div className="font-semibold text-white">Share your certificate</div>
-            <div className="text-sm text-slate-400">Live credibility score with verification hash</div>
-          </div>
-        </div>
-        <Button variant="primary" size="md" onClick={() => navigate(`/certificate/${user.username}`)}>
-          View Certificate <ArrowRight className="w-4 h-4" />
-        </Button>
-      </Card>
+      <p className="mt-6 text-xs text-slate-500">
+        Scores and tiers reflect persisted account data and update as review scoring launches.
+      </p>
     </PageWrapper>
   );
 };
