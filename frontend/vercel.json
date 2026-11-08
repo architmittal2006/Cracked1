@@ -6,7 +6,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://cracked-api.onrender.com/api/:path*"
+      "destination": "https://cracked1-afy4.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",

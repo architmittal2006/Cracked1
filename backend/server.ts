@@ -916,6 +916,20 @@ app.post('/api/auth/logout', (req: Request, res: Response) => {
   });
 });
 
+// Health checks (no auth, no sensitive data)
+app.get('/api/health', (_req: Request, res: Response): void => {
+  res.json({ status: 'ok' });
+});
+
+app.get('/api/health/db', async (_req: Request, res: Response): Promise<void> => {
+  try {
+    await pool.query('SELECT 1');
+    res.json({ status: 'ok', database: 'connected' });
+  } catch {
+    res.status(503).json({ status: 'unavailable' });
+  }
+});
+
 app.get('/api/cases', async (_req: Request, res: Response): Promise<void> => {
   try {
     const cases = await DatabaseService.getPublishedCases();

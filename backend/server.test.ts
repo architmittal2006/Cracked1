@@ -1087,6 +1087,20 @@ describe('Security headers', () => {
   });
 });
 
+describe('Health endpoints', () => {
+  it('GET /api/health returns liveness without auth', async () => {
+    const res = await request(app).get('/api/health');
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ status: 'ok' });
+  });
+
+  it('GET /api/health/db reports database readiness', async () => {
+    const res = await request(app).get('/api/health/db');
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('ok');
+  });
+});
+
 describe('Auth endpoints', () => {
   it('signup creates a user and sets a session cookie', async () => {
     const agent = request.agent(app);
