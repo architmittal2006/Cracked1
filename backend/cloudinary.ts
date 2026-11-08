@@ -7,10 +7,11 @@ export const imageUpload = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit
   },
   fileFilter: (_req, file, cb) => {
-    if (file.mimetype.startsWith('image/')) {
+    const allowed = ['image/png', 'image/jpeg', 'image/webp', 'image/gif', 'image/avif'];
+    if (allowed.includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only image files are allowed'));
+      cb(new Error('Only PNG, JPEG, WebP, GIF or AVIF images are allowed'));
     }
   },
 });

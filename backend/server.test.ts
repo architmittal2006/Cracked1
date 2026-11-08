@@ -1064,6 +1064,27 @@ describe('Image upload route', () => {
     });
     expect(uploadImageBufferMock).toHaveBeenCalledWith(image, 'caseforge');
   });
+
+  it('rejects SVG and non-whitelisted image types', async () => {
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'image_upload_svg');
+    const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+    const res = await agent
+      .post('/api/upload/image')
+      .attach('image', svg, { filename: 'evil.svg', contentType: 'image/svg+xml' });
+    expect(res.status).toBe(500);
+    expect(uploadImageBufferMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('Security headers', () => {
+  it('sets helmet protections on API responses', async () => {
+    const res = await request(app).get('/api/cases');
+    expect(res.headers['x-frame-options']).toBe('SAMEORIGIN');
+    expect(res.headers['x-content-type-options']).toBe('nosniff');
+    expect(res.headers['referrer-policy']).toBe('no-referrer');
+    expect(res.headers['content-security-policy']).toContain("default-src 'self'");
+  });
 });
 
 describe('Auth endpoints', () => {

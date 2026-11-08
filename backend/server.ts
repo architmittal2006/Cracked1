@@ -7,6 +7,7 @@ import path from 'path';
 import fs from 'fs';
 import pgStoreFactory from 'connect-pg-simple';
 import rateLimit from 'express-rate-limit';
+import helmet from 'helmet';
 import { z } from 'zod';
 import { Pool } from 'pg';
 import { assertMigrationsCurrent } from './db/runMigrations.js';
@@ -90,6 +91,25 @@ const sessionStore = process.env.NODE_ENV === 'test' &&
 // Middleware
 app.use(express.json());
 app.use(cookieParser());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'sha256-qGEUyB6Ds0lf5oSj60qBEjHS3V/KoV/VweT/XzX6cO4='", "'sha256-3/q7qK2gWF+ms1j+yvqKhvngnfLykmLW5oaI/2cfX9E='", "'sha256-DK4jGptP89FUdtN98kt9ok6Gdn6/0t080BU3hBOggf0='"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      imgSrc: ["'self'", 'data:', 'https://res.cloudinary.com'],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'", 'data:', 'https://fonts.gstatic.com'],
+      objectSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
+  hsts: process.env.NODE_ENV === 'production'
+    ? { maxAge: 31536000, includeSubDomains: true }
+    : false,
+}));
 
 // CORS — allow configured client origin to call the API with credentials
 const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || 'http://localhost:5173';
