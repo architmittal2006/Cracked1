@@ -52,22 +52,23 @@ export const GoogleOAuthCallback: React.FC = () => {
     const handleCallback = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
+      const state = urlParams.get('state');
 
-      if (!code) {
-        setError('No authorization code found');
+      if (!code || !state) {
+        setError('Missing authorization parameters');
         setLoading(false);
         return;
       }
 
       try {
-        // Send code to backend for secure token exchange
+        // Send code and state to backend for secure token exchange
         const response = await fetch('/api/auth/google/callback', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           credentials: 'include', // Include cookies for session
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, state }),
         });
 
         const data = await response.json();

@@ -1333,6 +1333,41 @@ describe('Auth endpoints', () => {
     expect((await agent.post('/api/auth/github/callback').send({ code: 'code', state })).status).toBe(403);
   });
 
+  it('rejects OAuth callback with missing state parameter', async () => {
+    const agent = request.agent(app);
+    await agent.get('/api/auth/google');
+    expect((await agent.post('/api/auth/google/callback').send({ code: 'code' })).status).toBe(403);
+    expect((await agent.post('/api/auth/google/callback').send({})).status).toBe(400);
+  });
+
+  it('accepts OAuth callback with valid code and state', async () => {
+    const agent = request.agent(app);
+    const start = await agent.get('/api/auth/google');
+    const { state } = start.body as { state: string };
+    const originalFetch = globalThis.fetch;
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('oauth2.googleapis.com/token')) {
+        return new Response(JSON.stringify({ access_token: 'test-token' }), { status: 200 });
+      }
+      if (url.includes('googleapis.com/oauth2')) {
+        return new Response(JSON.stringify({
+          id: 'g_' + randomUUID(), email: 'oauth_' + randomUUID() + '@test.dev',
+          verified_email: true, name: 'OAuth User',
+        }), { status: 200 });
+      }
+      return originalFetch(input);
+    }));
+    try {
+      const res = await agent.post('/api/auth/google/callback').send({ code: 'auth-code', state });
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(res.body.user.email).toContain('@test.dev');
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('rolls back account suspension if its audit record cannot be written', async () => {
     const previousAdminIds = process.env.ADMIN_USER_IDS;
     const admin = await registerTestUser(request.agent(app), 'audit_rollback_admin');
