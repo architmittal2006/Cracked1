@@ -19,17 +19,28 @@ const CONTEXT_FILES = [
   'docs/OPEN_DECISIONS.md',
 ];
 
-const MAX_CONTEXT_CHARS = 120_000;
+// Context budget must keep the whole Responses API request under the LLM
+// provider's per-minute token cap. Groq free tier is ~8K TPM for gpt-oss
+// models; ~3.5 chars/token means 12K chars ≈ 3.4K tokens of context, leaving
+// ample room for instructions, schemas and the task text.
+const DEFAULT_MAX_CONTEXT_CHARS = 12_000;
+
+export function maxContextChars(env = process.env) {
+  const raw = env.ORCHESTRATOR_MAX_CONTEXT_CHARS;
+  if (raw === undefined || raw === '') return DEFAULT_MAX_CONTEXT_CHARS;
+  const value = Number.parseInt(raw, 10);
+  return Number.isFinite(value) && value > 0 ? value : DEFAULT_MAX_CONTEXT_CHARS;
+}
 
 /** Load project docs that exist in the checkout; missing files are skipped. */
-export async function loadProjectContext(repoRoot) {
+export async function loadProjectContext(repoRoot, env = process.env) {
   const parts = [];
   let total = 0;
   for (const rel of CONTEXT_FILES) {
     try {
       const text = await readFile(path.join(repoRoot, rel), 'utf8');
       const chunk = `\n\n===== ${rel} =====\n${text}`;
-      if (total + chunk.length > MAX_CONTEXT_CHARS) break;
+      if (total + chunk.length > maxContextChars(env)) break;
       parts.push(chunk);
       total += chunk.length;
     } catch {
@@ -44,7 +55,7 @@ export async function loadProjectContext(repoRoot) {
       try {
         const text = await readFile(path.join(repoRoot, 'docs', entry), 'utf8');
         const chunk = `\n\n===== docs/${entry} =====\n${text}`;
-        if (total + chunk.length > MAX_CONTEXT_CHARS) break;
+        if (total + chunk.length > maxContextChars(env)) break;
         parts.push(chunk);
         total += chunk.length;
       } catch { /* skip */ }
@@ -152,15 +163,26 @@ Do not ask questions; make reasonable decisions consistent with the documentatio
 
 export function buildReviewInput({ task, acceptanceCriteria, brief, devinResult, evidence, evidenceErrors }) {
   const prUrls = (devinResult?.pullRequests ?? []).map((p) => p?.url ?? p).filter(Boolean);
+  // Cap patch text so the review request stays under the LLM input-token
+  // budget (~3.5 chars/token). Full patches remain in state/report artifacts.
+  const PATCH_PROMPT_CHARS = 12_000;
+  let patchBudget = PATCH_PROMPT_CHARS;
   const evidenceSection = evidence?.length
-    ? evidence.map((e) => [
-        `### ${e.title ?? 'PR'} — ${e.url}`,
-        `state=${e.state} +${e.additions}/-${e.deletions} files=${e.changedFiles}`,
-        `changed files: ${(e.files ?? []).join(', ')}`,
-        '```diff',
-        e.patch || '(no patch content available)',
-        '```',
-      ].join('\n')).join('\n\n')
+    ? evidence.map((e) => {
+        let patch = e.patch || '(no patch content available)';
+        if (patch.length > patchBudget) {
+          patch = `${patch.slice(0, patchBudget)}\n…[patch truncated for prompt budget]`;
+        }
+        patchBudget = Math.max(0, patchBudget - patch.length);
+        return [
+          `### ${e.title ?? 'PR'} — ${e.url}`,
+          `state=${e.state} +${e.additions}/-${e.deletions} files=${e.changedFiles}`,
+          `changed files: ${(e.files ?? []).join(', ')}`,
+          '```diff',
+          patch,
+          '```',
+        ].join('\n');
+      }).join('\n\n')
     : '(no pull-request diffs could be retrieved — review must rely on the agent\'s self-report and treat unverified claims with suspicion)';
 
   const errorNote = evidenceErrors?.length

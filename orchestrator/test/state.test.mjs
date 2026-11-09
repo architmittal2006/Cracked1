@@ -115,3 +115,15 @@ test('report markdown contains session links, reviews and safety notes', () => {
   assert.match(md, /approve/);
   assert.match(md, /never merges PRs|No merge or deployment/);
 });
+
+test('project context respects ORCHESTRATOR_MAX_CONTEXT_CHARS budget', async () => {
+  const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+  const { loadProjectContext, maxContextChars } = await import('../src/prompts.mjs');
+  const dir = await mkdtemp(path.join(tmpdir(), 'ctx-'));
+  await mkdir(path.join(dir, 'docs'), { recursive: true });
+  await writeFile(path.join(dir, 'docs', 'BIG.md'), 'x'.repeat(50000));
+  const small = await loadProjectContext(dir, { ORCHESTRATOR_MAX_CONTEXT_CHARS: '2000' });
+  assert.ok(small.length <= 2100);
+  const def = maxContextChars({});
+  assert.equal(def, 12000);
+});

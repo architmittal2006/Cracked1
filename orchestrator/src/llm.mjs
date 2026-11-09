@@ -9,9 +9,30 @@
 
 import { createOpenAiClient } from './openai.mjs';
 
-export function createLlmClient(config, http) {
+export class LlmBudgetError extends Error {
+  constructor(message) {
+    super(message);
+    this.name = 'LlmBudgetError';
+  }
+}
+
+// Rough token estimate (~3.5 chars/token for English+markdown). Used only as a
+// pre-flight guard so oversized prompts fail fast with a clear message instead
+// of a provider HTTP 413/429.
+export function estimateTokens(text) {
+  return Math.ceil(String(text ?? '').length / 3.5);
+}
+
+export function maxInputTokens(env = process.env) {
+  const raw = env.ORCHESTRATOR_MAX_INPUT_TOKENS;
+  if (raw === undefined || raw === '') return 6500; // safe under Groq's 8K TPM
+  const value = Number.parseInt(raw, 10);
+  return Number.isFinite(value) && value > 0 ? value : 6500;
+}
+
+export function createLlmClient(config, http, env = process.env) {
   const { llm } = config;
-  return createOpenAiClient({
+  const client = createOpenAiClient({
     apiKey: llm.apiKey,
     baseUrl: llm.baseUrl,
     model: llm.model,
@@ -21,4 +42,17 @@ export function createLlmClient(config, http) {
     fetchImpl: http.fetchImpl,
     sleep: http.sleep,
   });
+  const budget = maxInputTokens(env);
+  return {
+    async structured(args) {
+      const estimated = estimateTokens(args.instructions) + estimateTokens(args.input);
+      if (estimated > budget) {
+        throw new LlmBudgetError(
+          `Estimated input ~${estimated} tokens exceeds ORCHESTRATOR_MAX_INPUT_TOKENS=${budget}. ` +
+          'Reduce ORCHESTRATOR_MAX_CONTEXT_CHARS or raise the provider TPM limit.'
+        );
+      }
+      return client.structured(args);
+    },
+  };
 }

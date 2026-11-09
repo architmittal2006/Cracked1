@@ -112,3 +112,19 @@ test('401 auth failure is not retried', async () => {
   );
   assert.equal(attempts, 1);
 });
+
+test('input token budget guard rejects oversized prompts before any HTTP call', async () => {
+  const { LlmBudgetError, estimateTokens, maxInputTokens } = await import('../src/llm.mjs');
+  assert.equal(maxInputTokens({}), 6500);
+  assert.ok(estimateTokens('x'.repeat(3500)) === 1000);
+  let called = false;
+  const llm = createLlmClient(groqConfig(), {
+    timeoutMs: 1000, maxRetries: 0,
+    fetchImpl: async () => { called = true; return new Response('{}', { status: 200 }); },
+  }, { ORCHESTRATOR_MAX_INPUT_TOKENS: '10' });
+  await assert.rejects(
+    llm.structured({ instructions: 'i'.repeat(100), input: 'x'.repeat(100), schemaName: 's', schema: {} }),
+    LlmBudgetError
+  );
+  assert.equal(called, false);
+});
