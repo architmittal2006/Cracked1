@@ -128,3 +128,16 @@ test('input token budget guard rejects oversized prompts before any HTTP call', 
   );
   assert.equal(called, false);
 });
+
+test('requests carry explicit max_output_tokens=1500 by default', async () => {
+  const captured = {};
+  const llm = createLlmClient(groqConfig(), {
+    timeoutMs: 1000, maxRetries: 0,
+    fetchImpl: async (url, init) => {
+      captured.body = JSON.parse(init.body);
+      return new Response(JSON.stringify(okPayload('{"a":1}')), { status: 200 });
+    },
+  });
+  await llm.structured({ instructions: '', input: '', schemaName: 's', schema: {} });
+  assert.equal(captured.body.max_output_tokens, 1500);
+});

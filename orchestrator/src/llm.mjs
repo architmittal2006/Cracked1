@@ -32,6 +32,13 @@ export function estimateTokens(text) {
   return Math.ceil(String(text ?? '').length / 3.5);
 }
 
+export function maxOutputTokens(env = process.env) {
+  const raw = env.ORCHESTRATOR_MAX_OUTPUT_TOKENS;
+  if (raw === undefined || raw === '') return 1500;
+  const value = Number.parseInt(raw, 10);
+  return Number.isFinite(value) && value > 0 ? value : 1500;
+}
+
 export function maxInputTokens(env = process.env) {
   const raw = env.ORCHESTRATOR_MAX_INPUT_TOKENS;
   if (raw === undefined || raw === '') return 5000; // conservative vs Groq 8K TPM
@@ -46,6 +53,7 @@ export function createLlmClient(config, http, env = process.env) {
     baseUrl: llm.baseUrl,
     model: llm.model,
     sendStoreFlag: llm.sendStoreFlag,
+    maxOutputTokens: maxOutputTokens(env),
     timeoutMs: http.timeoutMs,
     maxRetries: http.maxRetries,
     fetchImpl: http.fetchImpl,
