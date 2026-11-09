@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "runId": "run-42676542412-1",
+  "taskHash": "c907d6668dba4a2a",
+  "repository": "architmittal2006/Cracked1",
+  "baseBranch": "feature/phase-2-admin-cms",
+  "status": "failed",
+  "phase": "creating_session",
+  "createdAt": "2026-11-09T18:43:44.713Z",
+  "updatedAt": "2026-11-09T18:43:49.668Z",
+  "devinSessionId": null,
+  "devinSessionUrl": null,
+  "correctionCycles": 0,
+  "apiCalls": {
+    "openai": 1,
+    "devin": 1
+  },
+  "brief": {
+    "title": "Add concise developer setup documentation",
+    "summary": "Create a clear, step‑by‑step local setup guide for new engineers covering repository layout, required environment variables, install/build/test commands, and migration process, without modifying any application code. Add the guide as docs/SETUP.md and reference it from the README so onboarding is discoverable.",
+    "planSteps": [
+      "Create a new file docs/SETUP.md",
+      "Populate SETUP.md with four sections: Repository layout (frontend/, backend/, docs/, orchestrator/), Environment variables (list all required vars for backend and frontend, reference .env.example), Install/Build/Test commands (backend dev, frontend dev, npm ci, npm run build, test commands as in README), Database migrations (how to run local migrations with drizzle or npm script, mention `npm run migrate` if exists and that it seeds demo data]",
+      "Add a brief introductory paragraph explaining purpose of the guide",
+      "Include a note on how migrations are run locally (e.g., `npm run migrate` or `npm run db:push` depending on project)",
+      "Update the root README.md Quick Start section to add a bullet linking to docs/SETUP.md for full setup instructions",
+      "Run a repository-wide search to ensure no other files are modified",
+      "Commit the new/updated files",
+      "Verify that the new documentation builds correctly in the repository view (no broken markdown links)"
+    ],
+    "filesToTouch": [
+      "docs/SETUP.md",
+      "README.md"
+    ],
+    "acceptanceMapping": [
+      "docs/SETUP.md exists and contains headings for Repository Layout, Environment Variables, Install/Build/Test Commands, and Running Migrations",
+      "Each heading includes concise, accurate instructions matching the project's actual scripts (e.g., `npm ci`, `npm run dev`, `npm test`, `npm run migrate` if present)",
+      "All required environment variables from docs/DEPLOYMENT.md are listed in SETUP.md with brief descriptions",
+      "README.md includes a link to the new SETUP.md guide in the Quick Start or a new “Setup” bullet",
+      "No source code files (frontend/, backend/) are modified; only documentation files are added/updated",
+      "Running the repo's existing test suite after the change still passes, confirming no code impact"
+    ],
+    "risks": [
+      "Accidentally editing code files instead of only docs",
+      "Omitting a required environment variable causing confusion for new engineers",
+      "Providing outdated command names if the project scripts change; ensure commands are read from package.json scripts",
+      "Breaking existing markdown links in README; verify link paths are correct",
+      "Introducing contradictory information with existing docs/DEPLOYMENT.md; keep the new guide consistent and refer to DEPLOYMENT.md for deployment‑specific details"
+    ],
+    "devinPrompt": "You are an autonomous coding assistant. Your task is to improve the developer onboarding documentation for the Cracked project.\n\nGoal:\n- Add a concise, developer‑focused setup guide (docs/SETUP.md) that explains:\n  1. Repository layout (frontend/, backend/, docs/, orchestrator/).\n  2. All required environment variables for local development (backend .env variables, any frontend vars). Reference .env.example and describe typical placeholder values.\n  3. Install, build, and test commands for both backend and frontend (npm ci, npm run dev, npm run build, npm test, integration test command).\n  4. How to run database migrations locally (e.g., `npm run migrate` or the appropriate drizzle/pg script) and note that it also seeds demo data.\n- Update the root README.md to add a clear link to this new guide within the Quick Start section, without altering any existing code.\n- Do NOT modify any application source files; only create/modify documentation files.\n- Ensure all markdown links are correct and that the new guide does not contradict the existing docs/DEPLOYMENT.md.\n- After changes, run the project's test suite locally to confirm no code was affected.\n\nConstraints:\n- Follow the repository's existing markdown style (headings with ##, bullet lists, code fences).\n- Preserve existing architecture descriptions; do not remove or alter existing docs/DEPLOYMENT.md content.\n- Keep file paths relative to the repo root.\n\nVerification:\n1. Verify docs/SETUP.md exists and contains the four required sections with accurate commands.\n2. Verify README.md contains a bullet like \"Full local setup guide: docs/SETUP.md\" and the link resolves.\n3. Run `npm test` (or the repository's test command) from the root; all tests must pass.\n4. Ensure no files outside docs/ and README.md were changed.\n\nProceed with the implementation following the plan steps provided in the implementation brief."
+  },
+  "reviews": [],
+  "devinResults": [],
+  "reportPath": null,
+  "failure": "Devin API POST https://api.devin.ai/v3/organizations/org-7c06f8d5599f4276a1c657c1a38af3c9/sessions failed: POST https://api.devin.ai/v3/organizations/org-7c06f8d5599f4276a1c657c1a38af3c9/sessions failed: HTTP 403 {\"type\":\"about:blank\",\"title\":\"Forbidden\",\"status\":403,\"detail\":\"Your organization has a billing error. Error: out_of_quota\",\"instance\":\"/v3/organizations/org-7c06f8d5599f4276a1c657c1a38af3c9/sessions\",\"error_code\":\"billing_restricted\"}"
+}

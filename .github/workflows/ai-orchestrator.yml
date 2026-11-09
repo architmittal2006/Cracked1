@@ -1,0 +1,165 @@
+name: AI Development Orchestrator
+
+# Manual-only orchestration: GPT (OpenAI Responses API) architects and reviews,
+# Devin implements via its v3 API. State is committed to this branch so an
+# interrupted run can be retried without creating a duplicate Devin session.
+#
+# Required secrets:
+#   OPENAI_API_KEY   - OpenAI API key with Responses API access
+#   DEVIN_API_KEY    - Devin service-user token (cog_...)
+#   DEVIN_ORG_ID     - Devin organization ID (org-...)  -- may also be a variable
+#
+# Required permissions: contents: write (state persistence on this branch).
+# The workflow never merges PRs and never deploys.
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_description:
+        description: 'Development task for Devin to implement'
+        required: true
+        type: string
+      acceptance_criteria:
+        description: 'Acceptance criteria (one per line)'
+        required: true
+        type: string
+      repository:
+        description: 'GitHub repository Devin should work in'
+        required: false
+        default: 'architmittal2006/Cracked1'
+        type: string
+      base_branch:
+        description: 'Branch the work targets / brief references'
+        required: false
+        default: 'feature/phase-2-admin-cms'
+        type: string
+      openai_model:
+        description: 'OpenAI model for architect/reviewer (must support structured outputs)'
+        required: false
+        default: 'gpt-5-mini'
+        type: string
+      devin_mode:
+        description: 'Devin agent mode'
+        required: false
+        default: 'normal'
+        type: choice
+        options: [normal, fast, lite, ultra, fusion]
+      devin_max_acu_limit:
+        description: 'Hard ACU cap for the Devin session (spending control)'
+        required: false
+        default: '10'
+        type: string
+      max_poll_minutes:
+        description: 'Per-round Devin polling timeout'
+        required: false
+        default: '90'
+        type: string
+      max_openai_calls:
+        description: 'OpenAI API call budget'
+        required: false
+        default: '12'
+        type: string
+      max_correction_cycles:
+        description: 'GPT->Devin correction cycles (max 2)'
+        required: false
+        default: '2'
+        type: string
+
+permissions:
+  contents: write # persist orchestrator state on this branch
+  pull-requests: read # fetch PR diffs so GPT reviews real code, not self-reports
+
+concurrency:
+  group: ai-orchestrator
+  cancel-in-progress: false
+
+jobs:
+  orchestrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    env:
+      TASK_DESCRIPTION: ${{ inputs.task_description }}
+      TASK_ACCEPTANCE_CRITERIA: ${{ inputs.acceptance_criteria }}
+      TASK_REPOSITORY: ${{ inputs.repository }}
+      TASK_BASE_BRANCH: ${{ inputs.base_branch }}
+      OPENAI_MODEL: ${{ inputs.openai_model }}
+      DEVIN_MODE: ${{ inputs.devin_mode }}
+      DEVIN_MAX_ACU_LIMIT: ${{ inputs.devin_max_acu_limit }}
+      ORCHESTRATOR_MAX_POLL_MINUTES: ${{ inputs.max_poll_minutes }}
+      ORCHESTRATOR_MAX_OPENAI_CALLS: ${{ inputs.max_openai_calls }}
+      ORCHESTRATOR_MAX_CORRECTION_CYCLES: ${{ inputs.max_correction_cycles }}
+      ORCHESTRATOR_STATE_PATH: orchestrator-state.json
+      ORCHESTRATOR_REPORT_DIR: orchestrator-reports
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      DEVIN_API_KEY: ${{ secrets.DEVIN_API_KEY }}
+      DEVIN_ORG_ID: ${{ secrets.DEVIN_ORG_ID || vars.DEVIN_ORG_ID }}
+    steps:
+      - name: Checkout orchestrator branch
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+
+      - name: Validate configuration
+        run: |
+          test -n "$OPENAI_API_KEY" || { echo "::error::OPENAI_API_KEY secret is not set"; exit 1; }
+          test -n "$DEVIN_API_KEY" || { echo "::error::DEVIN_API_KEY secret is not set"; exit 1; }
+          test -n "$DEVIN_ORG_ID" || { echo "::error::DEVIN_ORG_ID secret/variable is not set"; exit 1; }
+          node -e "const c=Number(process.env.ORCHESTRATOR_MAX_CORRECTION_CYCLES); if(c>2){console.error('max_correction_cycles cannot exceed 2');process.exit(1)}"
+
+      - name: Restore latest orchestrator state
+        # Re-run attempts check out the original commit, which predates the
+        # state commit pushed by the previous attempt. Overlay the newest
+        # committed state file so polling resumes the same Devin session.
+        run: |
+          git fetch --depth=1 origin "${{ github.ref_name }}" || true
+          git checkout "origin/${{ github.ref_name }}" -- orchestrator-state.json 2>/dev/null || true
+          if [ -f orchestrator-state.json ]; then
+            echo "Resuming from committed state: $(node -e "console.log(JSON.parse(require('fs').readFileSync('orchestrator-state.json','utf8')).devinSessionId||'no session yet')")"
+          else
+            echo "No prior state found; starting fresh."
+          fi
+
+      - name: Run orchestrator tests (mocked, no API credits)
+        working-directory: orchestrator
+        run: npm test
+
+      - name: Run orchestrator
+        id: orchestrator
+        run: node orchestrator/src/cli.mjs
+
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: orchestrator-reports-${{ github.run_id }}-${{ github.run_attempt }}
+          path: orchestrator-reports/
+          if-no-files-found: warn
+
+      - name: Upload state snapshot
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: orchestrator-state-${{ github.run_id }}-${{ github.run_attempt }}
+          path: orchestrator-state.json
+          if-no-files-found: warn
+
+      - name: Persist state to branch
+        if: always()
+        run: |
+          if [ -f orchestrator-state.json ]; then
+            mkdir -p .orchestrator-state
+            cp orchestrator-state.json ".orchestrator-state/state-${{ github.run_id }}-${{ github.run_attempt }}.json"
+            cp orchestrator-state.json .orchestrator-state/latest.json
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add .orchestrator-state/ orchestrator-state.json || true
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: persist orchestrator state for run ${{ github.run_id }} (attempt ${{ github.run_attempt }})"
+              git push origin "HEAD:${{ github.ref_name }}"
+            fi
+          fi
