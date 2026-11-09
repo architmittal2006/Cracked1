@@ -5,18 +5,19 @@
 import { readFile, readdir } from 'node:fs/promises';
 import path from 'node:path';
 
+// Ordered by decision-relevance: agent rules and architecture first, README last.
 const CONTEXT_FILES = [
-  'README.md',
   'docs/AGENTS.md',
-  'docs/PRODUCT.md',
   'docs/SYSTEM_ARCHITECTURE.md',
+  'docs/IMPLEMENTATION_ROADMAP.md',
+  'docs/OPEN_DECISIONS.md',
+  'docs/PRODUCT.md',
   'docs/DOMAIN_MODEL.md',
   'docs/ACTORS_AND_PERMISSIONS.md',
   'docs/PRODUCT_WORKFLOWS.md',
   'docs/CONTENT_OPERATIONS.md',
-  'docs/IMPLEMENTATION_ROADMAP.md',
   'docs/FAILURE_AND_RECOVERY.md',
-  'docs/OPEN_DECISIONS.md',
+  'README.md',
 ];
 
 // Context budget must keep the whole Responses API request under the LLM
@@ -40,7 +41,9 @@ export async function loadProjectContext(repoRoot, env = process.env) {
     try {
       const text = await readFile(path.join(repoRoot, rel), 'utf8');
       const chunk = `\n\n===== ${rel} =====\n${text}`;
-      if (total + chunk.length > maxContextChars(env)) break;
+      // Skip oversized docs and continue — a large file must not starve the
+      // smaller high-priority docs that follow it.
+      if (total + chunk.length > maxContextChars(env)) continue;
       parts.push(chunk);
       total += chunk.length;
     } catch {
@@ -55,7 +58,7 @@ export async function loadProjectContext(repoRoot, env = process.env) {
       try {
         const text = await readFile(path.join(repoRoot, 'docs', entry), 'utf8');
         const chunk = `\n\n===== docs/${entry} =====\n${text}`;
-        if (total + chunk.length > maxContextChars(env)) break;
+        if (total + chunk.length > maxContextChars(env)) continue;
         parts.push(chunk);
         total += chunk.length;
       } catch { /* skip */ }

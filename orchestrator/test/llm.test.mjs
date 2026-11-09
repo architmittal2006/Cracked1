@@ -115,7 +115,7 @@ test('401 auth failure is not retried', async () => {
 
 test('input token budget guard rejects oversized prompts before any HTTP call', async () => {
   const { LlmBudgetError, estimateTokens, maxInputTokens } = await import('../src/llm.mjs');
-  assert.equal(maxInputTokens({}), 6500);
+  assert.equal(maxInputTokens({}), 5000);
   assert.ok(estimateTokens('x'.repeat(3500)) === 1000);
   let called = false;
   const llm = createLlmClient(groqConfig(), {

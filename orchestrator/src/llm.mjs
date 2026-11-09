@@ -19,15 +19,24 @@ export class LlmBudgetError extends Error {
 // Rough token estimate (~3.5 chars/token for English+markdown). Used only as a
 // pre-flight guard so oversized prompts fail fast with a clear message instead
 // of a provider HTTP 413/429.
+//
+// LIMITATIONS — read before tuning:
+//  - chars/3.5 is an approximation; code, JSON and non-English text tokenize
+//    denser (often 2-3 chars/token), so the estimate can UNDERCOUNT real usage.
+//  - It covers `instructions` + `input` only. It does NOT account for the JSON
+//    schema overhead, provider-side templating, or OUTPUT tokens.
+//  - Groq's TPM is org-level and appears to count generated tokens as well;
+//    unused input headroom is NOT guaranteed to be available for output. The
+//    conservative default below leaves margin for both.
 export function estimateTokens(text) {
   return Math.ceil(String(text ?? '').length / 3.5);
 }
 
 export function maxInputTokens(env = process.env) {
   const raw = env.ORCHESTRATOR_MAX_INPUT_TOKENS;
-  if (raw === undefined || raw === '') return 6500; // safe under Groq's 8K TPM
+  if (raw === undefined || raw === '') return 5000; // conservative vs Groq 8K TPM
   const value = Number.parseInt(raw, 10);
-  return Number.isFinite(value) && value > 0 ? value : 6500;
+  return Number.isFinite(value) && value > 0 ? value : 5000;
 }
 
 export function createLlmClient(config, http, env = process.env) {

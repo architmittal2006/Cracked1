@@ -127,3 +127,33 @@ test('project context respects ORCHESTRATOR_MAX_CONTEXT_CHARS budget', async () 
   const def = maxContextChars({});
   assert.equal(def, 12000);
 });
+
+test('essential docs are retained ahead of lower-priority files under budget pressure', async () => {
+  const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+  const { loadProjectContext } = await import('../src/prompts.mjs');
+  const dir = await mkdtemp(path.join(tmpdir(), 'ctx-pri-'));
+  await mkdir(path.join(dir, 'docs'), { recursive: true });
+  // Huge low-priority doc first in old order; essentials must still appear.
+  await writeFile(path.join(dir, 'README.md'), 'r'.repeat(50000));
+  await writeFile(path.join(dir, 'docs', 'AGENTS.md'), 'agents rules');
+  await writeFile(path.join(dir, 'docs', 'SYSTEM_ARCHITECTURE.md'), 'arch');
+  await writeFile(path.join(dir, 'docs', 'IMPLEMENTATION_ROADMAP.md'), 'roadmap');
+  await writeFile(path.join(dir, 'docs', 'OPEN_DECISIONS.md'), 'decisions');
+  const ctx = await loadProjectContext(dir, { ORCHESTRATOR_MAX_CONTEXT_CHARS: '500' });
+  assert.match(ctx, /docs\/AGENTS\.md/);
+  assert.match(ctx, /docs\/SYSTEM_ARCHITECTURE\.md/);
+  assert.match(ctx, /docs\/IMPLEMENTATION_ROADMAP\.md/);
+  assert.match(ctx, /docs\/OPEN_DECISIONS\.md/);
+});
+
+test('oversized doc is skipped, not breaking the loop', async () => {
+  const { mkdtemp, mkdir, writeFile } = await import('node:fs/promises');
+  const { loadProjectContext } = await import('../src/prompts.mjs');
+  const dir = await mkdtemp(path.join(tmpdir(), 'ctx-skip-'));
+  await mkdir(path.join(dir, 'docs'), { recursive: true });
+  await writeFile(path.join(dir, 'docs', 'AGENTS.md'), 'x'.repeat(50000)); // too big
+  await writeFile(path.join(dir, 'docs', 'PRODUCT.md'), 'product doc');     // fits after
+  const ctx = await loadProjectContext(dir, { ORCHESTRATOR_MAX_CONTEXT_CHARS: '2000' });
+  assert.doesNotMatch(ctx, /AGENTS\.md/);
+  assert.match(ctx, /docs\/PRODUCT\.md/);
+});
