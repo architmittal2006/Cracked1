@@ -1,13 +1,13 @@
 {
   "schemaVersion": 1,
-  "runId": "run-42651319257-1",
-  "taskHash": "b44a07fc5d3e91c7",
+  "runId": "run-42675269518-1",
+  "taskHash": "c9d8a78bdfda5cb3",
   "repository": "architmittal2006/Cracked1",
   "baseBranch": "feature/phase-2-admin-cms",
   "status": "failed",
   "phase": "planning",
-  "createdAt": "2026-11-09T16:06:23.784Z",
-  "updatedAt": "2026-11-09T16:06:43.100Z",
+  "createdAt": "2026-11-09T18:35:06.057Z",
+  "updatedAt": "2026-11-09T18:35:06.259Z",
   "devinSessionId": null,
   "devinSessionUrl": null,
   "correctionCycles": 0,
@@ -19,5 +19,5 @@
   "reviews": [],
   "devinResults": [],
   "reportPath": null,
-  "failure": "POST https://api.openai.com/v1/responses failed: HTTP 429 {\n  \"error\": {\n    \"message\": \"You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.\",\n    \"type\": \"insufficient_quota\",\n    \"param\": null,\n    \"code\": \"credit_balance_exhausted\"\n  }\n}"
+  "failure": "POST https://api.groq.com/openai/v1/responses failed: HTTP 413 {\"error\":{\"message\":\"Request too large for model `openai/gpt-oss-120b` in organization `org_01m70qyr3de2mby3hk73gxas06` service tier `on_demand` on tokens per minute (TPM): Limit 8000, Requested 8772, please reduce your message size and try again. Need more tokens? Upgrade to Dev Tier today at https://console.groq.com/settings/billing\",\"type\":\"tokens\",\"code\":\"rate_limit_exceeded\"}}\n"
 }
