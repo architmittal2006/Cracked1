@@ -1,0 +1,14 @@
+{
+  "name": "cracked-ai-orchestrator",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "GPT-architect + Devin-implementer orchestration for the Cracked repository. Runs in GitHub Actions; uses only Node.js built-ins.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "orchestrate": "node src/cli.mjs",
+    "test": "node --test"
+  }
+}

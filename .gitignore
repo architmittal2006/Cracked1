@@ -42,3 +42,6 @@ frontend/test-results/
 
 # Session files (old file store)
 sessions/
+
+# Orchestrator outputs (state file is intentionally committed for resume)
+orchestrator-reports/
