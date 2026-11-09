@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "runId": "run-42651319257-1",
+  "taskHash": "b44a07fc5d3e91c7",
+  "repository": "architmittal2006/Cracked1",
+  "baseBranch": "feature/phase-2-admin-cms",
+  "status": "failed",
+  "phase": "planning",
+  "createdAt": "2026-11-09T16:06:23.784Z",
+  "updatedAt": "2026-11-09T16:06:43.100Z",
+  "devinSessionId": null,
+  "devinSessionUrl": null,
+  "correctionCycles": 0,
+  "apiCalls": {
+    "openai": 1,
+    "devin": 0
+  },
+  "brief": null,
+  "reviews": [],
+  "devinResults": [],
+  "reportPath": null,
+  "failure": "POST https://api.openai.com/v1/responses failed: HTTP 429 {\n  \"error\": {\n    \"message\": \"You have no credits remaining. Add credits to continue using the API at https://platform.openai.com/settings/organization/billing/.\",\n    \"type\": \"insufficient_quota\",\n    \"param\": null,\n    \"code\": \"credit_balance_exhausted\"\n  }\n}"
+}
