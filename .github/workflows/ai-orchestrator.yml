@@ -9,7 +9,9 @@ name: AI Development Orchestrator
 # The ref is NOT a workflow_dispatch input: user-supplied refs could point at
 # untrusted code that would run with API credentials.
 #
-# Required secrets: OPENAI_API_KEY, DEVIN_API_KEY, DEVIN_ORG_ID (secret or var).
+# Required secrets: GROQ_API_KEY (default provider, free tier) or
+# OPENAI_API_KEY (only when LLM_PROVIDER=openai), plus DEVIN_API_KEY and
+# DEVIN_ORG_ID (secret or var).
 # Permissions: contents: write (state commits on orchestrator_ref only),
 #              pull-requests: read (PR diff evidence for the reviewer).
 # The workflow never merges PRs and never deploys.
@@ -35,8 +37,19 @@ on:
         required: false
         default: 'feature/phase-2-admin-cms'
         type: string
+      llm_provider:
+        description: 'LLM provider (groq = free tier default, openai = paid)'
+        required: false
+        default: 'groq'
+        type: choice
+        options: [groq, openai]
+      groq_model:
+        description: 'Groq model (used when llm_provider=groq)'
+        required: false
+        default: 'openai/gpt-oss-120b'
+        type: string
       openai_model:
-        description: 'OpenAI model for architect/reviewer'
+        description: 'OpenAI model (used when llm_provider=openai)'
         required: false
         default: 'gpt-5-mini'
         type: string
@@ -86,7 +99,10 @@ jobs:
       TASK_ACCEPTANCE_CRITERIA: ${{ inputs.acceptance_criteria }}
       TASK_REPOSITORY: ${{ inputs.repository }}
       TASK_BASE_BRANCH: ${{ inputs.base_branch }}
+      LLM_PROVIDER: ${{ inputs.llm_provider }}
+      GROQ_MODEL: ${{ inputs.groq_model }}
       OPENAI_MODEL: ${{ inputs.openai_model }}
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
       DEVIN_MODE: ${{ inputs.devin_mode }}
       DEVIN_MAX_ACU_LIMIT: ${{ inputs.devin_max_acu_limit }}
       ORCHESTRATOR_MAX_POLL_MINUTES: ${{ inputs.max_poll_minutes }}
@@ -130,9 +146,13 @@ jobs:
 
       - name: Validate configuration
         run: |
-          test -n "$OPENAI_API_KEY" || { echo "::error::OPENAI_API_KEY secret is not set"; exit 1; }
           test -n "$DEVIN_API_KEY" || { echo "::error::DEVIN_API_KEY secret is not set"; exit 1; }
           test -n "$DEVIN_ORG_ID" || { echo "::error::DEVIN_ORG_ID secret/variable is not set"; exit 1; }
+          if [ "$LLM_PROVIDER" = "groq" ]; then
+            test -n "$GROQ_API_KEY" || { echo "::error::GROQ_API_KEY secret is not set (llm_provider=groq)"; exit 1; }
+          else
+            test -n "$OPENAI_API_KEY" || { echo "::error::OPENAI_API_KEY secret is not set (llm_provider=openai)"; exit 1; }
+          fi
           test -f orchestrator/src/cli.mjs || { echo "::error::orchestrator code missing on $ORCHESTRATOR_REF"; exit 1; }
           node -e "const c=Number(process.env.ORCHESTRATOR_MAX_CORRECTION_CYCLES); if(c>2){console.error('max_correction_cycles cannot exceed 2');process.exit(1)}"
 
