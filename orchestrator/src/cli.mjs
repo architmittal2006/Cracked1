@@ -14,6 +14,7 @@ import { loadState, saveState, initialState, resumableState } from './state.mjs'
 import { loadProjectContext } from './prompts.mjs';
 import { createOpenAiClient } from './openai.mjs';
 import { createDevinClient } from './devin.mjs';
+import { collectPullRequestEvidence, parsePullRequestUrl } from './github.mjs';
 import { runOrchestrator, OrchestratorError } from './orchestrator.mjs';
 import { buildReportMarkdown, buildReportJson } from './report.mjs';
 
@@ -67,6 +68,24 @@ async function main() {
 
   // API-call budgets are enforced inside runOrchestrator via state.apiCalls.
 
+  // Reviewer evidence: fetch actual PR diffs via GITHUB_TOKEN when running in
+  // Actions. Locally (no token) the reviewer is told the evidence is missing.
+  const githubToken = process.env.GITHUB_TOKEN || process.env.GH_TOKEN;
+  const collectEvidence = githubToken
+    ? async (result) => {
+        const urls = (result.pullRequests ?? [])
+          .map((p) => (typeof p === 'string' ? p : p?.url))
+          .filter((u) => u && parsePullRequestUrl(u));
+        if (!urls.length) return { evidence: [], errors: [] };
+        return collectPullRequestEvidence({
+          token: githubToken,
+          pullRequestUrls: urls,
+          timeoutMs: config.limits.httpTimeoutMs,
+          maxRetries: config.limits.httpMaxRetries,
+        });
+      }
+    : null;
+
   let outcome;
   try {
     outcome = await runOrchestrator({
@@ -74,6 +93,7 @@ async function main() {
       state,
       openai,
       devin,
+      collectEvidence,
       persist,
       projectContext,
       log,

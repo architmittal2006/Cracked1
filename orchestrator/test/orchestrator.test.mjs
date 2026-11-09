@@ -190,6 +190,33 @@ test('poll timeout when session never finishes', async () => {
   await assert.rejects(runOrchestrator(deps), /Timed out/);
 });
 
+test('evidence collector output reaches the reviewer input', async () => {
+  const config = makeConfig();
+  const { deps, state } = makeDeps({ config });
+  const seenInputs = [];
+  deps.openai = {
+    structured: async ({ schemaName, input }) => {
+      if (schemaName === 'review_verdict') seenInputs.push(input);
+      return schemaName === 'implementation_brief'
+        ? BRIEF
+        : { verdict: 'approve', issues: [], correctiveInstructions: '', summary: 'ok' };
+    },
+  };
+  deps.collectEvidence = async () => ({
+    evidence: [{
+      url: 'https://github.com/o/r/pull/1', title: 'PR', state: 'open',
+      additions: 5, deletions: 0, changedFiles: 1, files: ['a.ts'],
+      patch: '@@ +app.get("/api/health")', patchTruncated: false,
+    }],
+    errors: [],
+  });
+  await runOrchestrator(deps);
+  assert.equal(seenInputs.length, 1);
+  assert.match(seenInputs[0], /AUTHORITATIVE/);
+  assert.match(seenInputs[0], /api\/health/);
+  assert.match(seenInputs[0], /UNVERIFIED/);
+});
+
 test('state taskHash guards against cross-task resume', () => {
   const config = makeConfig();
   const state = initialState({ runId: 'x', config });

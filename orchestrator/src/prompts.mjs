@@ -150,7 +150,23 @@ The brief's devinPrompt must be a complete, self-contained prompt for an autonom
 it must state the goal, relevant files/conventions, constraints, and required verification.
 Do not ask questions; make reasonable decisions consistent with the documentation.`;
 
-export function buildReviewInput({ task, acceptanceCriteria, brief, devinResult }) {
+export function buildReviewInput({ task, acceptanceCriteria, brief, devinResult, evidence, evidenceErrors }) {
+  const prUrls = (devinResult?.pullRequests ?? []).map((p) => p?.url ?? p).filter(Boolean);
+  const evidenceSection = evidence?.length
+    ? evidence.map((e) => [
+        `### ${e.title ?? 'PR'} — ${e.url}`,
+        `state=${e.state} +${e.additions}/-${e.deletions} files=${e.changedFiles}`,
+        `changed files: ${(e.files ?? []).join(', ')}`,
+        '```diff',
+        e.patch || '(no patch content available)',
+        '```',
+      ].join('\n')).join('\n\n')
+    : '(no pull-request diffs could be retrieved — review must rely on the agent\'s self-report and treat unverified claims with suspicion)';
+
+  const errorNote = evidenceErrors?.length
+    ? `\nEvidence fetch problems: ${evidenceErrors.join('; ')}`
+    : '';
+
   return [
     `Repository: ${task.repository}`,
     `Base branch: ${task.baseBranch}`,
@@ -164,12 +180,21 @@ export function buildReviewInput({ task, acceptanceCriteria, brief, devinResult 
     '## Implementation brief given to the coding agent',
     JSON.stringify(brief, null, 2),
     '',
-    '## Coding agent reported result',
+    '## Coding agent self-reported result (UNVERIFIED claims)',
     JSON.stringify(devinResult, null, 2),
     '',
-    'Review the implementation against the task and acceptance criteria. Approve only if every',
-    'criterion is credibly met and no regressions are introduced. Otherwise list concrete issues',
-    'and write corrective instructions specific enough for the coding agent to act on.',
+    `## Pull requests opened (${prUrls.length || 'none'})`,
+    prUrls.length ? prUrls.join('\n') : 'The agent reported no pull request.',
+    '',
+    '## Actual diff evidence fetched from GitHub (AUTHORITATIVE)',
+    evidenceSection + errorNote,
+    '',
+    'Review instructions: the diff evidence above is authoritative — verify the code',
+    'actually implements the task and meets every acceptance criterion. The agent\'s',
+    'self-reported test results are claims, not proof; flag any criterion that the',
+    'diff does not demonstrably satisfy. Approve only if every criterion is credibly',
+    'met by the diff and no regressions are introduced. Otherwise list concrete',
+    'issues and write corrective instructions specific enough for the coding agent.',
   ].join('\n');
 }
 

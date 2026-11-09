@@ -143,6 +143,20 @@ export async function runOrchestrator(deps) {
     log(`Devin session created: ${state.devinSessionId} ${state.devinSessionUrl ?? ''}`.trim());
   };
 
+  const attachEvidence = async (result) => {
+    if (!deps.collectEvidence) return;
+    try {
+      const { evidence, errors } = await deps.collectEvidence(result);
+      result.evidence = evidence;
+      result.evidenceErrors = errors;
+      if (errors.length) log(`Evidence warnings: ${errors.join('; ')}`);
+    } catch (error) {
+      result.evidence = [];
+      result.evidenceErrors = [error instanceof Error ? error.message : String(error)];
+      log(`Evidence collection failed: ${result.evidenceErrors[0]}`);
+    }
+  };
+
   const review = async (devinResult) => {
     guard('openai');
     const verdict = await openai.structured({
@@ -152,6 +166,8 @@ export async function runOrchestrator(deps) {
         acceptanceCriteria: config.task.acceptanceCriteria,
         brief: state.brief,
         devinResult,
+        evidence: devinResult.evidence,
+        evidenceErrors: devinResult.evidenceErrors,
       }),
       schemaName: 'review_verdict',
       schema: REVIEW_VERDICT_SCHEMA,
@@ -167,6 +183,7 @@ export async function runOrchestrator(deps) {
     await save('implementing');
     const session = await pollSession();
     const result = devinResultFromSession(session);
+    await attachEvidence(result);
     state.devinResults.push(result);
     await save('implemented');
   } else {
@@ -203,6 +220,7 @@ export async function runOrchestrator(deps) {
     await save('implementing');
     const session = await pollSession();
     const result = devinResultFromSession(session);
+    await attachEvidence(result);
     state.devinResults.push(result);
     await save('implemented');
   }

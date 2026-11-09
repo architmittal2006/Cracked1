@@ -46,6 +46,7 @@ State persisted to orchestrator-state.json and committed to
 | `src/devin.mjs` | Devin v3 sessions client + terminal-status mapping |
 | `src/state.mjs` | Durable run state, task hashing, resume rules |
 | `src/prompts.mjs` | Prompt builders, JSON schemas, project-doc context loader |
+| `src/github.mjs` | Fetches actual PR diffs via GitHub REST so the reviewer sees code, not self-reports |
 | `src/orchestrator.mjs` | The plan → implement → review → correct loop |
 | `src/report.mjs` | Final markdown/JSON report |
 | `src/cli.mjs` | Entry point used by the workflow |
@@ -75,7 +76,19 @@ State persisted to orchestrator-state.json and committed to
 - The orchestrator treats `exit`, `error`, `suspended`, and
   `waiting_for_user`/`waiting_for_approval` as terminal; only
   `finished`/clean `exit` counts as success.
+- `max_acu_limit` is sent in the create-session request body and is enforced
+  server-side by the Devin API — it is a real spend cap, not a local setting.
 - Docs: <https://docs.devin.ai/api-reference/v3/sessions>
+
+### GitHub REST API (reviewer evidence)
+
+- `GET https://api.github.com/repos/{owner}/{repo}/pulls/{number}` — PR metadata
+- `GET https://api.github.com/repos/{owner}/{repo}/pulls/{number}/files` — per-file patches
+- Auth: the workflow's automatic `GITHUB_TOKEN` (`pull-requests: read`)
+- The GPT reviewer receives the actual diff (authoritative) alongside Devin's
+  self-report (explicitly labeled unverified). If no PR exists or fetches
+  fail, the reviewer is told the evidence is missing and must treat
+  self-reported claims with suspicion.
 
 ## Setup
 
@@ -87,8 +100,11 @@ State persisted to orchestrator-state.json and committed to
 | `DEVIN_API_KEY` | Devin service-user token (`cog_…`) with `UseDevinSessions` (`org.devins.use`) |
 | `DEVIN_ORG_ID` | Devin organization ID (`org-…`); may be a secret **or** an Actions variable |
 
-The Devin service user only needs session create/read/message permissions.
-Do **not** grant merge or deployment permissions to it for this workflow.
+The Devin service user needs only the `UseDevinSessions` (`org.devins.use`)
+organization permission: create, read own sessions, and send messages.
+`ViewOrgSessions` is not required (the service user reads sessions it created).
+`ImpersonateOrgSessions` is only needed for `create_as_user_id`, which this
+workflow does not use. Do **not** grant merge or deployment permissions.
 
 ### 2. Run
 
@@ -117,6 +133,12 @@ GitHub → Actions → **AI Development Orchestrator** → *Run workflow*, then 
   criteria) matches the current inputs. A different task always starts fresh.
 - A `failed` state resumes only if a session ID exists; terminal Devin states
   fail fast again instead of looping.
+- Re-run attempts check out the original commit, so a dedicated step restores
+  `orchestrator-state.json` from the branch head before the orchestrator runs.
+- The `ai-orchestrator` concurrency group serializes dispatches
+  (`cancel-in-progress: false`), so two runs never race on the state file.
+- Committed state contains task text, briefs, reviews and session links —
+  never API keys or tokens (HTTP errors are secret-sanitized).
 
 ## Cost controls
 

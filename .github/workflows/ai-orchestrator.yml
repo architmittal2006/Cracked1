@@ -66,7 +66,8 @@ on:
         type: string
 
 permissions:
-  contents: write # needed to persist orchestrator state on this branch
+  contents: write # persist orchestrator state on this branch
+  pull-requests: read # fetch PR diffs so GPT reviews real code, not self-reports
 
 concurrency:
   group: ai-orchestrator
@@ -109,6 +110,19 @@ jobs:
           test -n "$DEVIN_API_KEY" || { echo "::error::DEVIN_API_KEY secret is not set"; exit 1; }
           test -n "$DEVIN_ORG_ID" || { echo "::error::DEVIN_ORG_ID secret/variable is not set"; exit 1; }
           node -e "const c=Number(process.env.ORCHESTRATOR_MAX_CORRECTION_CYCLES); if(c>2){console.error('max_correction_cycles cannot exceed 2');process.exit(1)}"
+
+      - name: Restore latest orchestrator state
+        # Re-run attempts check out the original commit, which predates the
+        # state commit pushed by the previous attempt. Overlay the newest
+        # committed state file so polling resumes the same Devin session.
+        run: |
+          git fetch --depth=1 origin "${{ github.ref_name }}" || true
+          git checkout "origin/${{ github.ref_name }}" -- orchestrator-state.json 2>/dev/null || true
+          if [ -f orchestrator-state.json ]; then
+            echo "Resuming from committed state: $(node -e "console.log(JSON.parse(require('fs').readFileSync('orchestrator-state.json','utf8')).devinSessionId||'no session yet')")"
+          else
+            echo "No prior state found; starting fresh."
+          fi
 
       - name: Run orchestrator tests (mocked, no API credits)
         working-directory: orchestrator
