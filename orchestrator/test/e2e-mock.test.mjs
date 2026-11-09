@@ -1,5 +1,5 @@
 // End-to-end CLI test against a local mock HTTP server. No real API credits
-// are consumed: OPENAI_API_BASE and DEVIN_API_BASE point at 127.0.0.1.
+// are consumed: GROQ_API_BASE and DEVIN_API_BASE point at 127.0.0.1.
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -116,9 +116,9 @@ test('e2e: approve on first review completes and writes reports', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'orch-e2e-'));
   try {
     const { code, stdout, stderr } = await runCli({
-      OPENAI_API_KEY: 'sk-mock',
-      OPENAI_API_BASE: `http://127.0.0.1:${port}/v1`,
-      OPENAI_MODEL: 'mock-model',
+      GROQ_API_KEY: 'gsk-mock',
+      GROQ_API_BASE: `http://127.0.0.1:${port}/v1`,
+      GROQ_MODEL: 'mock-model',
       DEVIN_API_KEY: 'cog-mock',
       DEVIN_API_BASE: `http://127.0.0.1:${port}`,
       DEVIN_ORG_ID: 'org-x',
@@ -158,8 +158,8 @@ test('e2e: changes_required triggers exactly one corrective message then approve
   const dir = await mkdtemp(path.join(tmpdir(), 'orch-e2e-'));
   try {
     const { code, stderr, stdout } = await runCli({
-      OPENAI_API_KEY: 'sk-mock',
-      OPENAI_API_BASE: `http://127.0.0.1:${port}/v1`,
+      GROQ_API_KEY: 'gsk-mock',
+      GROQ_API_BASE: `http://127.0.0.1:${port}/v1`,
       DEVIN_API_KEY: 'cog-mock',
       DEVIN_API_BASE: `http://127.0.0.1:${port}`,
       DEVIN_ORG_ID: 'org-x',
@@ -187,7 +187,7 @@ test('e2e: changes_required triggers exactly one corrective message then approve
 test('e2e: missing credentials fails fast with clear error', async () => {
   const dir = await mkdtemp(path.join(tmpdir(), 'orch-e2e-'));
   const { code, stderr } = await runCli({
-    OPENAI_API_KEY: '',
+    GROQ_API_KEY: '',
     DEVIN_API_KEY: '',
     DEVIN_ORG_ID: '',
     TASK_DESCRIPTION: 'x',

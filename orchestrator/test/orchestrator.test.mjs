@@ -5,7 +5,7 @@ import { initialState, taskHash } from '../src/state.mjs';
 import { loadConfig } from '../src/config.mjs';
 
 const ENV = {
-  OPENAI_API_KEY: 'sk-test',
+  GROQ_API_KEY: 'gsk-test',
   DEVIN_API_KEY: 'cog-test',
   DEVIN_ORG_ID: 'org-test',
   TASK_DESCRIPTION: 'Add a health check endpoint',

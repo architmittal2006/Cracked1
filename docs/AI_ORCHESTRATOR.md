@@ -3,8 +3,10 @@
 A GitHub Actions-driven pipeline that removes manual prompt-copying between
 ChatGPT and Devin for the Cracked repository.
 
-- **OpenAI (Responses API)** — architects the task into a structured
-  implementation brief, then independently reviews each Devin result.
+- **LLM provider (Groq by default, OpenAI optional)** — architects the task into a
+  structured implementation brief, then independently reviews each Devin result.
+  Groq uses its free tier via an OpenAI-compatible Responses API; OpenAI remains
+  available via `LLM_PROVIDER=openai` but is never used as a silent fallback.
 - **Devin API v3** — implements the brief, receives up to two corrective
   messages, and reports structured results.
 - **GitHub Actions** — orchestration, state persistence, timeouts and reporting.
@@ -54,13 +56,28 @@ State persisted to orchestrator-state.json and committed to
 
 ## APIs used (verified against official docs)
 
-### OpenAI — Responses API
+### LLM provider — Groq (default, free tier)
+
+- `POST https://api.groq.com/openai/v1/responses` (OpenAI-compatible Responses API)
+- Auth: `Authorization: Bearer $GROQ_API_KEY`
+- Structured output: `text.format = { type: "json_schema", name, strict: true, schema }`
+- Default model: `openai/gpt-oss-120b` (override with `GROQ_MODEL`)
+- Free-plan limits (org-level, per console.groq.com/docs/rate-limits):
+  ~30 RPM / 1,000 RPD / 8K TPM / 200K TPD for gpt-oss models. A full run needs
+  only ~4–8 calls, far below daily caps; rate limits are retried with backoff.
+- Docs: <https://console.groq.com/docs/responses-api>, <https://console.groq.com/docs/structured-outputs>
+
+### LLM provider — OpenAI (optional, paid)
 
 - `POST https://api.openai.com/v1/responses`
-- Auth: `Authorization: Bearer $OPENAI_API_KEY`
-- Structured output: `text.format = { type: "json_schema", name, strict: true, schema }`
+- Auth: `Authorization: Bearer $OPENAI_API_KEY`; select with `LLM_PROVIDER=openai`
+- Structured output via `text.format` json_schema; `store:false` is sent only for OpenAI
 - Docs: <https://developers.openai.com/api/docs/guides/structured-outputs>
-- Response text extracted from `output_text` or `output[].content[]`.
+
+Provider selection is explicit (`LLM_PROVIDER=groq|openai`, default `groq`).
+Only the selected provider's API key is required, and there is **no automatic
+fallback** — a provider failure fails the run rather than silently spending
+money on the other provider.
 
 ### Devin — API v3 (service users)
 
@@ -96,7 +113,8 @@ State persisted to orchestrator-state.json and committed to
 
 | Secret | Source |
 |---|---|
-| `OPENAI_API_KEY` | OpenAI platform key with Responses API access |
+| `GROQ_API_KEY` | Groq API key (free tier) — **default provider** |
+| `OPENAI_API_KEY` | OpenAI key — only needed when `llm_provider=openai` |
 | `DEVIN_API_KEY` | Devin service-user token (`cog_…`) with `UseDevinSessions` (`org.devins.use`) |
 | `DEVIN_ORG_ID` | Devin organization ID (`org-…`); may be a secret **or** an Actions variable |
 

@@ -14,8 +14,18 @@ function intEnv(env, name, fallback) {
 }
 
 export function loadConfig(env = process.env) {
-  const missing = ['OPENAI_API_KEY', 'DEVIN_API_KEY', 'DEVIN_ORG_ID']
-    .filter((name) => !env[name]);
+  // LLM provider: 'groq' (default, free tier) or 'openai' (paid).
+  // No silent fallback — the selected provider's key is required and used
+  // exclusively; a failing provider never switches to the other.
+  const provider = (env.LLM_PROVIDER || 'groq').toLowerCase();
+  if (!['groq', 'openai'].includes(provider)) {
+    throw new ConfigError(`LLM_PROVIDER must be 'groq' or 'openai', got: ${JSON.stringify(provider)}`);
+  }
+
+  const required = ['DEVIN_API_KEY', 'DEVIN_ORG_ID'];
+  if (provider === 'groq') required.push('GROQ_API_KEY');
+  if (provider === 'openai') required.push('OPENAI_API_KEY');
+  const missing = required.filter((name) => !env[name]);
   if (missing.length > 0) {
     throw new ConfigError(`Missing required environment variables: ${missing.join(', ')}`);
   }
@@ -27,10 +37,17 @@ export function loadConfig(env = process.env) {
   }
 
   return {
-    openai: {
-      apiKey: env.OPENAI_API_KEY,
-      baseUrl: env.OPENAI_API_BASE || 'https://api.openai.com/v1',
-      model: env.OPENAI_MODEL || 'gpt-5-mini',
+    llm: {
+      provider,
+      apiKey: provider === 'groq' ? env.GROQ_API_KEY : env.OPENAI_API_KEY,
+      baseUrl: provider === 'groq'
+        ? (env.GROQ_API_BASE || 'https://api.groq.com/openai/v1')
+        : (env.OPENAI_API_BASE || 'https://api.openai.com/v1'),
+      model: provider === 'groq'
+        ? (env.GROQ_MODEL || 'openai/gpt-oss-120b')
+        : (env.OPENAI_MODEL || 'gpt-5-mini'),
+      // Groq's Responses API does not document a `store` field; omit it there.
+      sendStoreFlag: provider === 'openai',
     },
     devin: {
       apiKey: env.DEVIN_API_KEY,

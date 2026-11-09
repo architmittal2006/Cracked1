@@ -12,7 +12,7 @@ import path from 'node:path';
 import { loadConfig, validateTaskInput, ConfigError } from './config.mjs';
 import { loadState, saveState, initialState, resumableState } from './state.mjs';
 import { loadProjectContext } from './prompts.mjs';
-import { createOpenAiClient } from './openai.mjs';
+import { createLlmClient } from './llm.mjs';
 import { createDevinClient } from './devin.mjs';
 import { collectPullRequestEvidence, parsePullRequestUrl } from './github.mjs';
 import { runOrchestrator, OrchestratorError } from './orchestrator.mjs';
@@ -51,10 +51,7 @@ async function main() {
   const projectContext = await loadProjectContext(repoRoot);
   log(`Loaded ${projectContext.length} chars of project context`);
 
-  const openai = createOpenAiClient({
-    apiKey: config.openai.apiKey,
-    baseUrl: config.openai.baseUrl,
-    model: config.openai.model,
+  const llm = createLlmClient(config, {
     timeoutMs: config.limits.httpTimeoutMs,
     maxRetries: config.limits.httpMaxRetries,
   });
@@ -91,7 +88,7 @@ async function main() {
     outcome = await runOrchestrator({
       config,
       state,
-      openai,
+      openai: llm,
       devin,
       collectEvidence,
       persist,

@@ -8,7 +8,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 
 const ENV = {
-  OPENAI_API_KEY: 'k',
+  GROQ_API_KEY: 'gsk-test',
   DEVIN_API_KEY: 'k',
   DEVIN_ORG_ID: 'org-x',
   TASK_DESCRIPTION: 'task',
@@ -18,11 +18,46 @@ const ENV = {
 test('loadConfig requires credentials and task input', () => {
   assert.throws(() => loadConfig({}), ConfigError);
   const config = loadConfig(ENV);
-  assert.equal(config.openai.baseUrl, 'https://api.openai.com/v1');
+  assert.equal(config.llm.provider, 'groq');
+  assert.equal(config.llm.baseUrl, 'https://api.groq.com/openai/v1');
+  assert.equal(config.llm.model, 'openai/gpt-oss-120b');
+  assert.equal(config.llm.sendStoreFlag, false);
   assert.equal(config.devin.baseUrl, 'https://api.devin.ai');
   assert.equal(config.limits.maxCorrectionCycles, 2);
   assert.doesNotThrow(() => validateTaskInput(config));
   assert.throws(() => validateTaskInput(loadConfig({ ...ENV, TASK_DESCRIPTION: '' })), ConfigError);
+});
+
+test('provider selection: groq default, openai opt-in, invalid rejected', () => {
+  const groq = loadConfig(ENV);
+  assert.equal(groq.llm.provider, 'groq');
+  assert.equal(groq.llm.sendStoreFlag, false);
+
+  const openai = loadConfig({
+    ...ENV, LLM_PROVIDER: 'openai', OPENAI_API_KEY: 'sk-test', GROQ_API_KEY: '',
+  });
+  assert.equal(openai.llm.provider, 'openai');
+  assert.equal(openai.llm.apiKey, 'sk-test');
+  assert.equal(openai.llm.baseUrl, 'https://api.openai.com/v1');
+  assert.equal(openai.llm.sendStoreFlag, true);
+
+  assert.throws(() => loadConfig({ ...ENV, LLM_PROVIDER: 'bogus' }), ConfigError);
+});
+
+test('only the selected provider key is required; no silent fallback', () => {
+  // Groq selected, no OpenAI key at all — must still load.
+  const groq = loadConfig({ ...ENV, OPENAI_API_KEY: undefined });
+  assert.equal(groq.llm.provider, 'groq');
+  // OpenAI selected without OPENAI_API_KEY — must fail even if GROQ key exists.
+  assert.throws(
+    () => loadConfig({ ...ENV, LLM_PROVIDER: 'openai', OPENAI_API_KEY: '' }),
+    /OPENAI_API_KEY/
+  );
+  // Groq selected without GROQ_API_KEY — must fail even if OPENAI key exists.
+  assert.throws(
+    () => loadConfig({ ...ENV, GROQ_API_KEY: '', OPENAI_API_KEY: 'sk-x' }),
+    /GROQ_API_KEY/
+  );
 });
 
 test('loadConfig rejects correction cycles above 2', () => {

@@ -29,7 +29,7 @@ function extractOutputText(response) {
   return null;
 }
 
-export function createOpenAiClient({ apiKey, baseUrl, model, timeoutMs, maxRetries, fetchImpl, sleep, onCall }) {
+export function createOpenAiClient({ apiKey, baseUrl, model, sendStoreFlag = true, timeoutMs, maxRetries, fetchImpl, sleep, onCall }) {
   return {
     /**
      * Run a single Responses API call with a strict JSON-schema output.
@@ -45,7 +45,7 @@ export function createOpenAiClient({ apiKey, baseUrl, model, timeoutMs, maxRetri
           model,
           instructions,
           input,
-          store: false,
+          ...(sendStoreFlag ? { store: false } : {}),
           text: {
             format: {
               type: 'json_schema',
