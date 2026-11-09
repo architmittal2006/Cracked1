@@ -609,6 +609,16 @@ app.get('/api/auth/me', requireAuth, (req: Request, res: Response) => {
   res.json({ success: true, user: req.session.user });
 });
 
+app.get('/api/dashboard/activity', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const activity = await DatabaseService.getDashboardActivity(req.session.user!.id);
+    res.json({ success: true, ...activity });
+  } catch (error) {
+    logError('Dashboard activity load failed', error);
+    res.status(500).json({ success: false, error: 'Could not load your recent activity' });
+  }
+});
+
 app.get('/api/account/profile', requireAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const profile = await DatabaseService.getAccountProfile(req.session.user!.id);

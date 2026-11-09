@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowRight, FileText, Clock } from 'lucide-react';
+import { ArrowRight, Clock, FileText, RefreshCw } from 'lucide-react';
 import { getTierProgress } from '../data/mockData';
 import { ScoreRing } from '../components/ScoreRing';
 import { TierBadge } from '../components/TierBadge';
@@ -8,11 +8,19 @@ import { PageWrapper } from '../components/PageWrapper';
 import { Card } from '../components/Card';
 import { useAuth } from '../contexts/AuthContext';
 import { Button } from '../components/Button';
+import { getDashboardActivity } from '../services/api';
+import type { DashboardActivity } from '../services/api';
+
+const formatActivityDate = (value: string | undefined): string => {
+  if (!value) return 'Date unavailable';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Date unavailable';
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+};
 
 export const DashboardPage: React.FC = () => {
   const navigate = useNavigate();
   const { user, isAuthenticated, isLoading } = useAuth();
-
   const [userScores, setUserScores] = useState({
     credibilityScore: 0,
     solveScore: 0,
@@ -20,6 +28,10 @@ export const DashboardPage: React.FC = () => {
     casesSolved: 0,
     mergeBonusCount: 0,
   });
+  const [activity, setActivity] = useState<DashboardActivity | null>(null);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [activityError, setActivityError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
     if (user) {
@@ -39,13 +51,28 @@ export const DashboardPage: React.FC = () => {
     }
   }, [isLoading, isAuthenticated, user, navigate]);
 
-  if (isLoading) {
-    return null;
-  }
+  useEffect(() => {
+    if (!user?.id) return;
+    let isCurrent = true;
+    setActivityLoading(true);
+    setActivityError(null);
+    getDashboardActivity()
+      .then((result) => {
+        if (isCurrent) setActivity(result);
+      })
+      .catch((error: unknown) => {
+        if (isCurrent) {
+          setActivityError(error instanceof Error ? error.message : 'Could not load your activity.');
+        }
+      })
+      .finally(() => {
+        if (isCurrent) setActivityLoading(false);
+      });
+    return () => { isCurrent = false; };
+  }, [user?.id, reloadKey]);
 
-  if (!isAuthenticated || !user) {
-    return null;
-  }
+  if (isLoading) return null;
+  if (!isAuthenticated || !user) return null;
 
   const tierProgress = getTierProgress(userScores.credibilityScore);
 
@@ -98,40 +125,102 @@ export const DashboardPage: React.FC = () => {
         </Card>
       </div>
 
+      {activityError && (
+        <div className="mb-6 flex flex-col gap-3 border-y border-red-400/30 py-4 sm:flex-row sm:items-center sm:justify-between" role="alert">
+          <p className="text-sm text-red-200">{activityError}</p>
+          <Button variant="secondary" size="sm" onClick={() => setReloadKey((value) => value + 1)}>
+            <RefreshCw className="h-4 w-4" /> Try again
+          </Button>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <Card>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-white">Your progress</h2>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-white">Continue where you left off</h2>
+              <p className="mt-1 text-xs text-slate-500">Your saved case drafts</p>
+            </div>
             <Button variant="ghost" size="sm" onClick={() => navigate('/cases')}>Browse cases</Button>
           </div>
-          <div className="space-y-4">
-            <div className="flex flex-col items-center py-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/50 mb-3">
-                <FileText className="w-6 h-6 text-slate-500" />
-              </div>
-              <p className="text-slate-400 text-sm mb-1">No case attempts yet.</p>
-              <p className="text-slate-500 text-xs mb-3">Your submissions and drafts will appear here once you start solving.</p>
-              <Button variant="primary" size="sm" onClick={() => navigate('/cases')}>
-                Browse Cases
-              </Button>
+          {activityLoading ? (
+            <p className="py-6 text-sm text-slate-400" aria-live="polite">Loading your drafts…</p>
+          ) : activityError ? (
+            <p className="py-6 text-sm text-slate-400">Drafts are unavailable until activity can be loaded.</p>
+          ) : activity?.drafts.length ? (
+            <div className="divide-y divide-[var(--border-subtle)]">
+              {activity.drafts.map((draft) => (
+                <article key={draft.id} className="flex flex-col gap-3 py-4 first:pt-0 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="min-w-0">
+                    <h3 className="break-words text-sm font-medium text-white">{draft.title}</h3>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {draft.type || 'Case'} <span aria-hidden="true">·</span> Updated {formatActivityDate(draft.updatedAt)}
+                    </p>
+                  </div>
+                  {draft.caseAvailable ? (
+                    <Button variant="secondary" size="sm" onClick={() => navigate(`/cases/${encodeURIComponent(draft.caseId)}/solve`)} className="shrink-0">
+                      Resume <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  ) : (
+                    <span className="shrink-0 text-xs text-slate-500">No longer available</span>
+                  )}
+                </article>
+              ))}
             </div>
-          </div>
+          ) : (
+            <div className="flex flex-col items-center py-7 text-center">
+              <FileText className="mb-3 h-6 w-6 text-slate-500" aria-hidden="true" />
+              <p className="text-sm text-slate-300">No drafts in progress</p>
+              <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">Start a case and your saved work will be ready to pick up here.</p>
+              <Button variant="primary" size="sm" onClick={() => navigate('/cases')} className="mt-4">Find a case</Button>
+            </div>
+          )}
         </Card>
 
         <Card>
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold text-white">Compare solutions</h2>
-            <span className="text-xs text-slate-500">After you submit</span>
-          </div>
-          <div className="space-y-4">
-            <div className="flex flex-col items-center py-6 text-center">
-              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-slate-800/50 mb-3">
-                <Clock className="w-6 h-6 text-slate-500" />
-              </div>
-              <p className="text-slate-400 text-sm mb-1">Nothing to compare yet.</p>
-              <p className="text-slate-500 text-xs">Submit a solution to a case to see how other students approached it.</p>
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-semibold text-white">Recent submissions</h2>
+              <p className="mt-1 text-xs text-slate-500">Your latest submitted attempts</p>
             </div>
+            <span className="text-xs text-slate-500">Latest 5</span>
           </div>
+          {activityLoading ? (
+            <p className="py-6 text-sm text-slate-400" aria-live="polite">Loading your submissions…</p>
+          ) : activityError ? (
+            <p className="py-6 text-sm text-slate-400">Submissions are unavailable until activity can be loaded.</p>
+          ) : activity?.submissions.length ? (
+            <div className="divide-y divide-[var(--border-subtle)]">
+              {activity.submissions.map((submission) => (
+                <article key={submission.id} className="py-4 first:pt-0">
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <h3 className="break-words text-sm font-medium text-white">{submission.title}</h3>
+                      <p className="mt-1 text-xs text-slate-500">
+                        {submission.type || 'Case'} <span aria-hidden="true">·</span> {formatActivityDate(submission.createdAt)}
+                      </p>
+                      <span className="mt-2 inline-flex rounded border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-slate-400">{submission.status}</span>
+                    </div>
+                    {submission.caseAvailable ? (
+                      <div className="flex shrink-0 flex-wrap gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => navigate(`/cases/${encodeURIComponent(submission.caseId)}`)}>Review case</Button>
+                        <Button variant="secondary" size="sm" onClick={() => navigate(`/cases/${encodeURIComponent(submission.caseId)}/solutions`)}>Compare <ArrowRight className="h-4 w-4" /></Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-500">Case no longer available</span>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center py-7 text-center">
+              <Clock className="mb-3 h-6 w-6 text-slate-500" aria-hidden="true" />
+              <p className="text-sm text-slate-300">No submissions yet</p>
+              <p className="mt-1 max-w-xs text-xs leading-5 text-slate-500">Once you submit a case, you can return here to review it and compare approaches.</p>
+              <Button variant="primary" size="sm" onClick={() => navigate('/cases')} className="mt-4">Browse cases</Button>
+            </div>
+          )}
         </Card>
       </div>
 

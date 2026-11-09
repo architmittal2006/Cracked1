@@ -67,6 +67,27 @@ export interface AdminAuditLog {
   createdAt: string;
 }
 
+export interface DashboardActivityItem {
+  id: string;
+  caseId: string;
+  title: string;
+  type: string;
+  caseAvailable: boolean;
+  updatedAt?: string;
+  createdAt?: string;
+  status?: string;
+}
+
+export interface DashboardActivity {
+  drafts: DashboardActivityItem[];
+  submissions: DashboardActivityItem[];
+}
+
+export async function getDashboardActivity(): Promise<DashboardActivity> {
+  const result = await request<{ success: true } & DashboardActivity>('/api/dashboard/activity');
+  return { drafts: result.drafts, submissions: result.submissions };
+}
+
 export async function getAccountProfile(): Promise<AccountProfile> {
   const result = await request<{ success: true; profile: AccountProfile }>('/api/account/profile');
   return result.profile;

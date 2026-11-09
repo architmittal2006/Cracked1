@@ -1216,6 +1216,78 @@ export class DatabaseService {
     };
   }
 
+  public static async getDashboardActivity(userId: string): Promise<{
+    drafts: { id: string; caseId: string; title: string; type: string; updatedAt: string; caseAvailable: boolean }[];
+    submissions: { id: string; caseId: string; title: string; type: string; status: string; createdAt: string; caseAvailable: boolean }[];
+  }> {
+    const [draftRows, submissionRows] = await Promise.all([
+      pool.query<{
+        id: string; case_id: string; title: string; type: string; updated_at: Date | null;
+        created_at: Date; case_available: boolean;
+      }>(
+        `SELECT s.id, s.case_id,
+           CASE WHEN c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL THEN COALESCE(v.title, c.title)
+                ELSE 'Case no longer available' END AS title,
+           CASE WHEN c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL THEN COALESCE(v.type, c.type)
+                ELSE '' END AS type,
+           s.updated_at, s.created_at,
+           (c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL) AS case_available
+         FROM submissions s
+         LEFT JOIN cases c ON c.id = s.case_id
+         LEFT JOIN case_versions v ON v.id = c.current_version_id
+         WHERE s.user_id = $1 AND s.status = 'Draft'
+           AND NOT EXISTS (
+             SELECT 1 FROM submissions completed
+             WHERE completed.case_id = s.case_id AND completed.user_id = s.user_id
+               AND completed.status <> 'Draft'
+               AND completed.created_at >= COALESCE(s.updated_at, s.created_at)
+           )
+         ORDER BY COALESCE(s.updated_at, s.created_at) DESC, s.id ASC
+         LIMIT 5`,
+        [userId]
+      ),
+      pool.query<{
+        id: string; case_id: string; title: string; type: string; status: string;
+        created_at: Date; case_available: boolean;
+      }>(
+        `SELECT s.id, s.case_id,
+           CASE WHEN c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL THEN COALESCE(v.title, c.title)
+                ELSE 'Case no longer available' END AS title,
+           CASE WHEN c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL THEN COALESCE(v.type, c.type)
+                ELSE '' END AS type,
+           s.status, s.created_at,
+           (c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL) AS case_available
+         FROM submissions s
+         LEFT JOIN cases c ON c.id = s.case_id
+         LEFT JOIN case_versions v ON v.id = c.current_version_id
+         WHERE s.user_id = $1 AND s.status <> 'Draft'
+         ORDER BY s.created_at DESC, s.id ASC
+         LIMIT 5`,
+        [userId]
+      ),
+    ]);
+
+    return {
+      drafts: draftRows.rows.map((row) => ({
+        id: row.id,
+        caseId: row.case_id,
+        title: row.title,
+        type: row.type,
+        updatedAt: (row.updated_at ?? row.created_at).toISOString(),
+        caseAvailable: row.case_available,
+      })),
+      submissions: submissionRows.rows.map((row) => ({
+        id: row.id,
+        caseId: row.case_id,
+        title: row.title,
+        type: row.type,
+        status: row.status,
+        createdAt: row.created_at.toISOString(),
+        caseAvailable: row.case_available,
+      })),
+    };
+  }
+
   public static async hasSubmittedAttempt(caseId: string, userId: string): Promise<boolean> {
     const result = await pool.query<{ exists: boolean }>(
       `SELECT EXISTS (

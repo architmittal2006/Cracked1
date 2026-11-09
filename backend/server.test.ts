@@ -767,6 +767,71 @@ describe('Student workspace drafts', () => {
     expect(otherDraft.body.draft).toBeNull();
   });
 
+  it('returns only the authenticated student’s recent drafts and submissions', async () => {
+    const caseId = await publishCase();
+    const agentA = request.agent(app);
+    const agentB = request.agent(app);
+    const agentC = request.agent(app);
+    await registerTestUser(agentA, 'ws_activity_both');
+    await registerTestUser(agentB, 'ws_activity_draft');
+    await registerTestUser(agentC, 'ws_activity_empty');
+
+    expect((await request(app).get('/api/dashboard/activity')).status).toBe(401);
+    await agentA.put(`/api/cases/${caseId}/draft`).send({ contentJson: { issue_tree: 'Draft structure' } });
+    const submitted = await agentA.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: { issue_tree: 'Revenue is flat while costs rose due to shrink.', recommendation: 'Reduce shrink and renegotiate supplier terms.' },
+      citationsCount: 0,
+    });
+    expect(submitted.status).toBe(201);
+    const completedDraftActivity = await agentA.get('/api/dashboard/activity');
+    expect(completedDraftActivity.body.drafts).toHaveLength(0);
+    expect(completedDraftActivity.body.submissions).toHaveLength(1);
+
+    // A later draft is a new attempt and should remain resumable.
+    await agentA.put(`/api/cases/${caseId}/draft`).send({ contentJson: { issue_tree: 'Revised approach after reviewing the first attempt' } });
+    await agentB.put(`/api/cases/${caseId}/draft`).send({ contentJson: { issue_tree: 'Only a draft' } });
+
+    const ownActivity = await agentA.get('/api/dashboard/activity');
+    expect(ownActivity.status).toBe(200);
+    expect(ownActivity.body.drafts).toHaveLength(1);
+    expect(ownActivity.body.drafts[0]).toMatchObject({
+      caseId, title: content.title, type: content.type, caseAvailable: true,
+    });
+    expect(ownActivity.body.submissions).toHaveLength(1);
+    expect(ownActivity.body.submissions[0]).toMatchObject({
+      caseId, title: content.title, type: content.type, status: 'Submitted', caseAvailable: true,
+    });
+    expect(ownActivity.body.drafts[0].content).toBeUndefined();
+
+    const draftOnlyActivity = await agentB.get('/api/dashboard/activity');
+    expect(draftOnlyActivity.body.drafts).toHaveLength(1);
+    expect(draftOnlyActivity.body.submissions).toHaveLength(0);
+
+    const emptyActivity = await agentC.get('/api/dashboard/activity');
+    expect(emptyActivity.body.drafts).toHaveLength(0);
+    expect(emptyActivity.body.submissions).toHaveLength(0);
+    expect(ownActivity.body.drafts[0].id).not.toBe(draftOnlyActivity.body.drafts[0].id);
+
+    // Unpublishing makes old activity non-resumable and prevents dead links.
+    const adminAgent = request.agent(app);
+    const admin = await registerTestUser(adminAgent, 'ws_activity_admin');
+    const restoreAdmin = setAdminEnvForWorkspace(admin.id);
+    try {
+      expect((await adminAgent.post(`/api/admin/content/${caseId}/unpublish`)).status).toBe(200);
+    } finally {
+      restoreAdmin();
+    }
+    const unavailableActivity = await agentA.get('/api/dashboard/activity');
+    expect(unavailableActivity.body.drafts[0]).toMatchObject({
+      title: 'Case no longer available', caseAvailable: false,
+    });
+    expect(unavailableActivity.body.submissions[0]).toMatchObject({
+      title: 'Case no longer available', caseAvailable: false,
+    });
+    expect(unavailableActivity.body.drafts[0].caseId).toBe(caseId);
+    expect(unavailableActivity.body.submissions[0].caseId).toBe(caseId);
+  });
+
   it('hides reference_solution publicly and reveals it only after a real submission', async () => {
     const caseId = await publishCase();
     const agent = request.agent(app);
