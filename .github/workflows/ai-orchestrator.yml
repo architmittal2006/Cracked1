@@ -3,9 +3,11 @@ name: AI Development Orchestrator
 # Bootstrap entrypoint. The workflow file must live on the default branch for
 # workflow_dispatch to work (GitHub docs: "This event will only trigger a
 # workflow run if the workflow file exists on the default branch"), but the
-# orchestrator code and all run state live on the `orchestrator_ref` branch —
-# this workflow checks that branch out and pushes state commits there, never
-# to main.
+# orchestrator code and all run state live on the hardcoded trusted branch
+# `automation/gpt-devin-orchestrator` — this workflow checks that branch out
+# and pushes state commits there, never to main or any other branch.
+# The ref is NOT a workflow_dispatch input: user-supplied refs could point at
+# untrusted code that would run with API credentials.
 #
 # Required secrets: OPENAI_API_KEY, DEVIN_API_KEY, DEVIN_ORG_ID (secret or var).
 # Permissions: contents: write (state commits on orchestrator_ref only),
@@ -15,11 +17,6 @@ name: AI Development Orchestrator
 on:
   workflow_dispatch:
     inputs:
-      orchestrator_ref:
-        description: 'Branch containing orchestrator/ code and run state'
-        required: false
-        default: 'automation/gpt-devin-orchestrator'
-        type: string
       task_description:
         description: 'Development task for Devin to implement'
         required: true
@@ -83,7 +80,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 300
     env:
-      ORCHESTRATOR_REF: ${{ inputs.orchestrator_ref }}
+      # Hardcoded trusted branch — deliberately not a workflow input.
+      ORCHESTRATOR_REF: automation/gpt-devin-orchestrator
       TASK_DESCRIPTION: ${{ inputs.task_description }}
       TASK_ACCEPTANCE_CRITERIA: ${{ inputs.acceptance_criteria }}
       TASK_REPOSITORY: ${{ inputs.repository }}
@@ -104,8 +102,26 @@ jobs:
       - name: Checkout orchestrator branch
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
-          ref: ${{ inputs.orchestrator_ref }}
+          ref: automation/gpt-devin-orchestrator
           fetch-depth: 0
+
+      - name: Verify trusted orchestrator ref
+        # Fail fast before any checked-out code runs: the ref must be exactly
+        # the trusted automation branch — never main/master/production or any
+        # user-supplied value.
+        run: |
+          set -euo pipefail
+          case "$ORCHESTRATOR_REF" in
+            automation/gpt-devin-orchestrator) ;;
+            *) echo "::error::Untrusted orchestrator ref: $ORCHESTRATOR_REF"; exit 1 ;;
+          esac
+          case "$ORCHESTRATOR_REF" in
+            main|master|production|prod|release*) echo "::error::Protected branch refused: $ORCHESTRATOR_REF"; exit 1 ;;
+          esac
+          git fetch --depth=1 origin "$ORCHESTRATOR_REF"
+          test "$(git rev-parse HEAD)" = "$(git rev-parse FETCH_HEAD)" || {
+            echo "::error::Checked-out HEAD does not match origin/$ORCHESTRATOR_REF"; exit 1; }
+          echo "Verified orchestrator ref: $ORCHESTRATOR_REF @ $(git rev-parse --short HEAD)"
 
       - name: Set up Node.js
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -157,6 +173,10 @@ jobs:
       - name: Persist state to orchestrator branch
         if: always()
         run: |
+          # Push target is a literal — state can never land on main or any
+          # other branch even if ORCHESTRATOR_REF were somehow altered.
+          test "$ORCHESTRATOR_REF" = "automation/gpt-devin-orchestrator" || {
+            echo "::error::Refusing to persist state to untrusted ref: $ORCHESTRATOR_REF"; exit 1; }
           if [ -f orchestrator-state.json ]; then
             mkdir -p .orchestrator-state
             cp orchestrator-state.json ".orchestrator-state/state-${{ github.run_id }}-${{ github.run_attempt }}.json"
@@ -166,6 +186,6 @@ jobs:
             git add .orchestrator-state/ orchestrator-state.json || true
             if ! git diff --cached --quiet; then
               git commit -m "chore: persist orchestrator state for run ${{ github.run_id }} (attempt ${{ github.run_attempt }})"
-              git push origin "HEAD:refs/heads/$ORCHESTRATOR_REF"
+              git push origin "HEAD:refs/heads/automation/gpt-devin-orchestrator"
             fi
           fi
