@@ -23,7 +23,7 @@ describe('split frontend and backend deployment', () => {
       (rewrite: { source: string }) => rewrite.source === '/api/:path*',
     );
 
-    expect(apiRewrite?.destination).toBe('https://cracked-api.onrender.com/api/:path*');
+    expect(apiRewrite?.destination).toBe('https://cracked1-1-veul.onrender.com/api/:path*');
   });
 
   it('loads migration seed data from the new frontend folder', async () => {
