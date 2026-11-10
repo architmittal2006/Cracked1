@@ -783,3 +783,26 @@ export async function getReferenceSolution(caseId: string): Promise<string | nul
   }
   return data.referenceSolution;
 }
+
+// ─── Submission Debrief ───
+
+export interface SubmissionDebrief {
+  submissionId: string;
+  caseId: string;
+  content: Record<string, string>;
+  citationsCount: number;
+  wordCount: number;
+  status: string;
+  createdAt: string;
+  caseAvailable: boolean;
+  versionNumber: number | null;
+  referenceSolution: string | null;
+  referenceRange: { value: number; unit: string; low: number; high: number } | null;
+}
+
+export async function getSubmissionDebrief(caseId: string, submissionId: string): Promise<SubmissionDebrief> {
+  const result = await request<{ success: true; debrief: SubmissionDebrief }>(
+    `/api/cases/${encodeURIComponent(caseId)}/submissions/${encodeURIComponent(submissionId)}/debrief`
+  );
+  return result.debrief;
+}

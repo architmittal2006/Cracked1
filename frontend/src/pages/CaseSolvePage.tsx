@@ -120,6 +120,7 @@ export const CaseSolvePage: React.FC = () => {
   const [submitState, setSubmitState] = useState<'idle' | 'submitting' | 'error'>('idle');
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [submitNotice, setSubmitNotice] = useState<string | null>(null);
+  const [lastSubmissionId, setLastSubmissionId] = useState<string | null>(null);
   const [validationShown, setValidationShown] = useState(false);
 
   const [isDirty, setIsDirty] = useState(false);
@@ -477,6 +478,7 @@ export const CaseSolvePage: React.FC = () => {
       setIsDirty(false);
       setSubmitState('idle');
       setSubmitNotice(`Attempt submitted (${response.submissionId}).`);
+      setLastSubmissionId(response.submissionId);
       const solution = await getReferenceSolution(id);
       setReferenceSolution(solution);
     } catch (error) {
@@ -571,10 +573,15 @@ export const CaseSolvePage: React.FC = () => {
             </div>
           )}
           <div className="mt-5 flex flex-wrap gap-3">
+            {lastSubmissionId && (
+              <Button variant="primary" size="sm" onClick={() => navigate(`/cases/${caseData.id}/submissions/${lastSubmissionId}/debrief`)}>
+                View debrief
+              </Button>
+            )}
             <Button variant="secondary" size="sm" onClick={() => navigate(`/cases/${caseData.id}/solutions`)}>
               Compare solutions
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => { setSubmitted(false); setSubmitNotice(null); }}>
+            <Button variant="ghost" size="sm" onClick={() => { setSubmitted(false); setSubmitNotice(null); setLastSubmissionId(null); }}>
               Start another attempt
             </Button>
           </div>

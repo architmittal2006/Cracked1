@@ -1411,6 +1411,27 @@ app.get('/api/cases/:caseId/solutions', requireAuth, async (req: Request, res: R
   }
 });
 
+app.get('/api/cases/:caseId/submissions/:submissionId/debrief', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  const submissionId = req.params.submissionId;
+  if (typeof caseId !== 'string' || typeof submissionId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid case or submission parameter' });
+    return;
+  }
+
+  try {
+    const debrief = await DatabaseService.getSubmissionDebrief(caseId, submissionId, req.session.user!.id);
+    if (!debrief) {
+      res.status(404).json({ success: false, error: 'Submission not found' });
+      return;
+    }
+    res.json({ success: true, debrief });
+  } catch (error) {
+    logError('Submission debrief error', error);
+    res.status(500).json({ success: false, error: 'Could not load submission debrief' });
+  }
+});
+
 app.get('/api/cases/:caseId/review-queue', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const caseId = req.params.caseId;
   if (typeof caseId !== 'string') {

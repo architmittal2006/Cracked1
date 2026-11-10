@@ -161,6 +161,7 @@ export const submissions = pgTable('submissions', {
   status: varchar('status', { length: 50 }).notNull().default('Submitted'),
   structuralCompliant: boolean('structural_compliant').default(false),
   finalWeightedScore: integer('final_weighted_score'),
+  caseVersionId: varchar('case_version_id', { length: 255 }).references(() => caseVersions.id),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
 });

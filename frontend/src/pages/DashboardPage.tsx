@@ -201,14 +201,17 @@ export const DashboardPage: React.FC = () => {
                       </p>
                       <span className="mt-2 inline-flex rounded border border-[var(--border-subtle)] px-2 py-1 text-[11px] text-slate-400">{submission.status}</span>
                     </div>
-                    {submission.caseAvailable ? (
-                      <div className="flex shrink-0 flex-wrap gap-2">
-                        <Button variant="ghost" size="sm" onClick={() => navigate(`/cases/${encodeURIComponent(submission.caseId)}`)}>Review case</Button>
-                        <Button variant="secondary" size="sm" onClick={() => navigate(`/cases/${encodeURIComponent(submission.caseId)}/solutions`)}>Compare <ArrowRight className="h-4 w-4" /></Button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-500">Case no longer available</span>
-                    )}
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Button variant="ghost" size="sm" onClick={() => navigate(`/cases/${encodeURIComponent(submission.caseId)}/submissions/${encodeURIComponent(submission.id)}/debrief`)}>Debrief</Button>
+                      {submission.caseAvailable ? (
+                        <>
+                          <Button variant="ghost" size="sm" onClick={() => navigate(`/cases/${encodeURIComponent(submission.caseId)}`)}>Review case</Button>
+                          <Button variant="secondary" size="sm" onClick={() => navigate(`/cases/${encodeURIComponent(submission.caseId)}/solutions`)}>Compare <ArrowRight className="h-4 w-4" /></Button>
+                        </>
+                      ) : (
+                        <span className="self-center text-xs text-slate-500">Case no longer available</span>
+                      )}
+                    </div>
                   </div>
                 </article>
               ))}

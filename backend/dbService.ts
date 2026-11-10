@@ -1152,6 +1152,14 @@ export class DatabaseService {
   public static async createSubmission(payload: any): Promise<string> {
     const id = 'sub_' + crypto.randomUUID().slice(2, 11);
     await db.transaction(async (tx) => {
+      // Pin the submission to the case's currently published version inside
+      // the same transaction so the debrief always sees the version that was
+      // live at submit time.
+      const [caseRow] = await tx
+        .select({ currentVersionId: cases.currentVersionId })
+        .from(cases)
+        .where(eq(cases.id, payload.caseId))
+        .limit(1);
       await tx.insert(submissions).values({
         id,
         caseId: payload.caseId,
@@ -1162,6 +1170,7 @@ export class DatabaseService {
         status: payload.status || 'Submitted',
         structuralCompliant: payload.structuralCompliant || false,
         finalWeightedScore: payload.finalWeightedScore ?? null,
+        caseVersionId: caseRow?.currentVersionId ?? null,
       });
       await tx.update(cases)
         .set({ submissionCount: sql`${cases.submissionCount} + 1` })
@@ -1334,6 +1343,65 @@ export class DatabaseService {
       content: row.content_json,
       createdAt: row.created_at.toISOString(),
     }));
+  }
+
+  public static async getSubmissionDebrief(
+    caseId: string,
+    submissionId: string,
+    userId: string
+  ): Promise<{
+    submissionId: string;
+    caseId: string;
+    content: Record<string, string>;
+    citationsCount: number;
+    wordCount: number;
+    status: string;
+    createdAt: string;
+    caseAvailable: boolean;
+    versionNumber: number | null;
+    referenceSolution: string | null;
+    referenceRange: GuesstimateReferenceRange | null;
+  } | undefined> {
+    const result = await pool.query<{
+      id: string;
+      case_id: string;
+      content_json: Record<string, string>;
+      citations_count: number;
+      word_count: number;
+      status: string;
+      created_at: Date;
+      case_available: boolean;
+      version_number: number | null;
+      reference_solution: string | null;
+      reference_range: GuesstimateReferenceRange | null;
+    }>(
+      `SELECT s.id, s.case_id, s.content_json, s.citations_count, s.word_count,
+         s.status, s.created_at,
+         (c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL) AS case_available,
+         v.version_number, v.reference_solution, v.reference_range
+       FROM submissions s
+       LEFT JOIN cases c ON c.id = s.case_id
+       LEFT JOIN case_versions v
+         ON v.id = COALESCE(s.case_version_id, c.current_version_id)
+       WHERE s.id = $1 AND s.case_id = $2 AND s.user_id = $3
+         AND s.status <> 'Draft' AND s.structural_compliant = TRUE`,
+      [submissionId, caseId, userId]
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    return {
+      submissionId: row.id,
+      caseId: row.case_id,
+      content: row.content_json,
+      citationsCount: row.citations_count,
+      wordCount: row.word_count,
+      status: row.status,
+      createdAt: row.created_at.toISOString(),
+      caseAvailable: row.case_available,
+      versionNumber: row.version_number,
+      referenceSolution: row.reference_solution,
+      referenceRange: row.reference_range,
+    };
   }
 
   public static async getActiveReviewsForSubmission(submissionId: string): Promise<ReviewRecord[]> {

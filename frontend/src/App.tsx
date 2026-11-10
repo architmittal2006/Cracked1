@@ -16,6 +16,7 @@ import { CasesByTypePage } from './pages/CasesByTypePage';
 import { CaseDetailPage } from './pages/CaseDetailPage';
 import { CaseSolvePage } from './pages/CaseSolvePage';
 import { CaseSolutionsPage } from './pages/CaseSolutionsPage';
+import { SubmissionDebriefPage } from './pages/SubmissionDebriefPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { HowItWorksPage } from './pages/HowItWorksPage';
@@ -109,6 +110,11 @@ const App: React.FC = () => {
                   <Route path="/cases/:id/solutions" element={
                     <ProtectedRoute>
                       <CaseSolutionsPage />
+                    </ProtectedRoute>
+                  } />
+                  <Route path="/cases/:id/submissions/:submissionId/debrief" element={
+                    <ProtectedRoute>
+                      <SubmissionDebriefPage />
                     </ProtectedRoute>
                   } />
                   <Route path="/cases/:id/review" element={

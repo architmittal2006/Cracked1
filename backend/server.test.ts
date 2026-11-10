@@ -1013,6 +1013,220 @@ describe('Submission integrity', () => {
   });
 });
 
+describe('Submission debrief', () => {
+  const content = {
+    title: 'Debrief profitability case',
+    type: 'Profitability',
+    sector: 'Retail',
+    difficulty: 'Standard',
+    description: 'A debrief test case description with enough detail to satisfy the content contract rules.',
+    deliverables: ['Issue tree', 'Recommendation'],
+    referenceSolution: 'Version one reference solution text for debrief verification.',
+    rubricCriteria: [{ name: 'Structure', description: 'MECE issue tree.' }],
+    contentOwner: 'Cracked content team',
+    sourceKind: 'original',
+    rightsDeclaration: 'Original work created for Cracked.',
+    rightsConfirmed: true,
+  };
+
+  const setAdminEnv = (userId: string): (() => void) => {
+    const previous = process.env.ADMIN_USER_IDS;
+    process.env.ADMIN_USER_IDS = [previous, userId].filter(Boolean).join(',');
+    return () => {
+      if (previous === undefined) delete process.env.ADMIN_USER_IDS;
+      else process.env.ADMIN_USER_IDS = previous;
+    };
+  };
+
+  const publishCase = async (overrides: Record<string, unknown> = {}): Promise<{ caseId: string; adminAgent: ReturnType<typeof request.agent> }> => {
+    const adminAgent = request.agent(app);
+    const admin = await registerTestUser(adminAgent, 'debrief_admin');
+    const restoreAdmin = setAdminEnv(admin.id);
+    try {
+      const create = await adminAgent.post('/api/admin/content').send({ ...content, ...overrides });
+      expect(create.status).toBe(201);
+      const caseId = create.body.caseId as string;
+      const publish = await adminAgent.post(`/api/admin/content/${caseId}/publish`);
+      expect(publish.status).toBe(200);
+      return { caseId, adminAgent };
+    } finally {
+      restoreAdmin();
+    }
+  };
+
+  const republish = async (adminAgent: ReturnType<typeof request.agent>, caseId: string, overrides: Record<string, unknown>) => {
+    const save = await adminAgent.put(`/api/admin/content/${caseId}`).send({ ...content, ...overrides });
+    expect(save.status).toBe(200);
+    const publish = await adminAgent.post(`/api/admin/content/${caseId}/publish`);
+    expect(publish.status).toBe(200);
+  };
+
+  const submitSolution = (agent: ReturnType<typeof request.agent>, caseId: string) =>
+    agent.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: {
+        issue_tree: 'Costs rose on shrink and freight; revenue flat.',
+        recommendation: 'Renegotiate freight and fix shrink.',
+      },
+      citationsCount: 0,
+    });
+
+  it('requires authentication and returns 404 for foreign, missing, draft and wrong-case submissions', async () => {
+    const { caseId } = await publishCase();
+    const otherCase = await publishCase();
+    const agentA = request.agent(app);
+    const agentB = request.agent(app);
+    await registerTestUser(agentA, 'debrief_owner');
+    await registerTestUser(agentB, 'debrief_other');
+
+    const submit = await submitSolution(agentA, caseId);
+    expect(submit.status).toBe(201);
+    const submissionId = submit.body.submissionId as string;
+    const debriefPath = `/api/cases/${caseId}/submissions/${submissionId}/debrief`;
+
+    expect((await request(app).get(debriefPath)).status).toBe(401);
+    expect((await agentB.get(debriefPath)).status).toBe(404);
+    expect((await agentA.get(`/api/cases/${caseId}/submissions/sub_nonexistent/debrief`)).status).toBe(404);
+    expect((await agentA.get(`/api/cases/${otherCase.caseId}/submissions/${submissionId}/debrief`)).status).toBe(404);
+
+    await agentA.put(`/api/cases/${caseId}/draft`).send({ contentJson: { issue_tree: 'WIP draft only' } });
+    const draftRows = await pool.query<{ id: string }>(
+      `SELECT id FROM submissions WHERE case_id = $1 AND user_id = $2 AND status = 'Draft'`,
+      [caseId, (await agentA.get('/api/auth/me')).body.user.id]
+    );
+    expect((await agentA.get(`/api/cases/${caseId}/submissions/${draftRows.rows[0].id}/debrief`)).status).toBe(404);
+  });
+
+  it('returns the owner’s submission with the pinned version’s reference material', async () => {
+    const { caseId } = await publishCase();
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'debrief_view');
+
+    const submit = await submitSolution(agent, caseId);
+    expect(submit.status).toBe(201);
+    const submissionId = submit.body.submissionId as string;
+
+    const res = await agent.get(`/api/cases/${caseId}/submissions/${submissionId}/debrief`);
+    expect(res.status).toBe(200);
+    expect(res.body.debrief).toMatchObject({
+      submissionId,
+      caseId,
+      status: 'Submitted',
+      caseAvailable: true,
+      versionNumber: 1,
+    });
+    expect(res.body.debrief.content.issue_tree).toContain('Costs rose');
+    expect(res.body.debrief.wordCount).toBeGreaterThan(0);
+    expect(res.body.debrief.referenceSolution).toContain('Version one reference solution');
+    expect(res.body.debrief.referenceRange).toBeNull();
+  });
+
+  it('pins submissions to the published version atomically and survives republishing', async () => {
+    const { caseId, adminAgent } = await publishCase();
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'debrief_pin');
+
+    const first = await submitSolution(agent, caseId);
+    const firstId = first.body.submissionId as string;
+    const pinned = await pool.query<{ case_version_id: string }>(
+      `SELECT case_version_id FROM submissions WHERE id = $1`, [firstId]
+    );
+    const current = await pool.query<{ current_version_id: string }>(
+      `SELECT current_version_id FROM cases WHERE id = $1`, [caseId]
+    );
+    expect(pinned.rows[0].case_version_id).toBe(current.rows[0].current_version_id);
+    expect(pinned.rows[0].case_version_id).not.toBeNull();
+
+    // Republish with a different reference solution.
+    const adminId = (await adminAgent.get('/api/auth/me')).body.user.id as string;
+    const restoreAdmin = setAdminEnv(adminId);
+    try {
+      await republish(adminAgent, caseId, {
+        referenceSolution: 'Version two reference solution text, completely different.',
+      });
+    } finally {
+      restoreAdmin();
+    }
+
+    // Old submission still shows version one's material.
+    const oldDebrief = await agent.get(`/api/cases/${caseId}/submissions/${firstId}/debrief`);
+    expect(oldDebrief.status).toBe(200);
+    expect(oldDebrief.body.debrief.referenceSolution).toContain('Version one reference solution');
+    expect(oldDebrief.body.debrief.versionNumber).toBe(1);
+
+    // New submission pins version two.
+    const second = await submitSolution(agent, caseId);
+    const secondId = second.body.submissionId as string;
+    const newDebrief = await agent.get(`/api/cases/${caseId}/submissions/${secondId}/debrief`);
+    expect(newDebrief.status).toBe(200);
+    expect(newDebrief.body.debrief.referenceSolution).toContain('Version two reference solution');
+    expect(newDebrief.body.debrief.versionNumber).toBe(2);
+  });
+
+  it('falls back to the current published version for legacy submissions without a pin', async () => {
+    const { caseId } = await publishCase();
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'debrief_legacy');
+    const userId = (await agent.get('/api/auth/me')).body.user.id as string;
+
+    const legacyId = `sub_test_legacy_${randomUUID()}`;
+    await pool.query(
+      `INSERT INTO submissions (id, case_id, user_id, content_json, status, structural_compliant)
+       VALUES ($1, $2, $3, '{"issue_tree":"Legacy submission content.","recommendation":"Legacy recommendation."}'::jsonb, 'Submitted', TRUE)`,
+      [legacyId, caseId, userId]
+    );
+
+    const res = await agent.get(`/api/cases/${caseId}/submissions/${legacyId}/debrief`);
+    expect(res.status).toBe(200);
+    expect(res.body.debrief.referenceSolution).toContain('Version one reference solution');
+    expect(res.body.debrief.versionNumber).toBe(1);
+    await pool.query(`DELETE FROM submissions WHERE id LIKE 'sub_test_%'`);
+  });
+
+  it('degrades gracefully when the case is unpublished and returns guesstimate ranges', async () => {
+    const { caseId, adminAgent } = await publishCase({
+      title: 'Debrief guesstimate case',
+      type: 'Guesstimate',
+      referenceRange: { value: 100, unit: 'stores', low: 80, high: 120 },
+    });
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'debrief_guesstimate');
+
+    const submit = await agent.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: {
+        clarify_scope: 'Estimate annual revenue for a coffee chain.',
+        structure_segments: '["stores","revenue per store"]',
+        assumptions: JSON.stringify([
+          { name: 'stores', value: '1000', unit: 'stores', rationale: 'National footprint' },
+          { name: 'rev_per_store', value: '200000', unit: 'USD/year', rationale: 'Average unit revenue' },
+          { name: 'growth', value: '0.05', unit: 'fraction', rationale: 'Modest growth' },
+        ]),
+        calculation_steps: '1000 * 200000 * 1.05',
+        sanity_check: 'Within an order of magnitude of industry reports.',
+        final_estimate: JSON.stringify({ value: '210000000', unit: 'USD', low: '180000000', high: '240000000' }),
+      },
+      citationsCount: 0,
+    });
+    expect(submit.status).toBe(201);
+    const submissionId = submit.body.submissionId as string;
+
+    const res = await agent.get(`/api/cases/${caseId}/submissions/${submissionId}/debrief`);
+    expect(res.status).toBe(200);
+    expect(res.body.debrief.referenceRange).toMatchObject({ value: 100, unit: 'stores' });
+
+    // Unpublish: debrief still loads with the pinned version's material.
+    const restoreAdmin = setAdminEnv((await adminAgent.get('/api/auth/me')).body.user.id);
+    try {
+      expect((await adminAgent.post(`/api/admin/content/${caseId}/unpublish`)).status).toBe(200);
+    } finally {
+      restoreAdmin();
+    }
+    const after = await agent.get(`/api/cases/${caseId}/submissions/${submissionId}/debrief`);
+    expect(after.status).toBe(200);
+    expect(after.body.debrief.caseAvailable).toBe(false);
+    expect(after.body.debrief.referenceSolution).toContain('reference solution');
+  });
+});
+
 describe('Casebook routes', () => {
   it('returns only published casebooks and hides unpublished details and private metadata', async () => {
     const { id: uploaderId } = await registerTestUser(request.agent(app), 'catalog_owner');
