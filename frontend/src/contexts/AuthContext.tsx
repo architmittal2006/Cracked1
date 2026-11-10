@@ -12,6 +12,7 @@ interface User {
   casesSolved?: number;
   mergeBonusCount?: number;
   role?: string;
+  accessRole?: 'Student' | 'Admin';
 }
 
 interface AuthContextType {
@@ -96,17 +97,16 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   const logout = async () => {
-    try {
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        credentials: 'include',
-      });
-    } catch (error) {
-      console.error('Logout failed:', error);
-    } finally {
-      setUser(null);
-      setIsAuthenticated(false);
+    const response = await fetch('/api/auth/logout', {
+      method: 'POST',
+      credentials: 'include',
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Logout failed');
     }
+    setUser(null);
+    setIsAuthenticated(false);
   };
 
   return (

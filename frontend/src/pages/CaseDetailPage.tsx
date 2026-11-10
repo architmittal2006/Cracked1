@@ -1,27 +1,60 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Clock, Eye, FileText, PenLine } from 'lucide-react';
-import type { Case } from '../data/mockData';
+import { ArrowLeft, Clock, FileText, PenLine, BookOpen, Scale, ShieldCheck } from 'lucide-react';
+import type { ProblemType } from '../data/mockData';
+import type { StatusType } from '../components/StatusPill';
 import { StatusPill } from '../components/StatusPill';
 import { ProblemTypeBadge } from '../components/ProblemTypeBadge';
 import { DeliverablesList } from '../components/DeliverablesList';
 import { PageWrapper } from '../components/PageWrapper';
 import { Button } from '../components/Button';
-import { getCaseById } from '../services/api';
+import { getPublishedCase, getReferenceSolution } from '../services/api';
+import type { PublishedCaseDetail } from '../services/api';
+
+const SOURCE_LABELS: Record<string, string> = {
+  original: 'Original work',
+  licensed: 'Licensed content',
+  public_domain: 'Public domain',
+  permission_granted: 'Used with permission',
+};
 
 export const CaseDetailPage: React.FC = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [caseData, setCaseData] = useState<Case | null>(null);
+  const [caseData, setCaseData] = useState<PublishedCaseDetail | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [solutionRevealed, setSolutionRevealed] = useState(false);
+  const [solutionText, setSolutionText] = useState<string | null>(null);
+  const [solutionState, setSolutionState] = useState<'idle' | 'loading' | 'locked' | 'error'>('idle');
+
+  const revealSolution = async () => {
+    if (!id) return;
+    setSolutionRevealed(true);
+    setSolutionState('loading');
+    try {
+      const text = await getReferenceSolution(id);
+      if (text) {
+        setSolutionText(text);
+        setSolutionState('idle');
+      } else {
+        setSolutionState('locked');
+      }
+    } catch {
+      setSolutionState('error');
+    }
+  };
 
   useEffect(() => {
     if (!id) return;
     let isCurrent = true;
-    getCaseById(id)
+    getPublishedCase(id)
       .then((loadedCase) => {
         if (!isCurrent) return;
+        if (!loadedCase) {
+          setLoadError('This case is not published or does not exist.');
+          return;
+        }
         setCaseData(loadedCase);
       })
       .catch((error: unknown) => {
@@ -57,6 +90,8 @@ export const CaseDetailPage: React.FC = () => {
       ? 'border border-amber-500/30 bg-amber-500/10 text-amber-300'
       : 'border border-[var(--border-subtle)] bg-[var(--bg-card-hover)] text-[var(--text-secondary)]';
 
+  const sourceLabel = SOURCE_LABELS[caseData.source_kind] ?? caseData.source_kind;
+
   return (
     <PageWrapper className="py-8">
       <Button variant="ghost" size="sm" onClick={() => navigate('/cases')} className="mb-5 inline-flex gap-2">
@@ -65,16 +100,25 @@ export const CaseDetailPage: React.FC = () => {
 
       <header className="mb-8 border-b border-[var(--border-subtle)] pb-7">
         <div className="mb-3 flex flex-wrap items-center gap-2">
-          <ProblemTypeBadge type={caseData.type} linked />
+          <ProblemTypeBadge type={caseData.type as ProblemType} linked />
           <span className={`rounded px-2.5 py-1 text-xs font-medium ${difficultyClass}`}>{caseData.difficulty}</span>
-          <StatusPill status={caseData.status} />
+          <StatusPill status={caseData.status as StatusType} />
           {caseData.is_chaos && <span className="text-xs text-[var(--text-secondary)]">Chaos case</span>}
         </div>
         <h1 className="max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text-primary)] sm:text-3xl">{caseData.title}</h1>
         <p className="mt-2 text-sm text-[var(--text-secondary)]">
-          {caseData.sector}{caseData.companyType ? ` · ${caseData.companyType}` : ''}
+          {caseData.sector} · v{caseData.version_number}
         </p>
         <p className="mt-5 max-w-3xl whitespace-pre-wrap text-sm leading-6 text-[var(--text-primary)]">{caseData.description}</p>
+
+        {caseData.exhibits && (
+          <section className="mt-6 rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5" aria-label="Exhibits">
+            <h2 className="mb-3 flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]">
+              <BookOpen aria-hidden="true" className="h-4 w-4" /> Exhibits &amp; materials
+            </h2>
+            <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{caseData.exhibits}</p>
+          </section>
+        )}
 
         {caseData.tags.length > 0 && (
           <ul className="mt-5 flex flex-wrap gap-x-4 gap-y-2 text-xs text-[var(--text-secondary)]" aria-label="Case tags">
@@ -83,7 +127,7 @@ export const CaseDetailPage: React.FC = () => {
         )}
 
         <div className="mt-6 flex flex-wrap gap-x-6 gap-y-3 border-t border-[var(--border-subtle)] pt-4 text-sm text-[var(--text-secondary)]">
-          <span className="inline-flex items-center gap-2"><FileText aria-hidden="true" className="h-4 w-4" />{caseData.submissionCount} submissions</span>
+          <span className="inline-flex items-center gap-2"><FileText aria-hidden="true" className="h-4 w-4" />{caseData.submission_count} submissions</span>
           {caseData.deadline && (
             <span className="inline-flex items-center gap-2">
               <Clock aria-hidden="true" className="h-4 w-4" /> Deadline: {new Date(caseData.deadline).toLocaleDateString()}
@@ -94,10 +138,59 @@ export const CaseDetailPage: React.FC = () => {
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[minmax(0,1.6fr)_minmax(260px,0.8fr)]">
-        <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
-          <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Expected deliverables</h2>
-          <DeliverablesList deliverables={caseData.deliverables} />
-        </section>
+        <div className="space-y-8">
+          <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
+            <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Expected deliverables</h2>
+            <DeliverablesList deliverables={caseData.deliverables} />
+          </section>
+
+          <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
+            <h2 className="mb-4 flex items-center gap-2 text-lg font-semibold text-[var(--text-primary)]">
+              <Scale aria-hidden="true" className="h-5 w-5" /> Reference solution
+            </h2>
+            {solutionRevealed ? (
+              solutionText ? (
+                <p className="whitespace-pre-wrap text-sm leading-6 text-[var(--text-secondary)]">{solutionText}</p>
+              ) : solutionState === 'loading' ? (
+                <p className="text-sm text-[var(--text-secondary)]">Checking access…</p>
+              ) : solutionState === 'locked' ? (
+                <div>
+                  <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                    The reference solution unlocks after you submit an attempt on this case.
+                  </p>
+                  <Button variant="secondary" size="sm" onClick={() => navigate(`/cases/${caseData.id}/solve`)} className="mt-4">
+                    Go to workspace
+                  </Button>
+                </div>
+              ) : solutionState === 'error' ? (
+                <p className="text-sm text-red-300" role="alert">Could not load the reference solution. Try again.</p>
+              ) : null
+            ) : (
+              <div>
+                <p className="text-sm leading-6 text-[var(--text-secondary)]">
+                  The worked solution is hidden so you can attempt the case first. It unlocks after you submit an attempt.
+                </p>
+                <Button variant="secondary" size="sm" onClick={() => void revealSolution()} className="mt-4">
+                  Reveal reference solution
+                </Button>
+              </div>
+            )}
+          </section>
+
+          {caseData.rubric_criteria.length > 0 && (
+            <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
+              <h2 className="mb-4 text-lg font-semibold text-[var(--text-primary)]">Review rubric</h2>
+              <ul className="space-y-4">
+                {caseData.rubric_criteria.map((criterion, index) => (
+                  <li key={`${criterion.name}-${index}`}>
+                    <p className="text-sm font-medium text-[var(--text-primary)]">{criterion.name}</p>
+                    <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">{criterion.description}</p>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+        </div>
 
         <aside className="space-y-5">
           <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
@@ -109,11 +202,11 @@ export const CaseDetailPage: React.FC = () => {
               <Button
                 variant="primary"
                 size="sm"
-                onClick={() => navigate(`/cases/${caseData.id}/submit`)}
+                onClick={() => navigate(`/cases/${caseData.id}/solve`)}
                 className="w-full"
               >
                 <PenLine aria-hidden="true" className="h-4 w-4" />
-                Submit your solution
+                Start solving
               </Button>
               <Button
                 variant="secondary"
@@ -121,10 +214,40 @@ export const CaseDetailPage: React.FC = () => {
                 onClick={() => navigate(`/cases/${caseData.id}/solutions`)}
                 className="w-full"
               >
-                <Eye aria-hidden="true" className="h-4 w-4" />
                 Compare solutions
               </Button>
             </div>
+          </section>
+
+          <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--bg-card)] p-5 sm:p-6">
+            <h2 className="flex items-center gap-2 text-base font-semibold text-[var(--text-primary)]">
+              <ShieldCheck aria-hidden="true" className="h-4 w-4" /> Attribution &amp; rights
+            </h2>
+            <dl className="mt-3 space-y-2 text-sm">
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-[var(--text-secondary)]">Source</dt>
+                <dd className="text-[var(--text-primary)]">{sourceLabel}</dd>
+              </div>
+              {caseData.source_reference && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-[var(--text-secondary)]">Reference</dt>
+                  <dd className="break-words text-[var(--text-primary)]">{caseData.source_reference}</dd>
+                </div>
+              )}
+              <div>
+                <dt className="text-xs uppercase tracking-wide text-[var(--text-secondary)]">Content owner</dt>
+                <dd className="text-[var(--text-primary)]">{caseData.content_owner}</dd>
+              </div>
+              {caseData.author_credit && (
+                <div>
+                  <dt className="text-xs uppercase tracking-wide text-[var(--text-secondary)]">Author credit</dt>
+                  <dd className="text-[var(--text-primary)]">{caseData.author_credit}</dd>
+                </div>
+              )}
+            </dl>
+            <p className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-xs leading-5 text-[var(--text-secondary)]">
+              {caseData.rights_declaration}
+            </p>
           </section>
         </aside>
       </div>

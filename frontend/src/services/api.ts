@@ -37,74 +37,100 @@ async function request<T>(
   const data = await response.json();
 
   if (!response.ok) {
-    throw new Error(data.error || `API error: ${response.statusText}`);
+    const error = new Error(data.error || `API error: ${response.statusText}`) as Error & { status?: number };
+    error.status = response.status;
+    throw error;
   }
 
   return data;
 }
 
-// ─── Arena (Track 1) ───
-
-export interface ArenaCase {
+export interface AccountProfile {
   id: string;
-  title: string;
-  type: string;
-  sector: string;
-  difficulty: string;
-  status: string;
-  description: string;
-  deliverables: string[];
-  pts: number;
-  submissionCount: number;
-  upvotes: number;
-  deadline: string;
-  tags: string[];
-}
-
-export interface ArenaSubmission {
-  id: string;
-  caseId: string;
-  userId: string;
-  content: Record<string, string>;
-  upvotes: number;
-  downvotes: number;
-  status: 'Draft' | 'Published';
+  username: string;
+  name: string;
+  email: string;
+  bio: string | null;
+  isActive: boolean;
   createdAt: string;
 }
 
-export async function getArenaCases(): Promise<ArenaCase[]> {
-  // Mock data - in production this would call GET /api/arena
-  const { MOCK_ARENA_CASES } = await import('../data/mockData');
-  return MOCK_ARENA_CASES as ArenaCase[];
+export type AdminAccount = AccountProfile & { accessRole: 'Student' | 'Admin' };
+
+export interface AdminAuditLog {
+  id: string;
+  actorId: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
 }
 
-export async function getArenaCase(id: string): Promise<ArenaCase | null> {
-  const cases = await getArenaCases();
-  return cases.find(c => c.id === id) || null;
+export interface DashboardActivityItem {
+  id: string;
+  caseId: string;
+  title: string;
+  type: string;
+  caseAvailable: boolean;
+  updatedAt?: string;
+  createdAt?: string;
+  status?: string;
 }
 
-export async function submitArenaSolution(caseId: string, content: Record<string, string>): Promise<ArenaSubmission> {
-  // Mock submission - in production this would call POST /api/arena/[id]/submit
-  return {
-    id: `arena_sub_${Date.now()}`,
-    caseId,
-    userId: 'current_user',
-    content,
-    upvotes: 0,
-    downvotes: 0,
-    status: 'Published',
-    createdAt: new Date().toISOString(),
-  };
+export interface DashboardActivity {
+  drafts: DashboardActivityItem[];
+  submissions: DashboardActivityItem[];
 }
 
-export async function voteArenaSubmission(_submissionId: string, _direction: 'up' | 'down'): Promise<void> {
-  // Mock vote - in production this would call POST /api/arena/submissions/[id]/vote
-  // Rate limit: 1 vote per user per submission
+export async function getDashboardActivity(): Promise<DashboardActivity> {
+  const result = await request<{ success: true } & DashboardActivity>('/api/dashboard/activity');
+  return { drafts: result.drafts, submissions: result.submissions };
 }
 
-export async function getArenaSolutions(_caseId: string): Promise<ArenaSubmission[]> {
-  // Mock solutions - in production this would call GET /api/arena/[id]/solutions
-  return [];
+export async function getAccountProfile(): Promise<AccountProfile> {
+  const result = await request<{ success: true; profile: AccountProfile }>('/api/account/profile');
+  return result.profile;
+}
+
+export async function updateAccountProfile(input: {
+  username: string;
+  name: string;
+  bio: string | null;
+}): Promise<AccountProfile> {
+  const result = await request<{ success: true; profile: AccountProfile }>('/api/account/profile', {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  });
+  return result.profile;
+}
+
+export async function changeAccountPassword(input: {
+  currentPassword: string;
+  newPassword: string;
+}): Promise<void> {
+  await request<{ success: true }>('/api/account/password', {
+    method: 'POST',
+    body: JSON.stringify(input),
+  });
+}
+
+export async function getAdminAccounts(): Promise<AdminAccount[]> {
+  const result = await request<{ success: true; accounts: AdminAccount[] }>('/api/admin/accounts');
+  return result.accounts;
+}
+
+export async function setAdminAccountStatus(id: string, status: 'active' | 'suspended'): Promise<AdminAccount> {
+  const result = await request<{ success: true; account: AdminAccount }>(
+    `/api/admin/accounts/${encodeURIComponent(id)}/status`,
+    { method: 'PATCH', body: JSON.stringify({ status }) }
+  );
+  return result.account;
+}
+
+export async function getAdminAuditLogs(): Promise<AdminAuditLog[]> {
+  const result = await request<{ success: true; logs: AdminAuditLog[] }>('/api/admin/audit-logs');
+  return result.logs;
 }
 
 // ─── Cases ───
@@ -475,80 +501,6 @@ export async function getNextReviewSubmission(caseId: string): Promise<ReviewQue
 
 // ─── User & Profile ───
 
-export interface UserProfile {
-  id: string;
-  username: string;
-  name: string;
-  solve_score: number;
-  review_score: number;
-  credibility_score: number;
-  merge_bonus_count: number;
-  casesSolved: number;
-  bio: string;
-  tier: string;
-}
-
-export async function getUserProfile(username: string): Promise<UserProfile | null> {
-  const { getUserByUsername } = await import('../data/mockData');
-  const user = getUserByUsername(username);
-  if (!user) return null;
-  
-  const { getCredibilityTier } = await import('../data/mockData');
-  return {
-    id: user.id,
-    username: user.username,
-    name: user.name,
-    solve_score: user.solve_score,
-    review_score: user.review_score,
-    credibility_score: user.credibility_score,
-    merge_bonus_count: user.merge_bonus_count,
-    casesSolved: user.casesSolved,
-    bio: user.bio,
-    tier: getCredibilityTier(user.credibility_score),
-  };
-}
-
-// ─── Leaderboard ───
-
-export interface LeaderboardEntry {
-  rank: number;
-  user: UserProfile;
-  score: number;
-  casesSolved: number;
-  mergeBonuses: number;
-  rankDelta: number | 'NEW';
-}
-
-export async function getLeaderboard(
-  _period: 'all' | 'month' = 'all',
-  _type?: string
-): Promise<LeaderboardEntry[]> {
-  // Backend doesn't have this endpoint yet, use mock data
-  const { MOCK_USERS, getCredibilityTier } = await import('../data/mockData');
-  return MOCK_USERS.map((user, index) => ({
-    rank: index + 1,
-    user: {
-      id: user.id,
-      username: user.username,
-      name: user.name,
-      solve_score: user.solve_score,
-      review_score: user.review_score,
-      credibility_score: user.credibility_score,
-      merge_bonus_count: user.merge_bonus_count,
-      casesSolved: user.casesSolved,
-      bio: user.bio,
-      tier: getCredibilityTier(user.credibility_score),
-    },
-    score: user.credibility_score,
-    casesSolved: user.casesSolved,
-    mergeBonuses: user.merge_bonus_count,
-    rankDelta: user.rankDelta,
-  }));
-}
-
-
-// --- Image Upload (Cloudinary) ---
-
 export async function uploadImage(file: File): Promise<{ url: string; publicId: string }> {
   const formData = new FormData();
   formData.append("image", file);
@@ -569,4 +521,288 @@ export async function uploadImage(file: File): Promise<{ url: string; publicId: 
     url: data.url,
     publicId: data.publicId,
   };
+}
+
+// ─── Admin content CMS ───
+
+export type CaseContentType =
+  | 'Market Sizing' | 'Profitability' | 'Market Entry' | 'Operational'
+  | 'Pricing' | 'M&A' | 'Growth & Retention' | 'Guesstimate';
+
+export interface RubricCriterion { name: string; description: string }
+
+export interface ReferenceRange { value: number; unit: string; low: number; high: number }
+
+export interface CaseContentInput {
+  title: string;
+  type: CaseContentType;
+  sector: string;
+  difficulty: 'Standard' | 'High' | 'Chaos';
+  description: string;
+  exhibits?: string;
+  deliverables: string[];
+  referenceRange?: ReferenceRange | null;
+  referenceSolution: string;
+  rubricCriteria: RubricCriterion[];
+  contentOwner: string;
+  authorCredit?: string | null;
+  sourceKind: 'original' | 'licensed' | 'public_domain' | 'permission_granted';
+  sourceReference?: string | null;
+  rightsDeclaration: string;
+  rightsConfirmed: true;
+}
+
+export interface AdminContentItem {
+  id: string;
+  title: string;
+  type: string;
+  sector: string;
+  difficulty: string;
+  caseStatus: string;
+  contentStatus: 'Draft' | 'Published' | 'Unpublished';
+  hasDraft: boolean;
+  latestVersion: number | null;
+  createdAt: string;
+}
+
+export interface CaseVersionSnapshot {
+  id: string;
+  case_id: string;
+  version_number: number;
+  status: 'Draft' | 'Published';
+  title: string;
+  type: string;
+  sector: string;
+  difficulty: string;
+  description: string;
+  exhibits: string | null;
+  deliverables: string[];
+  reference_range: ReferenceRange | null;
+  reference_solution: string;
+  rubric_criteria: RubricCriterion[];
+  content_owner: string;
+  author_credit: string | null;
+  source_kind: string;
+  source_reference: string | null;
+  rights_declaration: string;
+  rights_verified: boolean;
+  created_by: string | null;
+  published_by: string | null;
+  created_at: string;
+  published_at: string | null;
+}
+
+export interface AdminContentDetail {
+  case: Record<string, unknown> & { id: string; status: string; current_version_id: string | null };
+  draft: CaseVersionSnapshot | null;
+  published: CaseVersionSnapshot | null;
+  versionCount: number;
+}
+
+export interface ContentVersionSummary {
+  id: string;
+  versionNumber: number;
+  status: 'Draft' | 'Published';
+  title: string;
+  type: string;
+  createdAt: string;
+  publishedAt: string | null;
+  createdBy: string | null;
+  publishedBy: string | null;
+}
+
+const snapshotToInput = (snapshot: CaseVersionSnapshot): CaseContentInput => ({
+  title: snapshot.title,
+  type: snapshot.type as CaseContentType,
+  sector: snapshot.sector,
+  difficulty: snapshot.difficulty as CaseContentInput['difficulty'],
+  description: snapshot.description,
+  exhibits: snapshot.exhibits ?? undefined,
+  deliverables: snapshot.deliverables ?? [],
+  referenceRange: snapshot.reference_range ?? null,
+  referenceSolution: snapshot.reference_solution,
+  rubricCriteria: snapshot.rubric_criteria ?? [],
+  contentOwner: snapshot.content_owner,
+  authorCredit: snapshot.author_credit ?? null,
+  sourceKind: snapshot.source_kind as CaseContentInput['sourceKind'],
+  sourceReference: snapshot.source_reference ?? null,
+  rightsDeclaration: snapshot.rights_declaration,
+  rightsConfirmed: true,
+});
+
+export async function getAdminContent(filters: {
+  type?: string; status?: string; q?: string;
+} = {}): Promise<AdminContentItem[]> {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(filters)) {
+    if (value) params.set(key, value);
+  }
+  const query = params.toString();
+  const result = await request<{ success: true; content: AdminContentItem[] }>(
+    `/api/admin/content${query ? `?${query}` : ''}`
+  );
+  return result.content;
+}
+
+export async function createAdminContent(input: CaseContentInput): Promise<{ caseId: string }> {
+  const result = await request<{ success: true; caseId: string }>('/api/admin/content', {
+    method: 'POST', body: JSON.stringify(input),
+  });
+  return { caseId: result.caseId };
+}
+
+export async function previewAdminContent(input: CaseContentInput): Promise<CaseContentInput> {
+  const result = await request<{ success: true; content: CaseContentInput }>(
+    '/api/admin/content/preview', { method: 'POST', body: JSON.stringify(input) }
+  );
+  return result.content;
+}
+
+export async function getAdminContentDetail(caseId: string): Promise<AdminContentDetail | null> {
+  try {
+    const result = await request<{ success: true } & AdminContentDetail>(
+      `/api/admin/content/${encodeURIComponent(caseId)}`
+    );
+    return result;
+  } catch {
+    return null;
+  }
+}
+
+export async function getAdminContentEditorState(caseId: string): Promise<{
+  detail: AdminContentDetail;
+  initial: CaseContentInput;
+}> {
+  const detail = await getAdminContentDetail(caseId);
+  if (!detail) throw new Error('Content not found');
+  const source = detail.draft ?? detail.published;
+  if (!source) throw new Error('Content has no versions yet');
+  return { detail, initial: snapshotToInput(source) };
+}
+
+export async function saveAdminContentDraft(caseId: string, input: CaseContentInput): Promise<{ versionId: string; versionNumber: number }> {
+  const result = await request<{ success: true; versionId: string; versionNumber: number }>(
+    `/api/admin/content/${encodeURIComponent(caseId)}`,
+    { method: 'PUT', body: JSON.stringify(input) }
+  );
+  return { versionId: result.versionId, versionNumber: result.versionNumber };
+}
+
+export async function getAdminContentVersions(caseId: string): Promise<ContentVersionSummary[]> {
+  const result = await request<{ success: true; versions: ContentVersionSummary[] }>(
+    `/api/admin/content/${encodeURIComponent(caseId)}/versions`
+  );
+  return result.versions;
+}
+
+export async function publishAdminContent(caseId: string): Promise<{ versionId: string; versionNumber: number }> {
+  const result = await request<{ success: true; versionId: string; versionNumber: number }>(
+    `/api/admin/content/${encodeURIComponent(caseId)}/publish`, { method: 'POST' }
+  );
+  return { versionId: result.versionId, versionNumber: result.versionNumber };
+}
+
+export async function unpublishAdminContent(caseId: string): Promise<{ versionId: string }> {
+  const result = await request<{ success: true; versionId: string }>(
+    `/api/admin/content/${encodeURIComponent(caseId)}/unpublish`, { method: 'POST' }
+  );
+  return { versionId: result.versionId };
+}
+
+// ─── Published case detail (versioned content) ───
+
+export interface PublishedCaseDetail {
+  id: string;
+  title: string;
+  type: string;
+  sector: string;
+  difficulty: string;
+  status: string;
+  description: string;
+  deliverables: string[];
+  pts: number;
+  submission_count: number;
+  review_count: number;
+  deadline: string | null;
+  tags: string[];
+  is_chaos: boolean | null;
+  timer_deadline: string | null;
+  created_at: string;
+  version_number: number;
+  exhibits: string | null;
+  rubric_criteria: RubricCriterion[];
+  content_owner: string;
+  author_credit: string | null;
+  source_kind: string;
+  source_reference: string | null;
+  rights_declaration: string;
+  published_at: string | null;
+}
+
+export async function getPublishedCase(id: string): Promise<PublishedCaseDetail | null> {
+  try {
+    return await request<PublishedCaseDetail>(`/api/cases/${encodeURIComponent(id)}`);
+  } catch {
+    return null;
+  }
+}
+
+// ─── Student solving workspace ───
+
+export interface CaseDraft {
+  id: string;
+  content: Record<string, unknown>;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export async function getCaseDraft(caseId: string): Promise<CaseDraft | null> {
+  const result = await request<{ success: true; draft: CaseDraft | null }>(
+    `/api/cases/${encodeURIComponent(caseId)}/draft`
+  );
+  return result.draft;
+}
+
+export async function saveCaseDraft(caseId: string, contentJson: Record<string, unknown>): Promise<CaseDraft> {
+  const result = await request<{ success: true; draft: CaseDraft }>(
+    `/api/cases/${encodeURIComponent(caseId)}/draft`,
+    { method: 'PUT', body: JSON.stringify({ contentJson }) }
+  );
+  return result.draft;
+}
+
+export async function getReferenceSolution(caseId: string): Promise<string | null> {
+  const response = await fetch(
+    `${API_BASE}/api/cases/${encodeURIComponent(caseId)}/reference-solution`,
+    { credentials: 'include' }
+  );
+  if (response.status === 403) return null;
+  const data = await response.json();
+  if (!response.ok || !data.success) {
+    throw new Error(data.error || 'Could not check submission status');
+  }
+  return data.referenceSolution;
+}
+
+// ─── Submission Debrief ───
+
+export interface SubmissionDebrief {
+  submissionId: string;
+  caseId: string;
+  content: Record<string, string>;
+  citationsCount: number;
+  wordCount: number;
+  status: string;
+  createdAt: string;
+  caseAvailable: boolean;
+  versionNumber: number | null;
+  referenceSolution: string | null;
+  referenceRange: { value: number; unit: string; low: number; high: number } | null;
+}
+
+export async function getSubmissionDebrief(caseId: string, submissionId: string): Promise<SubmissionDebrief> {
+  const result = await request<{ success: true; debrief: SubmissionDebrief }>(
+    `/api/cases/${encodeURIComponent(caseId)}/submissions/${encodeURIComponent(submissionId)}/debrief`
+  );
+  return result.debrief;
 }

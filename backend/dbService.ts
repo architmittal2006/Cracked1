@@ -54,7 +54,37 @@ export interface UserRecord {
   reviewScore: number;
   casesSolved: number;
   mergeBonusCount: number;
+  isActive: boolean;
+  sessionVersion: number;
   role: string;
+}
+
+export interface AccountProfileRecord {
+  id: string;
+  username: string;
+  name: string;
+  email: string;
+  bio: string | null;
+  isActive: boolean;
+  createdAt: string;
+}
+
+interface AccountProfileDbRow extends Omit<AccountProfileRecord, 'createdAt'> {
+  createdAt: Date | string;
+}
+
+interface AuditLogRecord {
+  id: string;
+  actorId: string | null;
+  action: string;
+  targetType: string;
+  targetId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
+}
+
+interface AuditLogDbRow extends Omit<AuditLogRecord, 'createdAt'> {
+  createdAt: Date | string;
 }
 
 export type CaseProposalStatus = 'Pending' | 'Changes_Requested' | 'Approved' | 'Declined';
@@ -202,6 +232,155 @@ export class DatabaseService {
   private static slugify(value: string): string {
     return value.toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 80) || 'casebook';
+  }
+
+  private static async insertAuditLog(
+    client: PoolClient,
+    actorId: string | null,
+    action: string,
+    targetType: string,
+    targetId: string | null,
+    details: Record<string, unknown> = {}
+  ): Promise<void> {
+    await client.query(
+      `INSERT INTO admin_audit_logs (id, actor_id, action, target_type, target_id, details)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+      [`audit_${crypto.randomUUID()}`, actorId, action, targetType, targetId, JSON.stringify(details)]
+    );
+  }
+
+  private static accountProfileFromRow(row: AccountProfileDbRow): AccountProfileRecord {
+    return {
+      ...row,
+      createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : row.createdAt,
+    };
+  }
+
+  public static async getAccountProfile(userId: string): Promise<AccountProfileRecord | undefined> {
+    const result = await pool.query<AccountProfileDbRow>(
+      `SELECT id, username, name, email, bio, is_active AS "isActive", created_at AS "createdAt"
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+    return result.rows[0] ? this.accountProfileFromRow(result.rows[0]) : undefined;
+  }
+
+  public static async updateAccountProfile(
+    userId: string,
+    input: { username: string; name: string; bio: string | null }
+  ): Promise<AccountProfileRecord | undefined> {
+    const result = await pool.query<AccountProfileDbRow>(
+      `UPDATE users SET username = $2, name = $3, bio = $4
+       WHERE id = $1
+       RETURNING id, username, name, email, bio, is_active AS "isActive", created_at AS "createdAt"`,
+      [userId, input.username, input.name, input.bio]
+    );
+    return result.rows[0] ? this.accountProfileFromRow(result.rows[0]) : undefined;
+  }
+
+  public static async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<boolean> {
+    const user = await this.getUserById(userId);
+    if (!user || !user.isActive || !user.passwordHash ||
+      !(await comparePassword(currentPassword, user.passwordHash))) {
+      return false;
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      await client.query(
+        'UPDATE users SET password_hash = $2, session_version = session_version + 1 WHERE id = $1',
+        [userId, passwordHash]
+      );
+      await client.query(`DELETE FROM sessions WHERE sess #>> '{user,id}' = $1`, [userId]);
+      await this.insertAuditLog(client, userId, 'account.password_changed', 'user', userId);
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public static async listAdminAccounts(): Promise<AccountProfileRecord[]> {
+    const result = await pool.query<AccountProfileDbRow>(
+      `SELECT id, username, name, email, bio, is_active AS "isActive", created_at AS "createdAt"
+       FROM users ORDER BY created_at DESC LIMIT 200`
+    );
+    return result.rows.map((account) => this.accountProfileFromRow(account));
+  }
+
+  public static async setAccountActive(
+    actorId: string,
+    targetId: string,
+    isActive: boolean
+  ): Promise<AccountProfileRecord | undefined> {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const result = await client.query<AccountProfileDbRow>(
+        `UPDATE users SET is_active = $3, session_version = session_version + 1
+         WHERE id = $1 AND id <> $2
+         RETURNING id, username, name, email, bio, is_active AS "isActive", created_at AS "createdAt"`,
+        [targetId, actorId, isActive]
+      );
+      const account = result.rows[0];
+      if (!account) {
+        await client.query('ROLLBACK');
+        return undefined;
+      }
+      if (!isActive) {
+        await client.query(`DELETE FROM sessions WHERE sess #>> '{user,id}' = $1`, [targetId]);
+      }
+      await this.insertAuditLog(
+        client,
+        actorId,
+        isActive ? 'account.reactivated' : 'account.suspended',
+        'user',
+        targetId
+      );
+      await client.query('COMMIT');
+      return this.accountProfileFromRow(account);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  public static async getAdminAuditLogs(limit: number): Promise<AuditLogRecord[]> {
+    const result = await pool.query<AuditLogDbRow>(
+      `SELECT id, actor_id AS "actorId", action, target_type AS "targetType",
+         target_id AS "targetId", details, created_at AS "createdAt"
+       FROM admin_audit_logs ORDER BY created_at DESC LIMIT $1`,
+      [limit]
+    );
+    return result.rows.map((entry) => ({
+      ...entry,
+      createdAt: entry.createdAt instanceof Date ? entry.createdAt.toISOString() : String(entry.createdAt),
+    }));
+  }
+
+  public static async recordAdminAuditEvent(
+    actorId: string,
+    action: string,
+    targetType: string,
+    targetId: string | null,
+    details: Record<string, unknown> = {}
+  ): Promise<void> {
+    await pool.query(
+      `INSERT INTO admin_audit_logs (id, actor_id, action, target_type, target_id, details)
+       VALUES ($1, $2, $3, $4, $5, $6::jsonb)`,
+      [`audit_${crypto.randomUUID()}`, actorId, action, targetType, targetId, JSON.stringify(details)]
+    );
   }
 
   private static async insertCasebookCases(
@@ -509,7 +688,7 @@ export class DatabaseService {
 
   public static async getCasebookModerationQueue(status: 'Pending' | 'Published'): Promise<CasebookRecord[]> {
     const result = await pool.query<CasebookDbRow>(
-      `SELECT b.${this.casebookSelect.trim().replaceAll(', ', ', b.')},
+      `SELECT b.${this.casebookSelect.trim().replace(/,\s*/g, ', b.')},
           COALESCE(u.name, b.uploader_id) AS "uploaderName"
        FROM casebooks b
        LEFT JOIN users u ON u.id = b.uploader_id
@@ -629,7 +808,7 @@ export class DatabaseService {
       `SELECT id, title, type, sector, difficulty, status, description, deliverables, pts,
               submission_count, review_count, deadline, tags, is_chaos, timer_deadline
        FROM cases
-       WHERE status = 'Open'
+       WHERE status = 'Open' AND current_version_id IS NOT NULL
        ORDER BY created_at DESC, id ASC`
     );
 
@@ -697,7 +876,10 @@ export class DatabaseService {
   }
 
   public static async getCaseType(caseId: string): Promise<string | undefined> {
-    const result = await pool.query<{ type: string }>('SELECT type FROM cases WHERE id = $1', [caseId]);
+    const result = await pool.query<{ type: string }>(
+      `SELECT type FROM cases WHERE id = $1 AND current_version_id IS NOT NULL`,
+      [caseId]
+    );
     return result.rows[0]?.type;
   }
 
@@ -710,6 +892,7 @@ export class DatabaseService {
        FROM cases c
        WHERE c.id = $1 AND EXISTS (
          SELECT 1 FROM submissions s WHERE s.case_id = c.id AND s.user_id = $2
+           AND s.status <> 'Draft'
        )`,
       [caseId, userId]
     );
@@ -856,32 +1039,8 @@ export class DatabaseService {
         return undefined;
       }
 
-      if (status === 'Approved') {
-        const caseId = `case_${crypto.randomUUID()}`;
-        const description = [
-          proposal.context,
-          `## Case prompt\n\n${proposal.prompt}`,
-          proposal.exhibits ? `## Available information\n\n${proposal.exhibits}` : '',
-        ].filter(Boolean).join('\n\n');
-        await client.query(
-          `INSERT INTO cases (
-             id, title, type, sector, difficulty, status, description, deliverables, pts,
-             tags, is_chaos, reference_range
-           )
-           VALUES ($1, $2, $3, $4, $5, 'Open', $6, $7, 0, $8, $9, $10)`,
-          [
-            caseId, proposal.title, proposal.type, proposal.sector, proposal.difficulty,
-            description, proposal.deliverables, [proposal.sector],
-            proposal.difficulty === 'Chaos', proposal.referenceRange ?? null,
-          ]
-        );
-        await client.query(
-          'UPDATE case_proposals SET published_case_id = $2 WHERE id = $1',
-          [proposalId, caseId]
-        );
-        proposal.publishedCaseId = caseId;
-      }
-
+      // Proposal approval no longer publishes content. Cases are only created
+      // and published through the admin content CMS (case_versions flow).
       await client.query('COMMIT');
       return proposal;
     } catch (error) {
@@ -898,7 +1057,9 @@ export class DatabaseService {
     email: string;
     passwordHash: string;
   }): Promise<string> {
-    const existingEmail = await db.select().from(users).where(eq(users.email, payload.email));
+    const email = payload.email.trim().toLowerCase();
+    const existingEmail = await db.select().from(users)
+      .where(sql`LOWER(${users.email}) = ${email}`);
     if (existingEmail.length > 0) {
       throw new Error('Email already registered');
     }
@@ -910,16 +1071,55 @@ export class DatabaseService {
     const id = 'u_' + crypto.randomUUID().slice(2, 11);
     await db.insert(users).values({
       id,
-      username: payload.username,
+      username: payload.username.trim(),
       name: payload.name,
-      email: payload.email,
+      email,
       passwordHash: payload.passwordHash,
     });
     return id;
   }
 
+  public static async upsertOAuthUser(payload: {
+    email: string;
+    name: string;
+    preferredUsername?: string;
+  }): Promise<UserRecord> {
+    const email = payload.email.trim().toLowerCase();
+    const existing = await this.getUserByEmail(email);
+    if (existing) return existing;
+
+    let baseUsername = (payload.preferredUsername || email.split('@')[0] || 'user')
+      .toLowerCase()
+      .replace(/[^a-z0-9_]/g, '')
+      .slice(0, 30);
+    if (baseUsername.length < 3) baseUsername = 'user_' + baseUsername;
+
+    let finalUsername = baseUsername;
+    let counter = 1;
+    while (await this.getUserByUsername(finalUsername)) {
+      finalUsername = baseUsername.slice(0, 25) + '_' + (counter++);
+    }
+
+    const id = 'u_' + crypto.randomUUID().slice(2, 11);
+    await db.insert(users).values({
+      id,
+      username: finalUsername,
+      name: payload.name || finalUsername,
+      email,
+      passwordHash: '',
+      role: 'General',
+    });
+
+    const created = await this.getUserById(id);
+    if (!created) throw new Error('Failed to create OAuth user record');
+    return created;
+  }
+
   public static async getUserByEmail(email: string): Promise<UserRecord | undefined> {
-    const result = await db.select().from(users).where(eq(users.email, email));
+    const normalizedEmail = email.trim().toLowerCase();
+    const result = await db.select().from(users)
+      .where(sql`LOWER(${users.email}) = ${normalizedEmail}`)
+      .limit(1);
     return result[0];
   }
 
@@ -952,6 +1152,14 @@ export class DatabaseService {
   public static async createSubmission(payload: any): Promise<string> {
     const id = 'sub_' + crypto.randomUUID().slice(2, 11);
     await db.transaction(async (tx) => {
+      // Pin the submission to the case's currently published version inside
+      // the same transaction so the debrief always sees the version that was
+      // live at submit time.
+      const [caseRow] = await tx
+        .select({ currentVersionId: cases.currentVersionId })
+        .from(cases)
+        .where(eq(cases.id, payload.caseId))
+        .limit(1);
       await tx.insert(submissions).values({
         id,
         caseId: payload.caseId,
@@ -962,12 +1170,143 @@ export class DatabaseService {
         status: payload.status || 'Submitted',
         structuralCompliant: payload.structuralCompliant || false,
         finalWeightedScore: payload.finalWeightedScore ?? null,
+        caseVersionId: caseRow?.currentVersionId ?? null,
       });
       await tx.update(cases)
         .set({ submissionCount: sql`${cases.submissionCount} + 1` })
         .where(eq(cases.id, payload.caseId));
     });
     return id;
+  }
+
+  public static async upsertCaseDraft(
+    caseId: string,
+    userId: string,
+    contentJson: Record<string, unknown>
+  ): Promise<{ id: string; content: Record<string, unknown>; createdAt: string; updatedAt: string }> {
+    const result = await pool.query<{
+      id: string;
+      content_json: Record<string, unknown>;
+      created_at: Date;
+      updated_at: Date;
+    }>(
+      `INSERT INTO submissions (id, case_id, user_id, content_json, status, structural_compliant, updated_at)
+       VALUES ($1, $2, $3, $4::jsonb, 'Draft', FALSE, NOW())
+       ON CONFLICT (case_id, user_id) WHERE status = 'Draft'
+       DO UPDATE SET content_json = EXCLUDED.content_json, updated_at = NOW()
+       RETURNING id, content_json, created_at, updated_at`,
+      [`sub_${crypto.randomUUID().slice(2, 11)}`, caseId, userId, JSON.stringify(contentJson)]
+    );
+    const row = result.rows[0];
+    return { id: row.id, content: row.content_json, createdAt: row.created_at.toISOString(), updatedAt: row.updated_at.toISOString() };
+  }
+
+  public static async getCaseDraft(
+    caseId: string,
+    userId: string
+  ): Promise<{ id: string; content: Record<string, unknown>; createdAt: string; updatedAt: string } | null> {
+    const result = await pool.query<{
+      id: string;
+      content_json: Record<string, unknown>;
+      created_at: Date;
+      updated_at: Date | null;
+    }>(
+      `SELECT id, content_json, created_at, updated_at FROM submissions
+       WHERE case_id = $1 AND user_id = $2 AND status = 'Draft'`,
+      [caseId, userId]
+    );
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      id: row.id,
+      content: row.content_json,
+      createdAt: row.created_at.toISOString(),
+      updatedAt: (row.updated_at ?? row.created_at).toISOString(),
+    };
+  }
+
+  public static async getDashboardActivity(userId: string): Promise<{
+    drafts: { id: string; caseId: string; title: string; type: string; updatedAt: string; caseAvailable: boolean }[];
+    submissions: { id: string; caseId: string; title: string; type: string; status: string; createdAt: string; caseAvailable: boolean }[];
+  }> {
+    const [draftRows, submissionRows] = await Promise.all([
+      pool.query<{
+        id: string; case_id: string; title: string; type: string; updated_at: Date | null;
+        created_at: Date; case_available: boolean;
+      }>(
+        `SELECT s.id, s.case_id,
+           CASE WHEN c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL THEN COALESCE(v.title, c.title)
+                ELSE 'Case no longer available' END AS title,
+           CASE WHEN c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL THEN COALESCE(v.type, c.type)
+                ELSE '' END AS type,
+           s.updated_at, s.created_at,
+           (c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL) AS case_available
+         FROM submissions s
+         LEFT JOIN cases c ON c.id = s.case_id
+         LEFT JOIN case_versions v ON v.id = c.current_version_id
+         WHERE s.user_id = $1 AND s.status = 'Draft'
+           AND NOT EXISTS (
+             SELECT 1 FROM submissions completed
+             WHERE completed.case_id = s.case_id AND completed.user_id = s.user_id
+               AND completed.status <> 'Draft'
+               AND completed.created_at >= COALESCE(s.updated_at, s.created_at)
+           )
+         ORDER BY COALESCE(s.updated_at, s.created_at) DESC, s.id ASC
+         LIMIT 5`,
+        [userId]
+      ),
+      pool.query<{
+        id: string; case_id: string; title: string; type: string; status: string;
+        created_at: Date; case_available: boolean;
+      }>(
+        `SELECT s.id, s.case_id,
+           CASE WHEN c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL THEN COALESCE(v.title, c.title)
+                ELSE 'Case no longer available' END AS title,
+           CASE WHEN c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL THEN COALESCE(v.type, c.type)
+                ELSE '' END AS type,
+           s.status, s.created_at,
+           (c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL) AS case_available
+         FROM submissions s
+         LEFT JOIN cases c ON c.id = s.case_id
+         LEFT JOIN case_versions v ON v.id = c.current_version_id
+         WHERE s.user_id = $1 AND s.status <> 'Draft'
+         ORDER BY s.created_at DESC, s.id ASC
+         LIMIT 5`,
+        [userId]
+      ),
+    ]);
+
+    return {
+      drafts: draftRows.rows.map((row) => ({
+        id: row.id,
+        caseId: row.case_id,
+        title: row.title,
+        type: row.type,
+        updatedAt: (row.updated_at ?? row.created_at).toISOString(),
+        caseAvailable: row.case_available,
+      })),
+      submissions: submissionRows.rows.map((row) => ({
+        id: row.id,
+        caseId: row.case_id,
+        title: row.title,
+        type: row.type,
+        status: row.status,
+        createdAt: row.created_at.toISOString(),
+        caseAvailable: row.case_available,
+      })),
+    };
+  }
+
+  public static async hasSubmittedAttempt(caseId: string, userId: string): Promise<boolean> {
+    const result = await pool.query<{ exists: boolean }>(
+      `SELECT EXISTS (
+         SELECT 1 FROM submissions
+         WHERE case_id = $1 AND user_id = $2 AND status <> 'Draft'
+           AND structural_compliant = TRUE
+       ) AS exists`,
+      [caseId, userId]
+    );
+    return result.rows[0]?.exists === true;
   }
 
   public static async getCaseSolutionsForUser(
@@ -979,6 +1318,7 @@ export class DatabaseService {
          EXISTS (
            SELECT 1 FROM submissions
            WHERE case_id = $1 AND user_id = $2
+             AND status <> 'Draft' AND structural_compliant = TRUE
          ) OR EXISTS (
            SELECT 1 FROM case_proposals
            WHERE published_case_id = $1 AND contributor_id = $2
@@ -1003,6 +1343,65 @@ export class DatabaseService {
       content: row.content_json,
       createdAt: row.created_at.toISOString(),
     }));
+  }
+
+  public static async getSubmissionDebrief(
+    caseId: string,
+    submissionId: string,
+    userId: string
+  ): Promise<{
+    submissionId: string;
+    caseId: string;
+    content: Record<string, string>;
+    citationsCount: number;
+    wordCount: number;
+    status: string;
+    createdAt: string;
+    caseAvailable: boolean;
+    versionNumber: number | null;
+    referenceSolution: string | null;
+    referenceRange: GuesstimateReferenceRange | null;
+  } | undefined> {
+    const result = await pool.query<{
+      id: string;
+      case_id: string;
+      content_json: Record<string, string>;
+      citations_count: number;
+      word_count: number;
+      status: string;
+      created_at: Date;
+      case_available: boolean;
+      version_number: number | null;
+      reference_solution: string | null;
+      reference_range: GuesstimateReferenceRange | null;
+    }>(
+      `SELECT s.id, s.case_id, s.content_json, s.citations_count, s.word_count,
+         s.status, s.created_at,
+         (c.id IS NOT NULL AND c.status = 'Open' AND c.current_version_id IS NOT NULL) AS case_available,
+         v.version_number, v.reference_solution, v.reference_range
+       FROM submissions s
+       LEFT JOIN cases c ON c.id = s.case_id
+       LEFT JOIN case_versions v
+         ON v.id = COALESCE(s.case_version_id, c.current_version_id)
+       WHERE s.id = $1 AND s.case_id = $2 AND s.user_id = $3
+         AND s.status <> 'Draft' AND s.structural_compliant = TRUE`,
+      [submissionId, caseId, userId]
+    );
+    const row = result.rows[0];
+    if (!row) return undefined;
+    return {
+      submissionId: row.id,
+      caseId: row.case_id,
+      content: row.content_json,
+      citationsCount: row.citations_count,
+      wordCount: row.word_count,
+      status: row.status,
+      createdAt: row.created_at.toISOString(),
+      caseAvailable: row.case_available,
+      versionNumber: row.version_number,
+      referenceSolution: row.reference_solution,
+      referenceRange: row.reference_range,
+    };
   }
 
   public static async getActiveReviewsForSubmission(submissionId: string): Promise<ReviewRecord[]> {

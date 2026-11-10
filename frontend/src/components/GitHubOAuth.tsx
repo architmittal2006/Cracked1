@@ -10,7 +10,7 @@ export const GitHubLoginButton: React.FC<GitHubLoginButtonProps> = () => {
   const handleGitHubLogin = async () => {
     try {
       // Get GitHub auth URL from backend
-      const response = await fetch('http://localhost:8080/api/auth/github');
+      const response = await fetch('/api/auth/github');
       const data = await response.json();
       
       if (data.authUrl) {
@@ -47,22 +47,23 @@ export const GitHubOAuthCallback: React.FC = () => {
     const handleCallback = async () => {
       const urlParams = new URLSearchParams(window.location.search);
       const code = urlParams.get('code');
+      const state = urlParams.get('state');
 
-      if (!code) {
-        setError('No authorization code found');
+      if (!code || !state) {
+        setError('Missing authorization parameters');
         setLoading(false);
         return;
       }
 
       try {
-        // Send code to backend for secure token exchange
-        const response = await fetch('http://localhost:8080/api/auth/github/callback', {
+        // Send code and state to backend for secure token exchange
+        const response = await fetch('/api/auth/github/callback', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           credentials: 'include', // Include cookies for session
-          body: JSON.stringify({ code }),
+          body: JSON.stringify({ code, state }),
         });
 
         const data = await response.json();

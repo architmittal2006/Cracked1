@@ -24,6 +24,9 @@ class VerificationEngine {
     const contentJson: Record<string, string> = Object.fromEntries([]);
     let wordCount = 0;
     for (const [field, value] of Object.entries(submission.contentJson)) {
+      // Private/internal fields (e.g. _notes) are draft-only and must never
+      // contribute to validation, word count, or persisted submission content.
+      if (field.startsWith('_')) continue;
       if (!field.trim() || typeof value !== 'string' || !value.trim()) {
         return { compliant: false, error: 'Every solution section must contain text.' };
       }

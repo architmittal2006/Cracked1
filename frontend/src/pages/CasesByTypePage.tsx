@@ -93,7 +93,7 @@ export const CasesByTypePage: React.FC = () => {
         <div>{filteredCases.map((caseData) => <CaseCard key={caseData.id} caseData={caseData} />)}</div>
       ) : (
         <p className="border-y border-[var(--border-subtle)] py-8 text-sm text-[var(--text-secondary)]">
-          No {problemType.toLowerCase()} cases match your filters yet. <a href="/contribute/cases" className="underline underline-offset-4">Propose a case</a>.
+          No {problemType.toLowerCase()} cases match your filters yet.
         </p>
       )}
     </PageWrapper>

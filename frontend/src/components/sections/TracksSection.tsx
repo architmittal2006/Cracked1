@@ -1,32 +1,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Zap, GitPullRequest, Trophy, ArrowRight } from 'lucide-react';
+import { Zap, ArrowRight } from 'lucide-react';
 
 const tracks = [
-  {
-    title: 'Open Arena',
-    slug: '/arena',
-    desc: 'Jump straight into open case prompts. No review gate needed to submit. Solutions are voted and discussed by the community.',
-    icon: Trophy,
-    color: '#10B981',
-    bgBadge: 'rgba(16, 185, 129, 0.15)',
-    borderBadge: 'rgba(16, 185, 129, 0.3)',
-    weight: '0.5× weight',
-    gate: 'Instant access',
-    cta: 'Explore Arena',
-  },
-  {
-    title: 'Community Questions',
-    slug: '/questions',
-    desc: 'Crowdsourced consulting queries and brainteasers. The original poster reviews solutions and accepts the best answer.',
-    icon: GitPullRequest,
-    color: '#8B5CF6',
-    bgBadge: 'rgba(139, 92, 246, 0.15)',
-    borderBadge: 'rgba(139, 92, 246, 0.3)',
-    weight: '0.8× weight',
-    gate: 'Poster accepted',
-    cta: 'Browse Questions',
-  },
   {
     title: 'Curated Cases',
     slug: '/cases',

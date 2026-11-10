@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: cracked-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm ci && npm run build
+    # Free plan has no preDeployCommand: migrations run at instance start via
+    # startCommand below. runMigrations.ts uses a Postgres advisory lock and is
+    # idempotent, and the server refuses to boot if migrations are pending, so
+    # this is safe on every deploy/rollback.
+    startCommand: npm run migrate && npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: SESSION_SECRET
+        sync: false
+      - key: CLIENT_ORIGIN
+        sync: false
+      - key: BASE_URL
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: ADMIN_USER_IDS
+        sync: false
+      - key: CASE_MODERATOR_EMAILS
+        sync: false
+      - key: CASE_MODERATOR_USER_IDS
+        sync: false

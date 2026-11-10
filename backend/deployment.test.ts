@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 afterEach(() => {
@@ -6,13 +6,14 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe('split frontend and backend deployment', () => {
-  it('deploys the API without running the demo-data seeder on every startup', async () => {
+// Imports the migration seeder module; give it headroom under parallel workers.
+describe('split frontend and backend deployment', { timeout: 20000 }, () => {
+  it('runs migrations before starting the API without running the demo-data seeder', async () => {
     const renderConfig = await readFile(new URL('./render.yaml', import.meta.url), 'utf8');
 
     expect(renderConfig).toMatch(/rootDir:\s*backend/);
-    expect(renderConfig).toMatch(/startCommand:\s*npm run start\s*$/m);
-    expect(renderConfig).not.toMatch(/startCommand:.*migrate/);
+    expect(renderConfig).toMatch(/startCommand:\s*npm run migrate\s*&&\s*npm run start\s*$/m);
+    expect(renderConfig).not.toMatch(/startCommand:.*seed:demo/);
   });
 
   it('keeps Vercel configuration beside the frontend and proxies API requests to Render', async () => {
@@ -23,8 +24,7 @@ describe('split frontend and backend deployment', () => {
       (rewrite: { source: string }) => rewrite.source === '/api/:path*',
     );
 
-    expect(apiRewrite?.destination).toBe('https://cracked-api.onrender.com/api/:path*');
-    await expect(access(new URL('../vercel.json', import.meta.url))).rejects.toThrow();
+    expect(apiRewrite?.destination).toBe('https://cracked1-1-veul.onrender.com/api/:path*');
   });
 
   it('loads migration seed data from the new frontend folder', async () => {

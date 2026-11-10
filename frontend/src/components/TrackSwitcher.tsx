@@ -1,26 +1,8 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Trophy, HelpCircle, Shield } from 'lucide-react';
+import { Shield } from 'lucide-react';
 
 const TRACKS = [
-  {
-    id: 'arena',
-    label: 'Arena',
-    icon: Trophy,
-    color: '#10B981',
-    bgColor: 'rgba(16, 185, 129, 0.15)',
-    borderColor: 'rgba(16, 185, 129, 0.3)',
-    path: '/arena',
-  },
-  {
-    id: 'questions',
-    label: 'Questions',
-    icon: HelpCircle,
-    color: '#8B5CF6',
-    bgColor: 'rgba(139, 92, 246, 0.15)',
-    borderColor: 'rgba(139, 92, 246, 0.3)',
-    path: '/questions',
-  },
   {
     id: 'cases',
     label: 'Curated',
