@@ -6,7 +6,8 @@ afterEach(() => {
   vi.resetModules();
 });
 
-describe('split frontend and backend deployment', () => {
+// Imports the migration seeder module; give it headroom under parallel workers.
+describe('split frontend and backend deployment', { timeout: 20000 }, () => {
   it('runs migrations before starting the API without running the demo-data seeder', async () => {
     const renderConfig = await readFile(new URL('./render.yaml', import.meta.url), 'utf8');
 

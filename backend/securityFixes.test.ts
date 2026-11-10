@@ -34,7 +34,9 @@ vi.mock('./db/index.js', () => ({
   },
 }));
 
-describe('Security Regression Suite: OAuth & Session Fixation', () => {
+// These tests dynamically import the full server module graph; under parallel
+// worker load the first import can exceed the default 5s test timeout.
+describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000 }, () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });
