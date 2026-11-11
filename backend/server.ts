@@ -975,22 +975,19 @@ app.get('/api/cases/:caseId', async (req: Request, res: Response): Promise<void>
   }
 });
 
-app.get('/api/cases/:caseId/gate-status', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const caseId = req.params.caseId;
-  if (typeof caseId !== 'string') {
-    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
-    return;
-  }
-  try {
-    const reviewsCompleted = await DatabaseService.getCompletedReviewCountForCase(
-      req.session.user!.id,
-      caseId
-    );
-    res.json({ reviews_completed: reviewsCompleted, can_submit: true });
-  } catch (error) {
-    logError('Case gate status error', error);
-    res.status(500).json({ success: false, error: 'Could not load your review gate status' });
-  }
+// Peer review is intentionally deferred (Phase 8). These endpoints stay
+// authenticated but report an explicit disabled state instead of implying
+// the unfinished pipeline is operational.
+const peerReviewDisabled = (res: Response): void => {
+  res.status(501).json({
+    success: false,
+    code: 'peer_review_disabled',
+    error: 'Peer review is not available yet.',
+  });
+};
+
+app.get('/api/cases/:caseId/gate-status', requireAuth, async (_req: Request, res: Response): Promise<void> => {
+  peerReviewDisabled(res);
 });
 
 // Legacy case proposals are disabled: historical records remain readable, but
@@ -1432,28 +1429,13 @@ app.get('/api/cases/:caseId/submissions/:submissionId/debrief', requireAuth, asy
   }
 });
 
-app.get('/api/cases/:caseId/review-queue', requireAuth, async (req: Request, res: Response): Promise<void> => {
-  const caseId = req.params.caseId;
-  if (typeof caseId !== 'string') {
-    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
-    return;
-  }
-
-  try {
-    const submission = await DatabaseService.getNextReviewSubmission(caseId, req.session.user!.id);
-    if (!submission) {
-      res.status(404).json({ success: false, error: 'No unreviewed submission is available for this case' });
-      return;
-    }
-    res.json(submission);
-  } catch (error) {
-    logError('Case review queue error', error);
-    res.status(500).json({ success: false, error: 'Could not load a submission to review' });
-  }
+app.get('/api/cases/:caseId/review-queue', requireAuth, async (_req: Request, res: Response): Promise<void> => {
+  peerReviewDisabled(res);
 });
 
 /**
  * CORE LOGIC GATEWAY: RUBRIC EVALUATION & LAYER 2/3 ROUTING
+ * Disabled until peer review is activated (Phase 8).
  */
 app.post('/api/submissions/:submissionId/reviews', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const submissionId = req.params.submissionId;
@@ -1461,58 +1443,7 @@ app.post('/api/submissions/:submissionId/reviews', requireAuth, async (req: Requ
     res.status(400).json({ success: false, error: 'Invalid submissionId parameter' });
     return;
   }
-  const currentUser = req.session.user!;
-
-  try {
-    const caseId = typeof req.body?.caseId === 'string' ? req.body.caseId : '';
-    const caseType = await DatabaseService.getCaseType(caseId);
-    const parse = (caseType === 'Guesstimate' ? guesstimateReviewSchema : caseReviewSchema).safeParse(req.body);
-    if (!parse.success) {
-      res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid review' });
-      return;
-    }
-    if (!caseType) {
-      res.status(404).json({ success: false, error: 'Case not found' });
-      return;
-    }
-
-    const scores = caseType === 'Guesstimate'
-      ? {
-          structure: 'structure' in parse.data ? parse.data.structure : 0,
-          assumption_quality: 'assumption_quality' in parse.data ? parse.data.assumption_quality : 0,
-          math_accuracy: 'math_accuracy' in parse.data ? parse.data.math_accuracy : 0,
-          sanity_check: 'sanity_check' in parse.data ? parse.data.sanity_check : 0,
-          clarity: 'clarity' in parse.data ? parse.data.clarity : 0,
-        }
-      : {
-          problem_framing: 'problem_framing' in parse.data ? parse.data.problem_framing : 0,
-          framework_fit: 'framework_fit' in parse.data ? parse.data.framework_fit : 0,
-          data_integrity: 'data_integrity' in parse.data ? parse.data.data_integrity : 0,
-          insight_depth: 'insight_depth' in parse.data ? parse.data.insight_depth : 0,
-          feasibility: 'feasibility' in parse.data ? parse.data.feasibility : 0,
-        };
-    // Insert review score payload
-    await DatabaseService.insertReview({
-      submissionId,
-      reviewerId: currentUser.id,
-      reviewerTier: currentUser.role,
-      caseId: parse.data.caseId,
-      feedback: parse.data.feedback,
-      scores,
-    });
-
-    // Execute Layer 2 Consensus Algorithm and check for Layer 3 escalation
-    const actionTaken = await VerificationEngine.processPeerReviewConsensus(submissionId);
-
-    res.status(200).json({ success: true, engineAction: actionTaken });
-  } catch (error: any) {
-    if (error instanceof InvalidCaseReviewError) {
-      res.status(400).json({ success: false, error: error.message });
-      return;
-    }
-    logError('Case review submission error', error);
-    res.status(500).json({ success: false, error: 'Could not submit review' });
-  }
+  peerReviewDisabled(res);
 });
 
 // Local root builds can serve the frontend; Render runs the API without that folder.

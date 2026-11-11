@@ -430,74 +430,9 @@ export async function createSubmission(
   });
 }
 
-export async function updateSubmission(
-  _submissionId: string,
-  _content: Record<string, string>
-): Promise<{ success: true }> {
-  // Backend doesn't have this endpoint yet, mock for now
-  return { success: true };
-}
-
-// ─── Reviews ───
-
-export type ReviewRequest =
-  | { problem_framing: number; framework_fit: number; data_integrity: number; insight_depth: number; feasibility: number }
-  | { structure: number; assumption_quality: number; math_accuracy: number; sanity_check: number; clarity: number };
-
-export interface ReviewResponse {
-  success: true;
-  engineAction: string;
-}
-
-export async function createReview(
-  submissionId: string,
-  scores: ReviewRequest,
-  caseId: string,
-  feedback: string
-): Promise<ReviewResponse> {
-  return request<ReviewResponse>(`/api/submissions/${submissionId}/reviews`, {
-    method: 'POST',
-    body: JSON.stringify({ ...scores, caseId, feedback }),
-  });
-}
-
-export async function flagReview(_reviewId: string): Promise<{ success: true }> {
-  // Backend doesn't have this endpoint yet, mock for now
-  return { success: true };
-}
-
-// ─── Gate Check ───
-
-export interface GateStatus {
-  reviews_completed: number;
-  can_submit: boolean;
-}
-
-export async function getGateStatus(caseId: string): Promise<GateStatus> {
-  return request<GateStatus>(`/api/cases/${encodeURIComponent(caseId)}/gate-status`);
-}
-
-// ─── Review Queue ───
-
-export interface ReviewQueueResponse {
-  submissionId: string;
-  caseId: string;
-  content: Record<string, string>;
-  referenceRangeHint?: boolean;
-}
-
-export async function getNextReviewSubmission(caseId: string): Promise<ReviewQueueResponse | null> {
-  try {
-    return await request<ReviewQueueResponse>(
-      `/api/cases/${encodeURIComponent(caseId)}/review-queue`
-    );
-  } catch (error) {
-    if (error instanceof Error && error.message === 'No unreviewed submission is available for this case') {
-      return null;
-    }
-    throw error;
-  }
-}
+// Peer review client methods removed: the feature is deferred and the
+// backend endpoints now return an explicit disabled response. Do not
+// reintroduce fake-success stubs — see docs/PEER_REVIEW.md.
 
 // ─── User & Profile ───
 

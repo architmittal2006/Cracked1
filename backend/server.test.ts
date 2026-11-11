@@ -1013,6 +1013,39 @@ describe('Submission integrity', () => {
   });
 });
 
+describe('Deferred peer review endpoints', () => {
+  it('returns an explicit disabled response and never mutates review records', async () => {
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'pr_disabled');
+
+    for (const path of [
+      '/api/cases/any_case/gate-status',
+      '/api/cases/any_case/review-queue',
+    ]) {
+      const res = await agent.get(path);
+      expect(res.status).toBe(501);
+      expect(res.body).toMatchObject({ success: false, code: 'peer_review_disabled' });
+    }
+
+    const before = await pool.query(`SELECT COUNT(*)::int AS c FROM reviews`);
+    const post = await agent.post('/api/submissions/sub_any/reviews').send({
+      caseId: 'any_case',
+      problem_framing: 3, framework_fit: 3, data_integrity: 3, insight_depth: 3, feasibility: 3,
+      feedback: 'This review must never be persisted while peer review is deferred.',
+    });
+    expect(post.status).toBe(501);
+    expect(post.body).toMatchObject({ success: false, code: 'peer_review_disabled' });
+    const after = await pool.query(`SELECT COUNT(*)::int AS c FROM reviews`);
+    expect(after.rows[0].c).toBe(before.rows[0].c);
+  });
+
+  it('still requires authentication on the disabled endpoints', async () => {
+    expect((await request(app).get('/api/cases/any_case/gate-status')).status).toBe(401);
+    expect((await request(app).get('/api/cases/any_case/review-queue')).status).toBe(401);
+    expect((await request(app).post('/api/submissions/sub_any/reviews').send({})).status).toBe(401);
+  });
+});
+
 describe('Submission debrief', () => {
   const content = {
     title: 'Debrief profitability case',
