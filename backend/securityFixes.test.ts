@@ -58,7 +58,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
       isActive: true,
       sessionVersion: 0,
       role: 'General',
-      termsVersion: '2026-11-11',
+      termsVersion: '2026-11-13',
     });
     vi.mocked(DatabaseService.createUser).mockResolvedValue('password-user');
     vi.mocked(DatabaseService.getUserById).mockResolvedValue({
@@ -75,7 +75,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
       isActive: true,
       sessionVersion: 0,
       role: 'General',
-      termsVersion: '2026-11-11',
+      termsVersion: '2026-11-13',
     });
     vi.mocked(DatabaseService.getUserByEmail).mockResolvedValue({
       id: 'password-user',
@@ -91,7 +91,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
       isActive: true,
       sessionVersion: 0,
       role: 'General',
-      termsVersion: '2026-11-11',
+      termsVersion: '2026-11-13',
     });
     vi.mocked(DatabaseService.getAccountProfile).mockResolvedValue({
       id: 'password-user',

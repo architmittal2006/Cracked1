@@ -258,7 +258,7 @@ app.use(session({
 }));
 
 // Authentication middleware
-const TERMS_VERSION = '2026-11-11';
+const TERMS_VERSION = '2026-11-13';
 
 // Exact method+path exemptions for the consent gate. Anything not listed
 // requires the user to have accepted the current TERMS_VERSION.

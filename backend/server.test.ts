@@ -1036,7 +1036,7 @@ describe('Terms consent enforcement', () => {
     const row = await pool.query(
       `SELECT terms_version, terms_accepted_at FROM users WHERE email LIKE 'terms_ok_%@test.cracked.local' LIMIT 1`
     );
-    expect(row.rows[0].terms_version).toBe('2026-11-11');
+    expect(row.rows[0].terms_version).toBe('2026-11-13');
     expect(row.rows[0].terms_accepted_at).not.toBeNull();
   });
 
@@ -1061,7 +1061,7 @@ describe('Terms consent enforcement', () => {
     // accept-terms endpoint is reachable while gated
     const bad = await agent.post('/api/legal/accept-terms').send({ termsVersion: 'wrong' });
     expect(bad.status).toBe(400);
-    const ok = await agent.post('/api/legal/accept-terms').send({ termsVersion: '2026-11-11' });
+    const ok = await agent.post('/api/legal/accept-terms').send({ termsVersion: '2026-11-13' });
     expect(ok.status).toBe(200);
     expect(ok.body.user.termsAccepted).toBe(true);
     expect((await agent.get('/api/dashboard/activity')).status).toBe(200);
@@ -1070,7 +1070,7 @@ describe('Terms consent enforcement', () => {
   });
 
   it('rejects accept-terms when unauthenticated', async () => {
-    expect((await request(app).post('/api/legal/accept-terms').send({ termsVersion: '2026-11-11' })).status).toBe(401);
+    expect((await request(app).post('/api/legal/accept-terms').send({ termsVersion: '2026-11-13' })).status).toBe(401);
   });
 });
 
