@@ -40,7 +40,7 @@ export const TermsOfServicePage: React.FC = () => {
           </section>
           <section>
             <h2 className="text-lg font-semibold text-white mb-2">6. Changes and contact</h2>
-            <p>We may update these Terms; continued use after changes constitutes acceptance of the updated version. Questions: <a href="mailto:hello@cracked.com" className="text-orange-300 hover:underline">hello@cracked.com</a>. See also our <Link to="/privacy" className="text-orange-300 hover:underline">Privacy Policy</Link>.</p>
+            <p>We may update these Terms; continued use after changes constitutes acceptance of the updated version. Questions: <a href="mailto:cracked.platform@gmail.com" className="text-orange-300 hover:underline">cracked.platform@gmail.com</a>. See also our <Link to="/privacy" className="text-orange-300 hover:underline">Privacy Policy</Link>.</p>
           </section>
         </div>
       </div>

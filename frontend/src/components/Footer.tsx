@@ -17,7 +17,7 @@ export const Footer: React.FC = () => {
             <div className="space-y-2">
               <p className="text-slate-400 text-sm">
                 <span className="text-[var(--text-secondary)]">Contact:</span>{' '}
-                <a href="mailto:hello@cracked.com" className="text-slate-300 hover:text-[#C75B39] transition-colors">hello@cracked.com</a>
+                <a href="mailto:cracked.platform@gmail.com" className="text-slate-300 hover:text-[#C75B39] transition-colors">cracked.platform@gmail.com</a>
               </p>
               <p className="text-slate-400 text-sm">
                 <span className="text-[var(--text-secondary)]">Twitter:</span>{' '}

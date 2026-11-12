@@ -97,7 +97,7 @@ export const PrivacyPolicyPage: React.FC = () => {
         <div className="glass-card p-8">
           <h2 className="text-2xl font-bold text-white mb-4">Contact Us</h2>
           <p className="text-slate-300 leading-relaxed">
-            If you have questions about this privacy policy or our data practices, please contact us at: <a href="mailto:privacy@cracked.com" className="text-[#FF4C25] hover:underline">privacy@cracked.com</a>
+            If you have questions about this privacy policy or our data practices, please contact us at: <a href="mailto:cracked.platform@gmail.com" className="text-[#FF4C25] hover:underline">cracked.platform@gmail.com</a>
           </p>
         </div>
       </section>
