@@ -164,6 +164,7 @@ const registerTestUser = async (agent: ReturnType<typeof request.agent>, label: 
     name: `Casebook ${label}`,
     email,
     password: 'SecurePass123!',
+    acceptTerms: true,
   });
   expect(response.status).toBe(201);
   return { id: response.body.user.id as string, email };
@@ -1013,6 +1014,66 @@ describe('Submission integrity', () => {
   });
 });
 
+describe('Terms consent enforcement', () => {
+  it('rejects registration without explicit terms acceptance', async () => {
+    const agent = request.agent(app);
+    const payload = {
+      username: `noterms_${randomUUID()}`,
+      name: 'No Terms',
+      email: `noterms_${randomUUID()}@test.cracked.local`,
+      password: 'SecurePass123!',
+    };
+    expect((await agent.post('/api/auth/register').send(payload)).status).toBe(400);
+    expect((await agent.post('/api/auth/register').send({ ...payload, acceptTerms: false })).status).toBe(400);
+  });
+
+  it('records consent at registration and grants access', async () => {
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'terms_ok');
+    const me = await agent.get('/api/auth/me');
+    expect(me.status).toBe(200);
+    expect(me.body.user.termsAccepted).toBe(true);
+    const row = await pool.query(
+      `SELECT terms_version, terms_accepted_at FROM users WHERE email LIKE 'terms_ok_%@test.cracked.local' LIMIT 1`
+    );
+    expect(row.rows[0].terms_version).toBe('2026-11-11');
+    expect(row.rows[0].terms_accepted_at).not.toBeNull();
+  });
+
+  it('blocks API access until a gated user accepts terms, without destroying the session', async () => {
+    const agent = request.agent(app);
+    const suffix = randomUUID();
+    // Emulate a pre-consent user (existing account or OAuth signup): register
+    // normally, then clear consent columns. The session stays valid.
+    const reg = await agent.post('/api/auth/register').send({
+      username: `pre_${suffix.slice(0, 8)}`, name: 'Pre Consent', email: `pre_${suffix}@test.cracked.local`,
+      password: 'SecurePass123!', acceptTerms: true,
+    });
+    expect(reg.status).toBe(201);
+    await pool.query(`UPDATE users SET terms_version = NULL, terms_accepted_at = NULL WHERE email = $1`, [`pre_${suffix}@test.cracked.local`]);
+    // Session cookie still references old sessionVersion (unchanged) — user row reloaded per request.
+    expect((await agent.get('/api/dashboard/activity')).status).toBe(403);
+    const gated = await agent.get('/api/dashboard/activity');
+    expect(gated.body.code).toBe('terms_consent_required');
+    const me = await agent.get('/api/auth/me');
+    expect(me.status).toBe(200);
+    expect(me.body.user.termsAccepted).toBe(false);
+    // accept-terms endpoint is reachable while gated
+    const bad = await agent.post('/api/legal/accept-terms').send({ termsVersion: 'wrong' });
+    expect(bad.status).toBe(400);
+    const ok = await agent.post('/api/legal/accept-terms').send({ termsVersion: '2026-11-11' });
+    expect(ok.status).toBe(200);
+    expect(ok.body.user.termsAccepted).toBe(true);
+    expect((await agent.get('/api/dashboard/activity')).status).toBe(200);
+    // session still valid — logout works
+    expect((await agent.post('/api/auth/logout')).status).toBe(200);
+  });
+
+  it('rejects accept-terms when unauthenticated', async () => {
+    expect((await request(app).post('/api/legal/accept-terms').send({ termsVersion: '2026-11-11' })).status).toBe(401);
+  });
+});
+
 describe('Deferred peer review endpoints', () => {
   it('returns an explicit disabled response and never mutates review records', async () => {
     const agent = request.agent(app);
@@ -1423,6 +1484,7 @@ describe('Auth endpoints', () => {
         name: 'Test User',
         email: `testuser_${Date.now()}@test.cracked.local`,
         password: 'SecurePass123!',
+    acceptTerms: true,
       });
 
     expect(res.status).toBe(201);
@@ -1439,6 +1501,7 @@ describe('Auth endpoints', () => {
       name: 'Dup User',
       email,
       password: 'SecurePass123!',
+    acceptTerms: true,
     });
 
     const res = await agent.post('/api/auth/register').send({
@@ -1446,6 +1509,7 @@ describe('Auth endpoints', () => {
       name: 'Dup User 2',
       email,
       password: 'SecurePass123!',
+    acceptTerms: true,
     });
 
     expect(res.status).toBe(400);
@@ -1460,6 +1524,7 @@ describe('Auth endpoints', () => {
         name: 'Short',
         email: `short_${Date.now()}@test.cracked.local`,
         password: 'short',
+    acceptTerms: true,
       });
 
     expect(res.status).toBe(400);
@@ -1472,6 +1537,7 @@ describe('Auth endpoints', () => {
 
     await agent.post('/api/auth/register').send({
       username, name: 'Login User', email, password: 'SecurePass123!',
+    acceptTerms: true,
     });
 
     const res = await agent.post('/api/auth/login').send({ email, password: 'SecurePass123!' });
@@ -1487,6 +1553,7 @@ describe('Auth endpoints', () => {
 
     await agent.post('/api/auth/register').send({
       username, name: 'Wrong PW', email, password: 'SecurePass123!',
+    acceptTerms: true,
     });
 
     const res = await agent.post('/api/auth/login').send({ email, password: 'WrongPassword123!' });
@@ -1501,6 +1568,7 @@ describe('Auth endpoints', () => {
 
     await agent.post('/api/auth/register').send({
       username, name: 'Me User', email, password: 'SecurePass123!',
+    acceptTerms: true,
     });
     await agent.post('/api/auth/login').send({ email, password: 'SecurePass123!' });
 
@@ -1522,6 +1590,7 @@ describe('Auth endpoints', () => {
 
     await agent.post('/api/auth/register').send({
       username, name: 'Logout User', email, password: 'SecurePass123!',
+    acceptTerms: true,
     });
     await agent.post('/api/auth/login').send({ email, password: 'SecurePass123!' });
 
@@ -1543,6 +1612,7 @@ describe('Auth endpoints', () => {
       name: 'Role escalation test',
       email: `role_${suffix}@test.cracked.local`,
       password: 'SecurePass123!',
+    acceptTerms: true,
       role: 'Admin',
       accessRole: 'Admin',
     });

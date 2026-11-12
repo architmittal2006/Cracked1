@@ -64,8 +64,8 @@ export const PrivacyPolicyPage: React.FC = () => {
           </p>
           <ul className="text-slate-300 leading-relaxed list-disc list-inside space-y-2">
             <li>Access and update your personal information</li>
-            <li>Delete your account and associated data</li>
-            <li>Request a copy of your personal data</li>
+            <li>Request deletion of your account and associated data by contacting us</li>
+            <li>Request a copy of your personal data by contacting us</li>
             <li>Opt out of certain data processing activities</li>
           </ul>
           <p className="text-slate-300 leading-relaxed mt-4">

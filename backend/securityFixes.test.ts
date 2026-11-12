@@ -58,6 +58,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
       isActive: true,
       sessionVersion: 0,
       role: 'General',
+      termsVersion: '2026-11-11',
     });
     vi.mocked(DatabaseService.createUser).mockResolvedValue('password-user');
     vi.mocked(DatabaseService.getUserById).mockResolvedValue({
@@ -74,6 +75,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
       isActive: true,
       sessionVersion: 0,
       role: 'General',
+      termsVersion: '2026-11-11',
     });
     vi.mocked(DatabaseService.getUserByEmail).mockResolvedValue({
       id: 'password-user',
@@ -89,6 +91,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
       isActive: true,
       sessionVersion: 0,
       role: 'General',
+      termsVersion: '2026-11-11',
     });
     vi.mocked(DatabaseService.getAccountProfile).mockResolvedValue({
       id: 'password-user',
@@ -143,6 +146,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
       name: 'Student',
       email: `student_${Date.now()}@example.test`,
       password: 'SecurePass123!',
+    acceptTerms: true,
     })).status).toBe(201);
     expect((await student.get('/api/account/profile')).status).toBe(200);
     expect((await student.get('/api/admin/accounts')).status).toBe(403);
@@ -167,6 +171,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
       name: 'Audit Student',
       email: `audit_student_${Date.now()}@example.test`,
       password: 'SecurePass123!',
+    acceptTerms: true,
     });
 
     expect((await student.get('/api/admin/accounts')).status).toBe(403);
@@ -190,6 +195,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
         name: 'Admin',
         email: `admin_${Date.now()}@example.test`,
         password: 'SecurePass123!',
+    acceptTerms: true,
       })).status).toBe(201);
       const { DatabaseService } = await import('./dbService.js');
 
@@ -213,6 +219,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
       name: 'DB Check',
       email: `dbcheck_${Date.now()}@example.test`,
       password: 'SecurePass123!',
+    acceptTerms: true,
     })).status).toBe(201);
     vi.mocked(DatabaseService.getUserById).mockRejectedValueOnce(new Error('database unavailable'));
     const response = await agent.get('/api/auth/me');
@@ -388,6 +395,7 @@ describe('Security Regression Suite: OAuth & Session Fixation', { timeout: 20000
     const initialCookie = initialSession.headers['set-cookie'][0];
     const registration = await agent.post('/api/auth/register').send({
       username: 'passworduser',
+    acceptTerms: true,
       name: 'Password User',
       email: 'password@example.test',
       password: 'SecurePass123!',

@@ -15,6 +15,9 @@ export const users = pgTable('users', {
   casesSolved: integer('cases_solved').notNull().default(0),
   mergeBonusCount: integer('merge_bonus_count').notNull().default(0),
   bio: text('bio'),
+  termsVersion: varchar('terms_version', { length: 20 }),
+  termsAcceptedAt: timestamp('terms_accepted_at', { withTimezone: true }),
+  privacyAcknowledgedAt: timestamp('privacy_acknowledged_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

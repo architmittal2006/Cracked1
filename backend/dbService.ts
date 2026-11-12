@@ -57,6 +57,9 @@ export interface UserRecord {
   isActive: boolean;
   sessionVersion: number;
   role: string;
+  termsVersion?: string | null;
+  termsAcceptedAt?: Date | null;
+  privacyAcknowledgedAt?: Date | null;
 }
 
 export interface AccountProfileRecord {
@@ -1056,6 +1059,8 @@ export class DatabaseService {
     name: string;
     email: string;
     passwordHash: string;
+    termsVersion: string;
+    termsAcceptedAt: Date;
   }): Promise<string> {
     const email = payload.email.trim().toLowerCase();
     const existingEmail = await db.select().from(users)
@@ -1075,8 +1080,18 @@ export class DatabaseService {
       name: payload.name,
       email,
       passwordHash: payload.passwordHash,
+      termsVersion: payload.termsVersion,
+      termsAcceptedAt: payload.termsAcceptedAt,
     });
     return id;
+  }
+
+  public static async recordTermsAcceptance(userId: string, termsVersion: string, privacyAcknowledged: boolean): Promise<void> {
+    await db.update(users).set({
+      termsVersion,
+      termsAcceptedAt: new Date(),
+      ...(privacyAcknowledged ? { privacyAcknowledgedAt: new Date() } : {}),
+    }).where(eq(users.id, userId));
   }
 
   public static async upsertOAuthUser(payload: {

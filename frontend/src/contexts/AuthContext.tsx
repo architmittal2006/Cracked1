@@ -13,6 +13,7 @@ interface User {
   mergeBonusCount?: number;
   role?: string;
   accessRole?: 'Student' | 'Admin';
+  termsAccepted?: boolean;
 }
 
 interface AuthContextType {
@@ -21,7 +22,8 @@ interface AuthContextType {
   isLoading: boolean;
   login: (user: User) => void;
   signIn: (email: string, password: string) => Promise<User>;
-  signUp: (userData: { username: string; name: string; email: string; password: string }) => Promise<User>;
+  signUp: (userData: { username: string; name: string; email: string; password: string; acceptTerms: true }) => Promise<User>;
+  acceptTerms: (termsVersion: string) => Promise<User>;
   logout: () => Promise<void>;
   checkAuth: () => Promise<void>;
 }
@@ -80,7 +82,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     return data.user;
   };
 
-  const signUp = async (userData: { username: string; name: string; email: string; password: string }) => {
+  const signUp = async (userData: { username: string; name: string; email: string; password: string; acceptTerms: true }) => {
     const response = await fetch('/api/auth/register', {
       method: 'POST',
       credentials: 'include',
@@ -94,6 +96,24 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     setUser(data.user);
     setIsAuthenticated(true);
     return data.user;
+  };
+
+  const acceptTerms = async (termsVersion: string) => {
+    const response = await fetch('/api/legal/accept-terms', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ termsVersion }),
+    });
+    const data = await response.json();
+    if (!response.ok || !data.success) {
+      throw new Error(data.error || 'Could not record acceptance');
+    }
+    if (data.user) {
+      setUser((current) => (current ? { ...current, ...data.user } : current));
+      setIsAuthenticated(true);
+    }
+    return data.user as User;
   };
 
   const logout = async () => {
@@ -110,7 +130,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, login, signIn, signUp, logout, checkAuth }}>
+    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, login, signIn, signUp, acceptTerms, logout, checkAuth }}>
       {children}
     </AuthContext.Provider>
   );

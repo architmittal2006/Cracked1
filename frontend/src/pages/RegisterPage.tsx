@@ -11,6 +11,7 @@ export const RegisterPage: React.FC = () => {
   const location = useLocation();
   const { signUp } = useAuth();
   const [formData, setFormData] = useState({ username: '', name: '', email: '', password: '', confirmPassword: '' });
+  const [acceptTerms, setAcceptTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -35,10 +36,14 @@ export const RegisterPage: React.FC = () => {
       setError('Password must be at least 8 characters');
       return;
     }
+    if (!acceptTerms) {
+      setError('Please accept the Terms of Service to create an account');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
-      await signUp({ username, name, email, password });
+      await signUp({ username, name, email, password, acceptTerms: true });
       navigate(from, { replace: true });
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -168,7 +173,18 @@ export const RegisterPage: React.FC = () => {
               {isSubmitting ? 'Creating account…' : 'Create account'}
               <ArrowRight className="w-5 h-5" />
             </button>
-          </form>
+                    <label className="flex items-start gap-3 text-sm text-slate-300 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={acceptTerms}
+              onChange={(e) => setAcceptTerms(e.target.checked)}
+              className="mt-1 h-4 w-4 accent-orange-500"
+            />
+            <span>
+              I agree to the <a href="/terms" target="_blank" rel="noreferrer" className="text-orange-300 hover:underline">Terms of Service</a> and have read the <a href="/privacy" target="_blank" rel="noreferrer" className="text-orange-300 hover:underline">Privacy Policy</a>
+            </span>
+          </label>
+</form>
 
           <div className="login-footnote">
             <span>Already have an account?</span>

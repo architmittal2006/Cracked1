@@ -21,6 +21,8 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { HowItWorksPage } from './pages/HowItWorksPage';
 import { PrivacyPolicyPage } from './pages/PrivacyPolicyPage';
+import { TermsOfServicePage } from './pages/TermsOfServicePage';
+import { ConsentPage } from './pages/ConsentPage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -143,6 +145,8 @@ const App: React.FC = () => {
                   <Route path="/profile/:username" element={<Navigate to="/profile" replace />} />
                   <Route path="/how-it-works" element={<HowItWorksPage />} />
                   <Route path="/privacy" element={<PrivacyPolicyPage />} />
+                  <Route path="/terms" element={<TermsOfServicePage />} />
+                  <Route path="/consent" element={<ConsentPage />} />
                   <Route path="/login" element={<LoginPage />} />
                   <Route path="/register" element={<RegisterPage />} />
                   <Route path="/callback/github" element={<GitHubOAuthCallback />} />

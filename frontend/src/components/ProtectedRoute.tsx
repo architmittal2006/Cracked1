@@ -24,6 +24,10 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children, requir
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  if (user?.termsAccepted === false) {
+    return <Navigate to="/consent" replace />;
+  }
+
   if (requiredRole === 'Admin' && user?.accessRole !== 'Admin') {
     return <Navigate to="/" replace />;
   }

@@ -49,6 +49,7 @@ declare module 'express-session' {
       role?: string;
       accessRole?: 'Student' | 'Admin';
       sessionVersion: number;
+      termsAccepted?: boolean;
     };
   }
 }
@@ -144,6 +145,7 @@ const signupSchema = z.object({
   name: z.string().trim().min(1).max(255),
   email: z.string().trim().email().transform((value) => value.toLowerCase()),
   password: z.string().min(8).max(256),
+  acceptTerms: z.literal(true),
 });
 
 const loginSchema = z.object({
@@ -256,6 +258,16 @@ app.use(session({
 }));
 
 // Authentication middleware
+const TERMS_VERSION = '2026-11-11';
+
+// Exact method+path exemptions for the consent gate. Anything not listed
+// requires the user to have accepted the current TERMS_VERSION.
+const CONSENT_EXEMPT_ROUTES: ReadonlyArray<{ method: string; path: string }> = [
+  { method: 'GET', path: '/api/auth/me' },
+  { method: 'POST', path: '/api/legal/accept-terms' },
+  { method: 'POST', path: '/api/auth/logout' },
+];
+
 const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
   if (!req.session.user) {
     res.status(401).json({ success: false, error: 'Unauthorized' });
@@ -273,6 +285,18 @@ const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
     }
     req.session.user.accessRole = isAdminUser(user.id) ? 'Admin' : 'Student';
     req.session.user.role = isCaseModeratorUser(user.id) ? 'Moderator' : (user.role || 'General');
+    req.session.user.termsAccepted = user.termsVersion === TERMS_VERSION;
+    const exempt = CONSENT_EXEMPT_ROUTES.some(
+      (route) => route.method === req.method && route.path === req.path
+    );
+    if (!req.session.user.termsAccepted && !exempt) {
+      res.status(403).json({
+        success: false,
+        code: 'terms_consent_required',
+        error: 'Please accept the Terms of Service to continue',
+      });
+      return;
+    }
     next();
   } catch (error) {
     logError('Authentication check failed', error);
@@ -337,6 +361,7 @@ function establishUserSession(req: Request, userRecord: UserRecord): Promise<voi
         role: isCaseModeratorUser(userRecord.id) ? 'Moderator' : (userRecord.role || 'General'),
         accessRole: isAdminUser(userRecord.id) ? 'Admin' : 'Student',
         sessionVersion: userRecord.sessionVersion,
+        termsAccepted: userRecord.termsVersion === TERMS_VERSION,
       };
       req.session.save((saveError) => saveError ? reject(saveError) : resolve());
     });
@@ -557,6 +582,8 @@ app.post('/api/auth/register', authLimiter, async (req: Request, res: Response):
       name,
       email,
       passwordHash,
+      termsVersion: TERMS_VERSION,
+      termsAcceptedAt: new Date(),
     });
 
     const newUser = await DatabaseService.getUserById(id);
@@ -607,6 +634,31 @@ app.post('/api/auth/login', authLimiter, async (req: Request, res: Response): Pr
 // Get current user
 app.get('/api/auth/me', requireAuth, (req: Request, res: Response) => {
   res.json({ success: true, user: req.session.user });
+});
+
+const acceptTermsSchema = z.object({
+  termsVersion: z.string().trim().min(1).max(20),
+  privacyAcknowledged: z.boolean().optional(),
+});
+
+app.post('/api/legal/accept-terms', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const parse = acceptTermsSchema.safeParse(req.body);
+  if (!parse.success || parse.data.termsVersion !== TERMS_VERSION) {
+    res.status(400).json({ success: false, error: 'Invalid terms version' });
+    return;
+  }
+  try {
+    await DatabaseService.recordTermsAcceptance(
+      req.session.user!.id,
+      parse.data.termsVersion,
+      parse.data.privacyAcknowledged === true
+    );
+    req.session.user!.termsAccepted = true;
+    res.json({ success: true, user: req.session.user });
+  } catch (error) {
+    logError('Terms acceptance failed', error);
+    res.status(500).json({ success: false, error: 'Could not record terms acceptance' });
+  }
 });
 
 app.get('/api/dashboard/activity', requireAuth, async (req: Request, res: Response): Promise<void> => {
