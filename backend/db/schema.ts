@@ -162,7 +162,10 @@ export const submissions = pgTable('submissions', {
   contentJson: jsonb('content_json').notNull(),
   citationsCount: integer('citations_count').notNull().default(0),
   wordCount: integer('word_count').notNull().default(0),
-  status: varchar('status', { length: 50 }).notNull().default('Pending_Review'),
+  // Lifecycle: Draft → Submitted (awaiting AI evaluation, future phase).
+  // Exceptional human review promotes to Pending_Review → Completed/In_Dispute.
+  // AI_Scored is reserved for the future automated evaluator — never set manually.
+  status: varchar('status', { length: 50 }).notNull().default('Submitted'),
   structuralCompliant: boolean('structural_compliant').default(false),
   finalWeightedScore: doublePrecision('final_weighted_score'),
   caseVersionId: varchar('case_version_id', { length: 255 }).references(() => caseVersions.id),

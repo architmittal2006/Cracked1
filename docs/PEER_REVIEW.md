@@ -17,20 +17,30 @@ validity, account status, and terms consent):
 - `GET /api/cases/:caseId/gate-status` — `{ reviewsCompleted,
   pendingReviewCount }` for the caller/case.
 
-## Lifecycle
+## Lifecycle (AI-first, human review exceptional)
+
+Target lifecycle: `Draft → Submitted → (future AI evaluation) → AI_Scored`,
+with `Submitted → Pending_Review → Completed / In_Dispute` reserved for
+exceptional human review.
 
 - `POST /api/cases/:caseId/submissions` creates submissions with
-  `status = 'Pending_Review'`.
+  `status = 'Submitted'` — awaiting automated evaluation (deferred phase).
+  Passing `requestPeerReview: true` opts into human review at submit time.
+- `POST /api/submissions/:submissionId/request-review` promotes a `Submitted`
+  submission to `Pending_Review`; allowed for the owner or a moderator
+  (`isAdminUser`/`isCaseModeratorUser`). Other statuses return 409.
 - `insertReview` only accepts submissions in `Pending_Review`; it rejects
   self-reviews, wrong-case submissions, duplicate active reviews, and reviews
   of drafts/completed/disputed submissions.
+- `AI_Scored` is a reserved status label only — nothing writes it yet, and it
+  must never be set without a real evaluation.
 - Reviewer identity comes from the session; `reviewerTier` is derived
   server-side via `resolveReviewerTier` (`backend/authorization.ts`):
   `Arbiter` requires `PEER_REVIEW_ARBITER_USER_IDS`, `Verified` requires
   `CASE_MODERATOR_USER_IDS`, otherwise `General`. Platform admins do **not**
   implicitly receive arbitration authority.
-- Migration `0009` converts legacy `'Submitted'` rows to `'Pending_Review'`;
-  all other statuses are preserved.
+- Legacy `Submitted` rows are preserved as-is; there is no automatic
+  conversion into the human-review queue.
 
 ## Deferred (not started)
 
@@ -53,7 +63,8 @@ WHERE is_voided = FALSE
 GROUP BY submission_id, reviewer_id
 HAVING COUNT(*) > 1;
 
--- H2: size the legacy status conversion performed by migration 0009.
+-- H2 (resolved): legacy 'Submitted' rows are intentionally preserved — no
+-- conversion migration. They await the future AI evaluation pathway.
 SELECT status, COUNT(*) FROM submissions GROUP BY status ORDER BY status;
 ```
 

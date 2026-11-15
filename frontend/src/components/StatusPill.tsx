@@ -1,6 +1,6 @@
 import React from 'react';
 
-export type StatusType = 'Draft' | 'Submitted' | 'Pending_Review' | 'In_Dispute' | 'Completed' | 'Merged' | 'Open' | 'In_Review' | 'Accepted' | 'Archived';
+export type StatusType = 'Draft' | 'Submitted' | 'AI_Scored' | 'Pending_Review' | 'In_Dispute' | 'Completed' | 'Merged' | 'Open' | 'In_Review' | 'Accepted' | 'Archived';
 
 interface StatusPillProps {
   status: StatusType;
@@ -11,6 +11,7 @@ export const StatusPill: React.FC<StatusPillProps> = ({ status }) => {
     switch (status) {
       case 'Draft': return { className: 'status-draft', label: 'Draft' };
       case 'Submitted': return { className: 'status-completed', label: 'Submitted' };
+      case 'AI_Scored': return { className: 'status-completed', label: 'AI Scored' };
       case 'Pending_Review': return { className: 'status-pending', label: 'Pending Review' };
       case 'In_Dispute': return { className: 'status-dispute', label: 'In Dispute' };
       case 'Completed': return { className: 'status-completed', label: 'Completed' };

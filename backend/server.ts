@@ -1334,7 +1334,7 @@ app.post('/api/takedown', takedownLimiter, async (req: Request, res: Response): 
 
 app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res: Response): Promise<void> => {
   const caseId = req.params.caseId;
-  const { contentJson, citationsCount = 0 } = req.body ?? {};
+  const { contentJson, citationsCount = 0, requestPeerReview = false } = req.body ?? {};
   const currentUser = req.session.user!;
 
   try {
@@ -1345,6 +1345,10 @@ app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res
 
     if (!Number.isSafeInteger(citationsCount) || citationsCount < 0) {
       res.status(400).json({ success: false, error: 'Invalid citationsCount parameter.' });
+      return;
+    }
+    if (typeof requestPeerReview !== 'boolean') {
+      res.status(400).json({ success: false, error: 'Invalid requestPeerReview parameter.' });
       return;
     }
 
@@ -1372,15 +1376,21 @@ app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res
       citationsCount,
       wordCount: layer1Check.wordCount,
       structuralCompliant: true,
-      // New submissions enter the peer-review pipeline; consensus scoring
-      // (verificationEngine) later moves them to Completed or In_Dispute.
-      status: 'Pending_Review'
+      // AI-first lifecycle: ordinary submissions await automated evaluation
+      // (Submitted). Human review is exceptional — only entered via explicit
+      // opt-in (requestPeerReview) or a future trigger/moderator promotion.
+      status: requestPeerReview ? 'Pending_Review' : 'Submitted'
     });
 
     const referenceRange = caseType === 'Guesstimate'
       ? await DatabaseService.getReferenceRangeAfterSubmission(caseId, currentUser.id)
       : undefined;
-    res.status(201).json({ success: true, submissionId, status: 'Pending_Review', referenceRange });
+    res.status(201).json({
+      success: true,
+      submissionId,
+      status: requestPeerReview ? 'Pending_Review' : 'Submitted',
+      referenceRange,
+    });
   } catch (error) {
     logError('Case submission failed', error);
     res.status(500).json({ success: false, error: 'Could not submit case response' });
@@ -1516,6 +1526,36 @@ app.get('/api/cases/:caseId/review-queue', requireAuth, async (req: Request, res
   } catch (error) {
     logError('Case review queue error', error);
     res.status(500).json({ success: false, error: 'Could not load a submission to review' });
+  }
+});
+
+// Exceptional-review opt-in: promotes a Submitted submission into the
+// Pending_Review queue. Allowed for the submission owner or a moderator.
+app.post('/api/submissions/:submissionId/request-review', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const submissionId = req.params.submissionId;
+  if (typeof submissionId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid submissionId parameter' });
+    return;
+  }
+  try {
+    const isModerator = isAdminUser(req.session.user!.id) || isCaseModeratorUser(req.session.user!.id);
+    const result = await DatabaseService.requestPeerReview(submissionId, req.session.user!.id, isModerator);
+    if (result === 'not_found') {
+      res.status(404).json({ success: false, error: 'Submission not found' });
+      return;
+    }
+    if (result === 'forbidden') {
+      res.status(403).json({ success: false, error: 'Only the submitter or a moderator can request review' });
+      return;
+    }
+    if (result === 'invalid_state') {
+      res.status(409).json({ success: false, error: 'Only submitted attempts awaiting evaluation can be sent to review' });
+      return;
+    }
+    res.json({ success: true, status: 'Pending_Review' });
+  } catch (error) {
+    logError('Peer review request failed', error);
+    res.status(500).json({ success: false, error: 'Could not request review' });
   }
 });
 

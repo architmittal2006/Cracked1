@@ -1506,6 +1506,28 @@ export class DatabaseService {
     }
   }
 
+  // Promote a Submitted submission into the exceptional human-review queue.
+  // Allowed for the submission owner or a moderator; only 'Submitted' rows may
+  // transition (AI_Scored/Completed/etc. are never demoted or re-queued here).
+  public static async requestPeerReview(
+    submissionId: string,
+    requesterId: string,
+    isModerator: boolean
+  ): Promise<'promoted' | 'not_found' | 'forbidden' | 'invalid_state'> {
+    const [submission] = await db
+      .select({ userId: submissions.userId, status: submissions.status })
+      .from(submissions)
+      .where(eq(submissions.id, submissionId))
+      .limit(1);
+    if (!submission) return 'not_found';
+    if (submission.userId !== requesterId && !isModerator) return 'forbidden';
+    if (submission.status !== 'Submitted') return 'invalid_state';
+    await db.update(submissions)
+      .set({ status: 'Pending_Review' })
+      .where(and(eq(submissions.id, submissionId), eq(submissions.status, 'Submitted')));
+    return 'promoted';
+  }
+
   // Count submissions still awaiting peer review for a case (gate-status).
   public static async getPendingReviewCountForCase(caseId: string): Promise<number> {
     const result = await pool.query<{ count: string }>(

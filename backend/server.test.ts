@@ -819,7 +819,7 @@ describe('Student workspace drafts', () => {
     });
     expect(ownActivity.body.submissions).toHaveLength(1);
     expect(ownActivity.body.submissions[0]).toMatchObject({
-      caseId, title: content.title, type: content.type, status: 'Pending_Review', caseAvailable: true,
+      caseId, title: content.title, type: content.type, status: 'Submitted', caseAvailable: true,
     });
     expect(ownActivity.body.drafts[0].content).toBeUndefined();
 
@@ -1224,7 +1224,7 @@ describe('Submission debrief', () => {
     expect(res.body.debrief).toMatchObject({
       submissionId,
       caseId,
-      status: 'Pending_Review',
+      status: 'Submitted',
       caseAvailable: true,
       versionNumber: 1,
     });
@@ -1850,16 +1850,21 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     }
   };
 
-  const submitSolution = async (agent: ReturnType<typeof request.agent>, caseId: string) => {
+  const submitSolution = async (
+    agent: ReturnType<typeof request.agent>,
+    caseId: string,
+    requestPeerReview = false
+  ) => {
     const response = await agent.post(`/api/cases/${caseId}/submissions`).send({
       contentJson: { framing: 'A complete structured solution with enough words to pass validation.' },
       citationsCount: 0,
+      requestPeerReview,
     });
     expect(response.status).toBe(201);
     return response.body.submissionId as string;
   };
 
-  it('moves new submissions into Pending_Review', async () => {
+  it('keeps ordinary submissions in Submitted, out of the human-review queue', async () => {
     const caseId = await publishCase();
     const agent = request.agent(app);
     await registerTestUser(agent, 'pr_submit');
@@ -1868,14 +1873,58 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     const row = await pool.query<{ status: string }>(
       'SELECT status FROM submissions WHERE id = $1', [submissionId]
     );
+    expect(row.rows[0].status).toBe('Submitted');
+
+    // Not visible to reviewers and rejected by the review endpoint.
+    const reviewer = request.agent(app);
+    await registerTestUser(reviewer, 'pr_norev');
+    expect((await reviewer.get(`/api/cases/${caseId}/review-queue`)).status).toBe(404);
+    const gate = await reviewer.get(`/api/cases/${caseId}/gate-status`);
+    expect(gate.body.pendingReviewCount).toBe(0);
+    expect((await reviewer.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId))).status).toBe(400);
+  });
+
+  it('enters Pending_Review only via explicit opt-in at submit time', async () => {
+    const caseId = await publishCase();
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'pr_optin');
+    const submissionId = await submitSolution(agent, caseId, true);
+
+    const row = await pool.query<{ status: string }>(
+      'SELECT status FROM submissions WHERE id = $1', [submissionId]
+    );
     expect(row.rows[0].status).toBe('Pending_Review');
+  });
+
+  it('promotes a Submitted submission to review via request-review opt-in', async () => {
+    const caseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_req_sub');
+    const submissionId = await submitSolution(submitter, caseId);
+
+    // Owner can request review for their own submission.
+    const promote = await submitter.post(`/api/submissions/${submissionId}/request-review`);
+    expect(promote.status).toBe(200);
+    expect(promote.body.status).toBe('Pending_Review');
+
+    // A second promotion is rejected (no longer Submitted).
+    expect((await submitter.post(`/api/submissions/${submissionId}/request-review`)).status).toBe(409);
+
+    // Non-owner, non-moderator cannot request review of someone else's work.
+    const other = request.agent(app);
+    await registerTestUser(other, 'pr_req_other');
+    const otherSub = await submitSolution(other, caseId);
+    expect((await submitter.post(`/api/submissions/${otherSub}/request-review`)).status).toBe(403);
+
+    // Unauthenticated is rejected.
+    expect((await request(app).post(`/api/submissions/${otherSub}/request-review`)).status).toBe(401);
   });
 
   it('serves the pending submission through review-queue and gate-status', async () => {
     const caseId = await publishCase();
     const submitter = request.agent(app);
     await registerTestUser(submitter, 'pr_owner');
-    const submissionId = await submitSolution(submitter, caseId);
+    const submissionId = await submitSolution(submitter, caseId, true);
 
     const reviewer = request.agent(app);
     await registerTestUser(reviewer, 'pr_reviewer');
@@ -1898,7 +1947,7 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     const caseId = await publishCase();
     const submitter = request.agent(app);
     await registerTestUser(submitter, 'pr_sub2');
-    const submissionId = await submitSolution(submitter, caseId);
+    const submissionId = await submitSolution(submitter, caseId, true);
 
     const reviewer = request.agent(app);
     const reviewerUser = await registerTestUser(reviewer, 'pr_rev2');
@@ -1921,7 +1970,7 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     const caseId = await publishCase();
     const submitter = request.agent(app);
     await registerTestUser(submitter, 'pr_sub3');
-    const submissionId = await submitSolution(submitter, caseId);
+    const submissionId = await submitSolution(submitter, caseId, true);
 
     const reviewer = request.agent(app);
     const reviewerUser = await registerTestUser(reviewer, 'pr_modrev');
@@ -1945,7 +1994,7 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     const otherCaseId = await publishCase();
     const submitter = request.agent(app);
     await registerTestUser(submitter, 'pr_sub4');
-    const submissionId = await submitSolution(submitter, caseId);
+    const submissionId = await submitSolution(submitter, caseId, true);
 
     // Self-review is rejected even with a valid rubric.
     const self = await submitter.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId));
@@ -1984,7 +2033,7 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     const caseId = await publishCase();
     const submitter = request.agent(app);
     await registerTestUser(submitter, 'pr_sub_rb');
-    const submissionId = await submitSolution(submitter, caseId);
+    const submissionId = await submitSolution(submitter, caseId, true);
 
     const reviewer = request.agent(app);
     await registerTestUser(reviewer, 'pr_rev_rb');
@@ -2018,7 +2067,7 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     const caseId = await publishCase();
     const submitter = request.agent(app);
     await registerTestUser(submitter, 'pr_sub_sus');
-    const submissionId = await submitSolution(submitter, caseId);
+    const submissionId = await submitSolution(submitter, caseId, true);
 
     // Suspended reviewer: session is invalidated by requireAuth.
     const suspended = request.agent(app);
@@ -2039,7 +2088,7 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     const caseId = await publishCase();
     const submitter = request.agent(app);
     await registerTestUser(submitter, 'pr_sub_q');
-    const submissionId = await submitSolution(submitter, caseId);
+    const submissionId = await submitSolution(submitter, caseId, true);
 
     const reviewerA = request.agent(app);
     await registerTestUser(reviewerA, 'pr_rev_qa');
@@ -2069,7 +2118,7 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     const caseId = await publishCase();
     const submitter = request.agent(app);
     await registerTestUser(submitter, 'pr_conc_sub');
-    const submissionId = await submitSolution(submitter, caseId);
+    const submissionId = await submitSolution(submitter, caseId, true);
 
     const reviewerA = request.agent(app);
     await registerTestUser(reviewerA, 'pr_conc_a');
@@ -2092,7 +2141,7 @@ describe('Peer review foundation (Phase 8.2B)', () => {
     // The same reviewer firing duplicate concurrent requests must not persist
     // two reviews for the same submission.
     const dupCaseId = await publishCase();
-    const submissionId2 = await submitSolution(submitter, dupCaseId);
+    const submissionId2 = await submitSolution(submitter, dupCaseId, true);
     const [d1, d2] = await Promise.all([
       reviewerA.post(`/api/submissions/${submissionId2}/reviews`).send(validReview(dupCaseId)),
       reviewerA.post(`/api/submissions/${submissionId2}/reviews`).send(validReview(dupCaseId)),
