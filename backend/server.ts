@@ -12,7 +12,7 @@ import { z } from 'zod';
 import { Pool } from 'pg';
 import { assertMigrationsCurrent } from './db/runMigrations.js';
 import { logError } from './logging.js';
-import { hasCapability, isAdminUser, isCaseModeratorUser, type Capability } from './authorization.js';
+import { hasCapability, isAdminUser, isCaseModeratorUser, resolveReviewerTier, type Capability } from './authorization.js';
 import { caseContentSchema } from './contentValidation.js';
 import { contentService, ContentError } from './contentService.js';
 import {
@@ -133,7 +133,7 @@ app.use((_req: Request, res: Response, next: NextFunction) => {
 // Rate limiting for auth endpoints
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: process.env.NODE_ENV === 'test' ? 100 : 20,
+  max: process.env.NODE_ENV === 'test' ? 500 : 20,
   message: { success: false, error: 'Too many attempts, please try again later' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -232,6 +232,14 @@ const takedownLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   max: 5,
   message: { success: false, error: 'You have reached the hourly report limit. Try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const reviewLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 60,
+  message: { success: false, error: 'You have reached the hourly review limit. Try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -1027,19 +1035,24 @@ app.get('/api/cases/:caseId', async (req: Request, res: Response): Promise<void>
   }
 });
 
-// Peer review is intentionally deferred (Phase 8). These endpoints stay
-// authenticated but report an explicit disabled state instead of implying
-// the unfinished pipeline is operational.
-const peerReviewDisabled = (res: Response): void => {
-  res.status(501).json({
-    success: false,
-    code: 'peer_review_disabled',
-    error: 'Peer review is not available yet.',
-  });
-};
-
-app.get('/api/cases/:caseId/gate-status', requireAuth, async (_req: Request, res: Response): Promise<void> => {
-  peerReviewDisabled(res);
+// Peer review gate status: how many of the caller's reviews are done for this
+// case and how many submissions are still waiting for reviewers.
+app.get('/api/cases/:caseId/gate-status', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+  try {
+    const [reviewsCompleted, pendingReviewCount] = await Promise.all([
+      DatabaseService.getCompletedReviewCountForCase(req.session.user!.id, caseId),
+      DatabaseService.getPendingReviewCountForCase(caseId),
+    ]);
+    res.json({ success: true, reviewsCompleted, pendingReviewCount });
+  } catch (error) {
+    logError('Case gate status error', error);
+    res.status(500).json({ success: false, error: 'Could not load your review gate status' });
+  }
 });
 
 // Legacy case proposals are disabled: historical records remain readable, but
@@ -1358,13 +1371,16 @@ app.post('/api/cases/:caseId/submissions', requireAuth, async (req: Request, res
       contentJson: layer1Check.contentJson,
       citationsCount,
       wordCount: layer1Check.wordCount,
-      structuralCompliant: true
+      structuralCompliant: true,
+      // New submissions enter the peer-review pipeline; consensus scoring
+      // (verificationEngine) later moves them to Completed or In_Dispute.
+      status: 'Pending_Review'
     });
 
     const referenceRange = caseType === 'Guesstimate'
       ? await DatabaseService.getReferenceRangeAfterSubmission(caseId, currentUser.id)
       : undefined;
-    res.status(201).json({ success: true, submissionId, status: 'Submitted', referenceRange });
+    res.status(201).json({ success: true, submissionId, status: 'Pending_Review', referenceRange });
   } catch (error) {
     logError('Case submission failed', error);
     res.status(500).json({ success: false, error: 'Could not submit case response' });
@@ -1481,21 +1497,90 @@ app.get('/api/cases/:caseId/submissions/:submissionId/debrief', requireAuth, asy
   }
 });
 
-app.get('/api/cases/:caseId/review-queue', requireAuth, async (_req: Request, res: Response): Promise<void> => {
-  peerReviewDisabled(res);
+// Next submission awaiting this reviewer's input. Self-reviews and cases the
+// reviewer already covered are excluded inside getNextReviewSubmission.
+app.get('/api/cases/:caseId/review-queue', requireAuth, async (req: Request, res: Response): Promise<void> => {
+  const caseId = req.params.caseId;
+  if (typeof caseId !== 'string') {
+    res.status(400).json({ success: false, error: 'Invalid caseId parameter' });
+    return;
+  }
+
+  try {
+    const submission = await DatabaseService.getNextReviewSubmission(caseId, req.session.user!.id);
+    if (!submission) {
+      res.status(404).json({ success: false, error: 'No unreviewed submission is available for this case' });
+      return;
+    }
+    res.json(submission);
+  } catch (error) {
+    logError('Case review queue error', error);
+    res.status(500).json({ success: false, error: 'Could not load a submission to review' });
+  }
 });
 
 /**
- * CORE LOGIC GATEWAY: RUBRIC EVALUATION & LAYER 2/3 ROUTING
- * Disabled until peer review is activated (Phase 8).
+ * CORE LOGIC GATEWAY: RUBRIC CAPTURE & REVIEW RECORDING
+ * Stores the review and enforces eligibility server-side. Consensus scoring
+ * (processPeerReviewConsensus) stays disabled until Phase 8.2C.
  */
-app.post('/api/submissions/:submissionId/reviews', requireAuth, async (req: Request, res: Response): Promise<void> => {
+app.post('/api/submissions/:submissionId/reviews', requireAuth, reviewLimiter, async (req: Request, res: Response): Promise<void> => {
   const submissionId = req.params.submissionId;
   if (typeof submissionId !== 'string') {
     res.status(400).json({ success: false, error: 'Invalid submissionId parameter' });
     return;
   }
-  peerReviewDisabled(res);
+  const currentUser = req.session.user!;
+
+  try {
+    const caseId = typeof req.body?.caseId === 'string' ? req.body.caseId : '';
+    const caseType = await DatabaseService.getCaseType(caseId);
+    const parse = (caseType === 'Guesstimate' ? guesstimateReviewSchema : caseReviewSchema).safeParse(req.body);
+    if (!parse.success) {
+      res.status(400).json({ success: false, error: parse.error.issues[0]?.message || 'Invalid review' });
+      return;
+    }
+    if (!caseType) {
+      res.status(404).json({ success: false, error: 'Case not found' });
+      return;
+    }
+
+    const scores = caseType === 'Guesstimate'
+      ? {
+          structure: 'structure' in parse.data ? parse.data.structure : 0,
+          assumption_quality: 'assumption_quality' in parse.data ? parse.data.assumption_quality : 0,
+          math_accuracy: 'math_accuracy' in parse.data ? parse.data.math_accuracy : 0,
+          sanity_check: 'sanity_check' in parse.data ? parse.data.sanity_check : 0,
+          clarity: 'clarity' in parse.data ? parse.data.clarity : 0,
+        }
+      : {
+          problem_framing: 'problem_framing' in parse.data ? parse.data.problem_framing : 0,
+          framework_fit: 'framework_fit' in parse.data ? parse.data.framework_fit : 0,
+          data_integrity: 'data_integrity' in parse.data ? parse.data.data_integrity : 0,
+          insight_depth: 'insight_depth' in parse.data ? parse.data.insight_depth : 0,
+          feasibility: 'feasibility' in parse.data ? parse.data.feasibility : 0,
+        };
+
+    // Reviewer identity and tier are resolved server-side; the client cannot
+    // supply or influence them.
+    await DatabaseService.insertReview({
+      submissionId,
+      reviewerId: currentUser.id,
+      reviewerTier: resolveReviewerTier(currentUser.id),
+      caseId: parse.data.caseId,
+      feedback: parse.data.feedback,
+      scores,
+    });
+
+    res.status(200).json({ success: true, status: 'review_recorded' });
+  } catch (error) {
+    if (error instanceof InvalidCaseReviewError) {
+      res.status(400).json({ success: false, error: error.message });
+      return;
+    }
+    logError('Case review submission error', error);
+    res.status(500).json({ success: false, error: 'Could not submit review' });
+  }
 });
 
 // Local root builds can serve the frontend; Render runs the API without that folder.

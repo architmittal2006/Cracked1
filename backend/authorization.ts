@@ -19,6 +19,24 @@ export const isAdminUser = (userId: string): boolean =>
 export const isCaseModeratorUser = (userId: string): boolean =>
   userIdsFor('CASE_MODERATOR_USER_IDS').has(userId);
 
+// Arbitration authority is deliberately separate from platform admin rights:
+// admins moderate content but must not silently gain Layer-3 review override.
+// Arbiter status requires explicit membership in PEER_REVIEW_ARBITER_USER_IDS.
+export const isPeerReviewArbiterUser = (userId: string): boolean =>
+  userIdsFor('PEER_REVIEW_ARBITER_USER_IDS').has(userId);
+
+export type ReviewerTier = 'General' | 'Verified' | 'Arbiter';
+
+// Reviewer tier is always derived server-side from allowlists — clients can
+// never supply or influence it. Arbiter requires the dedicated arbitration
+// allowlist; Verified (case moderators) carries the 1.5x weight; everyone
+// else reviews as General.
+export const resolveReviewerTier = (userId: string): ReviewerTier => {
+  if (isPeerReviewArbiterUser(userId)) return 'Arbiter';
+  if (isCaseModeratorUser(userId)) return 'Verified';
+  return 'General';
+};
+
 const ADMIN_CAPABILITIES: readonly Capability[] = [
   'admin:accounts:manage',
   'content:read',

@@ -137,6 +137,17 @@ afterAll(async () => {
     SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
   )`);
   await pool.query("DELETE FROM casebooks WHERE id LIKE 'casebook_test_%'");
+  // Reviews reference both submissions and users; remove them first.
+  await pool.query(`DELETE FROM reviews WHERE reviewer_id IN (
+    SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
+  ) OR submission_id IN (
+    SELECT id FROM submissions WHERE user_id IN (
+      SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
+    )
+  )`);
+  await pool.query(`DELETE FROM submissions WHERE user_id IN (
+    SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
+  )`);
   await pool.query("DELETE FROM users WHERE email LIKE '%@test.cracked.local'");
   await pool.end();
 });
@@ -150,6 +161,14 @@ beforeEach(async () => {
     SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
   )`);
   await pool.query("DELETE FROM casebooks WHERE id LIKE 'casebook_test_%'");
+  // Reviews reference both submissions and users; remove them first.
+  await pool.query(`DELETE FROM reviews WHERE reviewer_id IN (
+    SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
+  ) OR submission_id IN (
+    SELECT id FROM submissions WHERE user_id IN (
+      SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
+    )
+  )`);
   await pool.query(`DELETE FROM submissions WHERE user_id IN (
     SELECT id FROM users WHERE email LIKE '%@test.cracked.local'
   )`);
@@ -800,7 +819,7 @@ describe('Student workspace drafts', () => {
     });
     expect(ownActivity.body.submissions).toHaveLength(1);
     expect(ownActivity.body.submissions[0]).toMatchObject({
-      caseId, title: content.title, type: content.type, status: 'Submitted', caseAvailable: true,
+      caseId, title: content.title, type: content.type, status: 'Pending_Review', caseAvailable: true,
     });
     expect(ownActivity.body.drafts[0].content).toBeUndefined();
 
@@ -1074,33 +1093,34 @@ describe('Terms consent enforcement', () => {
   });
 });
 
-describe('Deferred peer review endpoints', () => {
-  it('returns an explicit disabled response and never mutates review records', async () => {
+describe('Peer review endpoints (Phase 8.2B live)', () => {
+  it('serves gate-status and empty review-queue for unknown cases', async () => {
     const agent = request.agent(app);
-    await registerTestUser(agent, 'pr_disabled');
+    await registerTestUser(agent, 'pr_live');
 
-    for (const path of [
-      '/api/cases/any_case/gate-status',
-      '/api/cases/any_case/review-queue',
-    ]) {
-      const res = await agent.get(path);
-      expect(res.status).toBe(501);
-      expect(res.body).toMatchObject({ success: false, code: 'peer_review_disabled' });
-    }
+    const gate = await agent.get('/api/cases/any_case/gate-status');
+    expect(gate.status).toBe(200);
+    expect(gate.body).toMatchObject({ success: true, reviewsCompleted: 0, pendingReviewCount: 0 });
 
+    const queue = await agent.get('/api/cases/any_case/review-queue');
+    expect(queue.status).toBe(404);
+  });
+
+  it('rejects reviews for nonexistent submissions without persisting rows', async () => {
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'pr_live2');
     const before = await pool.query(`SELECT COUNT(*)::int AS c FROM reviews`);
     const post = await agent.post('/api/submissions/sub_any/reviews').send({
       caseId: 'any_case',
       problem_framing: 3, framework_fit: 3, data_integrity: 3, insight_depth: 3, feasibility: 3,
-      feedback: 'This review must never be persisted while peer review is deferred.',
+      feedback: 'This review targets a submission that does not exist.',
     });
-    expect(post.status).toBe(501);
-    expect(post.body).toMatchObject({ success: false, code: 'peer_review_disabled' });
+    expect(post.status).toBe(400);
     const after = await pool.query(`SELECT COUNT(*)::int AS c FROM reviews`);
     expect(after.rows[0].c).toBe(before.rows[0].c);
   });
 
-  it('still requires authentication on the disabled endpoints', async () => {
+  it('requires authentication on the peer-review endpoints', async () => {
     expect((await request(app).get('/api/cases/any_case/gate-status')).status).toBe(401);
     expect((await request(app).get('/api/cases/any_case/review-queue')).status).toBe(401);
     expect((await request(app).post('/api/submissions/sub_any/reviews').send({})).status).toBe(401);
@@ -1204,7 +1224,7 @@ describe('Submission debrief', () => {
     expect(res.body.debrief).toMatchObject({
       submissionId,
       caseId,
-      status: 'Submitted',
+      status: 'Pending_Review',
       caseAvailable: true,
       versionNumber: 1,
     });
@@ -1785,3 +1805,318 @@ describe('Auth endpoints', () => {
     }
   });
 });
+
+describe('Peer review foundation (Phase 8.2B)', () => {
+  const content = {
+    title: 'Peer review test case',
+    type: 'Profitability',
+    sector: 'Retail',
+    difficulty: 'Standard',
+    description: 'A peer-review test case description with enough detail to satisfy the content contract rules.',
+    deliverables: ['Issue tree', 'Recommendation'],
+    referenceSolution: 'The reference solution text that must stay hidden until submission.',
+    rubricCriteria: [{ name: 'Structure', description: 'MECE issue tree.' }],
+    contentOwner: 'Cracked content team',
+    sourceKind: 'original',
+    rightsDeclaration: 'Original work created for Cracked.',
+    rightsConfirmed: true,
+  };
+
+  const validReview = (caseId: string) => ({
+    caseId,
+    problem_framing: 4,
+    framework_fit: 4,
+    data_integrity: 3,
+    insight_depth: 4,
+    feasibility: 3,
+    feedback: 'A thoughtful and structured approach with a clear recommendation and reasonable assumptions throughout the case.',
+  });
+
+  const publishCase = async (): Promise<string> => {
+    const adminAgent = request.agent(app);
+    const admin = await registerTestUser(adminAgent, 'pr_admin');
+    const previous = process.env.ADMIN_USER_IDS;
+    process.env.ADMIN_USER_IDS = [previous, admin.id].filter(Boolean).join(',');
+    try {
+      const create = await adminAgent.post('/api/admin/content').send(content);
+      expect(create.status).toBe(201);
+      const caseId = create.body.caseId as string;
+      const publish = await adminAgent.post(`/api/admin/content/${caseId}/publish`);
+      expect(publish.status).toBe(200);
+      return caseId;
+    } finally {
+      if (previous === undefined) delete process.env.ADMIN_USER_IDS;
+      else process.env.ADMIN_USER_IDS = previous;
+    }
+  };
+
+  const submitSolution = async (agent: ReturnType<typeof request.agent>, caseId: string) => {
+    const response = await agent.post(`/api/cases/${caseId}/submissions`).send({
+      contentJson: { framing: 'A complete structured solution with enough words to pass validation.' },
+      citationsCount: 0,
+    });
+    expect(response.status).toBe(201);
+    return response.body.submissionId as string;
+  };
+
+  it('moves new submissions into Pending_Review', async () => {
+    const caseId = await publishCase();
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'pr_submit');
+    const submissionId = await submitSolution(agent, caseId);
+
+    const row = await pool.query<{ status: string }>(
+      'SELECT status FROM submissions WHERE id = $1', [submissionId]
+    );
+    expect(row.rows[0].status).toBe('Pending_Review');
+  });
+
+  it('serves the pending submission through review-queue and gate-status', async () => {
+    const caseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_owner');
+    const submissionId = await submitSolution(submitter, caseId);
+
+    const reviewer = request.agent(app);
+    await registerTestUser(reviewer, 'pr_reviewer');
+
+    const queue = await reviewer.get(`/api/cases/${caseId}/review-queue`);
+    expect(queue.status).toBe(200);
+    expect(queue.body.submissionId).toBe(submissionId);
+
+    // The submitter cannot review their own work: queue is empty for them.
+    const ownQueue = await submitter.get(`/api/cases/${caseId}/review-queue`);
+    expect(ownQueue.status).toBe(404);
+
+    const gate = await reviewer.get(`/api/cases/${caseId}/gate-status`);
+    expect(gate.status).toBe(200);
+    expect(gate.body.pendingReviewCount).toBe(1);
+    expect(gate.body.reviewsCompleted).toBe(0);
+  });
+
+  it('records a valid review with a server-derived General tier', async () => {
+    const caseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_sub2');
+    const submissionId = await submitSolution(submitter, caseId);
+
+    const reviewer = request.agent(app);
+    const reviewerUser = await registerTestUser(reviewer, 'pr_rev2');
+    const response = await reviewer.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId));
+    expect(response.status).toBe(200);
+
+    const row = await pool.query<{ reviewer_tier: string; case_id: string }>(
+      'SELECT reviewer_tier, case_id FROM reviews WHERE submission_id = $1 AND reviewer_id = $2',
+      [submissionId, reviewerUser.id]
+    );
+    expect(row.rows).toHaveLength(1);
+    expect(row.rows[0].reviewer_tier).toBe('General');
+    expect(row.rows[0].case_id).toBe(caseId);
+
+    const gate = await reviewer.get(`/api/cases/${caseId}/gate-status`);
+    expect(gate.body.reviewsCompleted).toBe(1);
+  });
+
+  it('derives Verified tier for case moderators server-side', async () => {
+    const caseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_sub3');
+    const submissionId = await submitSolution(submitter, caseId);
+
+    const reviewer = request.agent(app);
+    const reviewerUser = await registerTestUser(reviewer, 'pr_modrev');
+    const previous = process.env.CASE_MODERATOR_USER_IDS;
+    process.env.CASE_MODERATOR_USER_IDS = [previous, reviewerUser.id].filter(Boolean).join(',');
+    try {
+      const response = await reviewer.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId));
+      expect(response.status).toBe(200);
+    } finally {
+      if (previous === undefined) delete process.env.CASE_MODERATOR_USER_IDS;
+      else process.env.CASE_MODERATOR_USER_IDS = previous;
+    }
+    const row = await pool.query<{ reviewer_tier: string }>(
+      'SELECT reviewer_tier FROM reviews WHERE submission_id = $1', [submissionId]
+    );
+    expect(row.rows[0].reviewer_tier).toBe('Verified');
+  });
+
+  it('rejects self-review, duplicates, wrong-case and closed submissions', async () => {
+    const caseId = await publishCase();
+    const otherCaseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_sub4');
+    const submissionId = await submitSolution(submitter, caseId);
+
+    // Self-review is rejected even with a valid rubric.
+    const self = await submitter.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId));
+    expect(self.status).toBe(400);
+
+    const reviewer = request.agent(app);
+    await registerTestUser(reviewer, 'pr_rev4');
+
+    // caseId that does not match the submission's case is rejected.
+    const wrongCase = await reviewer.post(`/api/submissions/${submissionId}/reviews`).send(validReview(otherCaseId));
+    expect(wrongCase.status).toBe(400);
+
+    // Malformed rubric is rejected before touching the database.
+    const badRubric = await reviewer.post(`/api/submissions/${submissionId}/reviews`).send({
+      caseId,
+      problem_framing: 9, framework_fit: 4, data_integrity: 3, insight_depth: 4, feasibility: 3,
+      feedback: 'A thoughtful and structured approach with a clear recommendation and reasonable assumptions throughout the case.',
+    });
+    expect(badRubric.status).toBe(400);
+
+    expect((await reviewer.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId))).status).toBe(200);
+    // A second review by the same reviewer is rejected.
+    const duplicate = await reviewer.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId));
+    expect(duplicate.status).toBe(400);
+
+    // Once the submission leaves Pending_Review, new reviews are rejected.
+    await pool.query(`UPDATE submissions SET status = 'Completed' WHERE id = $1`, [submissionId]);
+    const reviewer2 = request.agent(app);
+    await registerTestUser(reviewer2, 'pr_rev4b');
+    const closed = await reviewer2.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId));
+    expect(closed.status).toBe(400);
+    expect(closed.body.error).toMatch(/not open for review/);
+  });
+
+  it('rejects a guesstimate rubric against a non-guesstimate case', async () => {
+    const caseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_sub_rb');
+    const submissionId = await submitSolution(submitter, caseId);
+
+    const reviewer = request.agent(app);
+    await registerTestUser(reviewer, 'pr_rev_rb');
+    const response = await reviewer.post(`/api/submissions/${submissionId}/reviews`).send({
+      caseId,
+      structure: 4, assumption_quality: 4, math_accuracy: 3, sanity_check: 4, clarity: 3,
+      feedback: 'A thoughtful and structured approach with a clear recommendation and reasonable assumptions throughout the case.',
+    });
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects reviews of draft submissions', async () => {
+    const caseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_sub_draft');
+
+    // Save a draft (not a submission) and try to review it.
+    const draft = await submitter.put(`/api/cases/${caseId}/draft`).send({
+      contentJson: { framing: 'Draft content that must never enter review.' },
+    });
+    expect(draft.status).toBe(200);
+    const draftId = draft.body.draft.id as string;
+
+    const reviewer = request.agent(app);
+    await registerTestUser(reviewer, 'pr_rev_draft');
+    const response = await reviewer.post(`/api/submissions/${draftId}/reviews`).send(validReview(caseId));
+    expect(response.status).toBe(400);
+  });
+
+  it('rejects suspended and terms-gated reviewers', async () => {
+    const caseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_sub_sus');
+    const submissionId = await submitSolution(submitter, caseId);
+
+    // Suspended reviewer: session is invalidated by requireAuth.
+    const suspended = request.agent(app);
+    const suspendedUser = await registerTestUser(suspended, 'pr_rev_sus');
+    await pool.query('UPDATE users SET is_active = FALSE WHERE id = $1', [suspendedUser.id]);
+    expect((await suspended.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId))).status).toBe(401);
+
+    // Terms-gated reviewer: API access blocked until consent is recorded.
+    const gated = request.agent(app);
+    const gatedUser = await registerTestUser(gated, 'pr_rev_gate');
+    await pool.query('UPDATE users SET terms_version = NULL WHERE id = $1', [gatedUser.id]);
+    const gatedRes = await gated.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId));
+    expect(gatedRes.status).toBe(403);
+    expect(gatedRes.body.code).toBe('terms_consent_required');
+  });
+
+  it('excludes own and already-reviewed submissions from the queue', async () => {
+    const caseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_sub_q');
+    const submissionId = await submitSolution(submitter, caseId);
+
+    const reviewerA = request.agent(app);
+    await registerTestUser(reviewerA, 'pr_rev_qa');
+    const reviewerB = request.agent(app);
+    await registerTestUser(reviewerB, 'pr_rev_qb');
+
+    // Reviewer A takes the submission, then it leaves A's queue.
+    const first = await reviewerA.get(`/api/cases/${caseId}/review-queue`);
+    expect(first.body.submissionId).toBe(submissionId);
+    expect((await reviewerA.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId))).status).toBe(200);
+    expect((await reviewerA.get(`/api/cases/${caseId}/review-queue`)).status).toBe(404);
+
+    // Reviewer B still sees it (per-reviewer tracking, not per-submission).
+    const second = await reviewerB.get(`/api/cases/${caseId}/review-queue`);
+    expect(second.status).toBe(200);
+    expect(second.body.submissionId).toBe(submissionId);
+  });
+
+  it('requires authentication on all peer-review endpoints', async () => {
+    const anon = request.agent(app);
+    expect((await anon.get('/api/cases/case_x/gate-status')).status).toBe(401);
+    expect((await anon.get('/api/cases/case_x/review-queue')).status).toBe(401);
+    expect((await anon.post('/api/submissions/sub_x/reviews').send(validReview('case_x'))).status).toBe(401);
+  });
+
+  it('handles concurrent reviews without duplicate or cross-reviewer corruption', async () => {
+    const caseId = await publishCase();
+    const submitter = request.agent(app);
+    await registerTestUser(submitter, 'pr_conc_sub');
+    const submissionId = await submitSolution(submitter, caseId);
+
+    const reviewerA = request.agent(app);
+    await registerTestUser(reviewerA, 'pr_conc_a');
+    const reviewerB = request.agent(app);
+    await registerTestUser(reviewerB, 'pr_conc_b');
+
+    // Two distinct reviewers race: both reviews must persist.
+    const [ra, rb] = await Promise.all([
+      reviewerA.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId)),
+      reviewerB.post(`/api/submissions/${submissionId}/reviews`).send(validReview(caseId)),
+    ]);
+    expect(ra.status).toBe(200);
+    expect(rb.status).toBe(200);
+    const count = await pool.query<{ c: number }>(
+      'SELECT COUNT(*)::int AS c FROM reviews WHERE submission_id = $1 AND is_voided = FALSE',
+      [submissionId]
+    );
+    expect(count.rows[0].c).toBe(2);
+
+    // The same reviewer firing duplicate concurrent requests must not persist
+    // two reviews for the same submission.
+    const dupCaseId = await publishCase();
+    const submissionId2 = await submitSolution(submitter, dupCaseId);
+    const [d1, d2] = await Promise.all([
+      reviewerA.post(`/api/submissions/${submissionId2}/reviews`).send(validReview(dupCaseId)),
+      reviewerA.post(`/api/submissions/${submissionId2}/reviews`).send(validReview(dupCaseId)),
+    ]);
+    const persisted = await pool.query<{ c: number }>(
+      `SELECT COUNT(*)::int AS c FROM reviews r
+       JOIN submissions s ON s.id = r.submission_id
+       WHERE s.id = $1 AND r.is_voided = FALSE`,
+      [submissionId2]
+    );
+    expect(persisted.rows[0].c).toBeLessThanOrEqual(1);
+    expect([d1.status, d2.status].filter((s) => s === 200).length).toBeLessThanOrEqual(1);
+  });
+
+  it('accepts fractional final_weighted_score values after migration 0007', async () => {
+    const caseId = await publishCase();
+    const agent = request.agent(app);
+    await registerTestUser(agent, 'pr_float');
+    const submissionId = await submitSolution(agent, caseId);
+    await pool.query('UPDATE submissions SET final_weighted_score = 4.5 WHERE id = $1', [submissionId]);
+    const row = await pool.query<{ final_weighted_score: number }>(
+      'SELECT final_weighted_score FROM submissions WHERE id = $1', [submissionId]
+    );
+    expect(row.rows[0].final_weighted_score).toBe(4.5);
+  });
+});
+

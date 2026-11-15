@@ -1452,14 +1452,20 @@ export class DatabaseService {
     feedback: string;
   }): Promise<void> {
     const id = 'rev_' + crypto.randomUUID().slice(2, 11);
-    await db.transaction(async (tx) => {
+    try {
+      await db.transaction(async (tx) => {
       const [submission] = await tx
-        .select({ caseId: submissions.caseId, userId: submissions.userId })
+        .select({ caseId: submissions.caseId, userId: submissions.userId, status: submissions.status })
         .from(submissions)
         .where(eq(submissions.id, payload.submissionId))
         .limit(1);
       if (!submission || submission.caseId !== payload.caseId || submission.userId === payload.reviewerId) {
         throw new InvalidCaseReviewError('This submission is unavailable for your review');
+      }
+      // Reviews are only accepted while the submission is awaiting peer review.
+      // Drafts, Completed and In_Dispute submissions are closed to new reviews.
+      if (submission.status !== 'Pending_Review') {
+        throw new InvalidCaseReviewError('This submission is not open for review');
       }
 
       const [existingReview] = await tx
@@ -1488,7 +1494,26 @@ export class DatabaseService {
       await tx.update(cases)
         .set({ reviewCount: sql`${cases.reviewCount} + 1` })
         .where(eq(cases.id, payload.caseId));
-    });
+      });
+    } catch (error) {
+      // Only the duplicate-active-review constraint maps to the domain error;
+      // any other unique violation must surface as an unexpected failure.
+      const pgError = error as { code?: string; constraint?: string };
+      if (pgError?.code === '23505' && pgError?.constraint === 'reviews_submission_reviewer_active_unique') {
+        throw new InvalidCaseReviewError('You have already reviewed this submission');
+      }
+      throw error;
+    }
+  }
+
+  // Count submissions still awaiting peer review for a case (gate-status).
+  public static async getPendingReviewCountForCase(caseId: string): Promise<number> {
+    const result = await pool.query<{ count: string }>(
+      `SELECT COUNT(*)::int AS count FROM submissions
+       WHERE case_id = $1 AND status = 'Pending_Review' AND structural_compliant = TRUE`,
+      [caseId]
+    );
+    return Number(result.rows[0]?.count ?? 0);
   }
 
   public static async updateSubmissionStatus(submissionId: string, status: string): Promise<void> {

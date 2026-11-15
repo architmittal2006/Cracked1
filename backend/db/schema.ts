@@ -1,4 +1,5 @@
-import { pgTable, varchar, text, integer, boolean, timestamp, jsonb, uniqueIndex, index } from 'drizzle-orm/pg-core';
+import { sql } from 'drizzle-orm';
+import { pgTable, varchar, text, integer, boolean, timestamp, jsonb, doublePrecision, uniqueIndex, index } from 'drizzle-orm/pg-core';
 
 export const users = pgTable('users', {
   id: varchar('id', { length: 255 }).primaryKey(),
@@ -161,9 +162,9 @@ export const submissions = pgTable('submissions', {
   contentJson: jsonb('content_json').notNull(),
   citationsCount: integer('citations_count').notNull().default(0),
   wordCount: integer('word_count').notNull().default(0),
-  status: varchar('status', { length: 50 }).notNull().default('Submitted'),
+  status: varchar('status', { length: 50 }).notNull().default('Pending_Review'),
   structuralCompliant: boolean('structural_compliant').default(false),
-  finalWeightedScore: integer('final_weighted_score'),
+  finalWeightedScore: doublePrecision('final_weighted_score'),
   caseVersionId: varchar('case_version_id', { length: 255 }).references(() => caseVersions.id),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }),
@@ -179,7 +180,13 @@ export const reviews = pgTable('reviews', {
   feedback: text('feedback').notNull().default(''),
   isVoided: boolean('is_voided').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  // Mirrors migration 0008: at most one active (non-voided) review per
+  // submission+reviewer pair; voided reviews do not block re-review.
+  uniqueIndex('reviews_submission_reviewer_active_unique')
+    .on(table.submissionId, table.reviewerId)
+    .where(sql`${table.isVoided} = FALSE`),
+]);
 
 export const votes = pgTable('votes', {
   id: varchar('id', { length: 255 }).primaryKey(),
