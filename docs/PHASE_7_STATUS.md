@@ -73,3 +73,41 @@ Adjacent security/stabilisation work delivered in the same window: OAuth state-f
 Phase 7 (7A dashboard + 7B debrief) is **functionally complete, tested, merged, and deployed** (`493cd14`). The deferred peer-review cleanup (`acd9145`) is merged into local/remote `main` but **not yet deployed** — production still runs `493cd14`. The security audit's code-level blockers are resolved; `SESSION_SECRET` is provably set (production server boots under the new guard). Remaining work is **product decisions, not bugs**: the dead peer-review pipeline needs a build-or-remove decision, plus minor test-coverage and CSP-automation gaps. No new blockers discovered.
 
 **Exact next implementation task:** Phase 8 — build the real peer-review loop (`Pending_Review` transition on submit, review UI, `final_weighted_score` → float migration `0006`, re-enable the disabled endpoints).
+
+---
+
+## Phase 8.2 Production Release & Verification (2026-11-20)
+
+**Release:** `origin/main` fast-forwarded `62383e8` → `10ff24e` (5 commits: legal-consent ×3, Phase 8.2B peer-review foundation, AI-first lifecycle). Render `Cracked1-1` deployed and serves the new code; Vercel `cracked1` serves the matching frontend build (`index-Cbdizu2p.js`).
+
+### Production smoke test — PASS for tested scope
+
+Verified live against `https://cracked1-1-veul.onrender.com` on `10ff24e`:
+
+- `schema_migrations` contains 0000–0008; 0009 absent (Neon SQL Editor)
+- Student account permissions verified (General/Student, no elevated roles)
+- Ordinary submission creates `Submitted` records
+- Ordinary submissions stay outside the peer-review queue (404)
+- `POST /api/submissions/:id/request-review` promotes to `Pending_Review`
+- Submit-time `requestPeerReview: true` creates `Pending_Review` directly
+- Review queue serves eligible `Pending_Review` submissions
+- Valid rubric review accepted (`review_recorded`)
+- Duplicate review rejected (400); self-review rejected (400)
+- Case `submissionCount`/`reviewCount` counters update consistently
+- Auth (401 unauthenticated) and terms-consent protections verified
+- `gate-status` exposes aggregate counts only
+
+### PARTIAL / NOT TESTED
+
+- **Wrong-case protection:** bogus `caseId` rejected (404); true cross-case mismatch untested (only one published case exists)
+- **GitHub/Google OAuth:** NOT TESTED (interactive browser flows)
+- **Concurrent review race:** NOT TESTED in production; covered by integration suite (partial unique index `0008`)
+
+### Test artifacts (retained, no cleanup authorized)
+
+- Accounts: `devin_smoke_1` (`u_906a63-6b`), `devin_smoke_2` (`u_cda8c8-96`)
+- Submissions: `sub_5b6e62-fd` (promoted via request-review), `sub_96e703-b3` (opt-in at submit)
+- One review by `devin_smoke_2`; both submissions remain in review queue
+- Case counters: submissions 1→3, reviews 0→1
+
+**Completion statement:** Production smoke test **PASS** for the tested submission and opt-in peer-review lifecycle; OAuth, production concurrency, and cross-case mismatch testing remain outstanding.
